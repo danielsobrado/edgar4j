@@ -36,7 +36,18 @@ public class Filling {
     private String sic;
     private String fiscalYearEnd;
     private FormType formType;
-    private Date date;
+    private Date fillingDate;
+    private Date reportDate;
     private String url;
+    private String accessionNumber;
+    private String fileNumber;
+    private String filmNumber;
+    private String items;
+    private boolean isXBRL;
+    private boolean isInlineXBRL;
+    private String primaryDocument;
+    private String primaryDocDescription;
+    
+    
 
 }
