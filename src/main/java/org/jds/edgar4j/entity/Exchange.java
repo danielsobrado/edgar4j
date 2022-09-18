@@ -31,4 +31,10 @@ public class Exchange {
     private String name;
     private String code;
     private String country;
+
+    // NASDAQ = "Nasdaq"
+    // OTC = "OTC"
+    // CBOE = "CBOE"
+    // NYSE = "NYSE"
+    // NONE = ""
 }
