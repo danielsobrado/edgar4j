@@ -11,7 +11,7 @@ import org.springframework.stereotype.Service;
 @Service
 public interface Form4Service {
 
-    Form4 downloadForm4(String cik, String accessionNumber, String primaryDocument);
-    void parseForm4();
+    String downloadForm4(String cik, String accessionNumber, String primaryDocument);
+    Form4 parseForm4(String raw);
 
 }
