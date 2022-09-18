@@ -10,6 +10,6 @@ import org.springframework.stereotype.Service;
 @Service
 public interface DownloadSubmissionsService {
 
-    void downloadSubmissions();
+    void downloadSubmissions(String cik);
 
 }

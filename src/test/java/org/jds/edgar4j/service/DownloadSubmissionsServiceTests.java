@@ -1,6 +1,6 @@
 package org.jds.edgar4j.service;
 
-import org.jds.edgar4j.service.impl.DownloadTickersServiceImpl;
+import org.jds.edgar4j.service.impl.DownloadSubmissionsServiceImpl;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.runner.RunWith;
@@ -24,34 +24,19 @@ import org.springframework.test.context.junit4.SpringRunner;
         MongoAutoConfiguration.class,
         MongoDataAutoConfiguration.class })
 @TestPropertySource(properties = "spring.mongodb.embedded.version=3.5.5")
-public class DownloadTickersServiceTests {
+public class DownloadSubmissionsServiceTests {
 
     @Autowired
-    private DownloadTickersServiceImpl downloadTickersService;
+    private DownloadSubmissionsServiceImpl downloadSubmissionsService;
 
-    @DisplayName("JUnit test for downloadTickers() method")
+    @DisplayName("JUnit test for testSubmissions() method")
     @Test
-    public void testDownloadTickers() {
-
-        downloadTickersService.downloadTickers();
+    public void testSubmissions() {
+        String cik = "789019";
+        downloadSubmissionsService.downloadSubmissions(cik);
 
     }
 
-    @DisplayName("JUnit test for downloadTickersExchanges() method")
-    @Test
-    public void testDownloadTickersExchanges() {
-
-        downloadTickersService.downloadTickersExchanges();
-
-    }
-
-    @DisplayName("JUnit test for downloadTickersMFs() method")
-    @Test
-    public void testDownloadTickersMFs() {
-
-        downloadTickersService.downloadTickersMFs();
-
-    }
 
 
 }

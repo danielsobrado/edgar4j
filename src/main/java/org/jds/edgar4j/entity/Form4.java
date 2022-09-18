@@ -26,12 +26,12 @@ public class Form4 {
 
     private String securityTitle;
     private Date transactionDate;
-    provate float transactionValue;
+    private float transactionValue;
     private Date expirationDate;
     private String boughtSold;
     private float exercisePrice;
     private float exerciseShares;
-    private String ticker_element;
+    private String tickerElement;
     private String tradingSymbol;
     private String owner;
     private String rptOwnerName;
