@@ -6,6 +6,8 @@ edgar4j:
         edgarDataArchivesUrl: https://www.sec.gov/Archives/edgar/data
         submissionsUrl: https://data.sec.gov/submissions
         submissionsCIKUrl: https://data.sec.gov/submissions/CIK
+        bulkSubmissionsFileUrl: https://www.sec.gov/Archives/edgar/daily-index/bulkdata/submissions.zip 
+        bulkCompanyFactsFileUrl: https://www.sec.gov/Archives/edgar/daily-index/xbrl/companyfacts.zip
         companyTickersUrl: https://www.sec.gov/files/company_tickers.json
         companyTickersExchangesUrl: https://www.sec.gov/files/company_tickers_exchange.json
         companyTickersMFsUrl: https://www.sec.gov/files/company_tickers_mf.json
