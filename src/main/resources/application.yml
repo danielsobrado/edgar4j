@@ -1,1 +1,14 @@
 
+edgar4j:
+    urls:
+        baseSecUrl: https://www.sec.gov
+        baseDataSecUrl: https://data.sec.gov
+        edgarDataArchives: https://www.sec.gov/Archives/edgar/data
+        companyTickerExchange: https://www.sec.gov/files/company_tickers_exchange.json
+        submissions: https://data.sec.gov/submissions
+        submissionsCIK: https://data.sec.gov/submissions/CIK
+        companyTickers: https://www.sec.gov/files/company_tickers.json
+        companyTickersExchange: https://www.sec.gov/files/company_tickers_exchange.json
+        companyTickersMF: https://www.sec.gov/files/company_tickers_mf.json
+
+        
