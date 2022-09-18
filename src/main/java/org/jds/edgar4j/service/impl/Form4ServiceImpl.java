@@ -4,6 +4,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.concurrent.CompletableFuture;
 
 import org.jds.edgar4j.entity.Form4;
 import org.jds.edgar4j.service.Form4Service;
@@ -35,22 +36,19 @@ public class Form4ServiceImpl implements Form4Service {
         // else:
         //     owner = 'Unknown'
 
-        public String downloadForm4(String cik, String accessionNumber, String primaryDocument) {
+        public CompletableFuture<HttpResponse<String>> downloadForm4(String cik, String accessionNumber, String primaryDocument) {
                 log.info("Download form 4");
 
                 final String formURL = edgarDataArchivesUrl + "/" + cik + "/" + accessionNumber.replace("-", "") + "/" + primaryDocument;
 
                 log.debug("Form URL: {}", formURL);
 
-                final HttpClient client = HttpClient.newHttpClient();
-                HttpRequest request = HttpRequest.newBuilder()
+                final HttpClient httpClient = HttpClient.newHttpClient();
+                HttpRequest httpRequest = HttpRequest.newBuilder()
                         .uri(URI.create(formURL))
                         .build();
-                client.sendAsync(request, HttpResponse.BodyHandlers.ofString())
-                        .thenApply(HttpResponse::body)
-                        .thenAccept(System.out::println)
-                        .join();
-                return "";
+                HttpResponse.BodyHandler<String> bodyHandler = HttpResponse.BodyHandlers.ofString();
+                return httpClient.sendAsync(httpRequest, bodyHandler);
         }
         
         public Form4 parseForm4(String raw) {

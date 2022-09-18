@@ -1,5 +1,8 @@
 package org.jds.edgar4j.service;
 
+import java.net.http.HttpResponse;
+import java.util.concurrent.CompletableFuture;
+
 import org.jds.edgar4j.entity.Form4;
 import org.springframework.stereotype.Service;
 
@@ -11,7 +14,7 @@ import org.springframework.stereotype.Service;
 @Service
 public interface Form4Service {
 
-    String downloadForm4(String cik, String accessionNumber, String primaryDocument);
+    CompletableFuture<HttpResponse<String>> downloadForm4(String cik, String accessionNumber, String primaryDocument);
     Form4 parseForm4(String raw);
 
 }
