@@ -25,6 +25,8 @@ https://www.sec.gov/Archives/edgar/data/{CIK}/{AccessionNumber}/{PrimaryDocument
 
 Example from Microsoft: https://www.sec.gov/Archives/edgar/data/789019/000162643116000118/xslF345X03/edgar.xml
 
+**Note**: Remove '-' from the Accession Number.
+
 ## Bulk
 
 ## Forms
@@ -39,12 +41,12 @@ Form 13F is a quarterly report that is required to be filed by all institutional
 
 ### Insider Transactions: 3, 4 and 5
 
-SEC Form 4: Statement of Changes in Beneficial Ownership? SEC Form 4: Statement of Changes in Beneficial Ownership is a document that must be filed with the Securities and Exchange Commission (SEC) whenever there is a material change in the holdings of company insiders.
+**SEC Form 4**: Statement of Changes in Beneficial Ownership? SEC Form 4: Statement of Changes in Beneficial Ownership is a document that must be filed with the Securities and Exchange Commission (SEC) whenever there is a material change in the holdings of company insiders.
 
-Form 3 is a document that a company insider or major shareholder must file with the SEC. The information provided on the form is meant to disclose the holdings of directors, officers, and beneficial owners of registered companies and becomes public record.
+**SEC Form 3**: Is a document that a company insider or major shareholder must file with the SEC. The information provided on the form is meant to disclose the holdings of directors, officers, and beneficial owners of registered companies and becomes public record.
 
-SEC Form 5: Annual Statement of Changes in Beneficial Ownership of Securities is a document that company insiders must file with the Securities and Exchange Commission (SEC) if they have conducted transactions in the company's securities during the year.
+**SEC Form 5**: Annual Statement of Changes in Beneficial Ownership of Securities is a document that company insiders must file with the Securities and Exchange Commission (SEC) if they have conducted transactions in the company's securities during the year.
 
 ## Terms
 
-Accession Number: Unique for each filling
+**Accession Number**: Unique for each filling
