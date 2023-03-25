@@ -1,17 +1,11 @@
-package org.jds.edgar4j.entity;
-
-import java.util.Date;
-
-import org.springframework.data.annotation.Id;
+package org.jds.edgar4j.model;
 
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
+import lombok.*;
+import org.springframework.data.annotation.Id;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
-import lombok.NoArgsConstructor;
+import java.util.Date;
 
 
 /**

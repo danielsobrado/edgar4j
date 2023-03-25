@@ -1,4 +1,3 @@
-
 edgar4j:
     urls:
         baseSecUrl: https://www.sec.gov
@@ -6,15 +5,18 @@ edgar4j:
         edgarDataArchivesUrl: https://www.sec.gov/Archives/edgar/data
         submissionsUrl: https://data.sec.gov/submissions
         submissionsCIKUrl: https://data.sec.gov/submissions/CIK
-        bulkSubmissionsFileUrl: https://www.sec.gov/Archives/edgar/daily-index/bulkdata/submissions.zip 
+        bulkSubmissionsFileUrl: https://www.sec.gov/Archives/edgar/daily-index/bulkdata/submissions.zip
         bulkCompanyFactsFileUrl: https://www.sec.gov/Archives/edgar/daily-index/xbrl/companyfacts.zip
         companyTickersUrl: https://www.sec.gov/files/company_tickers.json
         companyTickersExchangesUrl: https://www.sec.gov/files/company_tickers_exchange.json
         companyTickersMFsUrl: https://www.sec.gov/files/company_tickers_mf.json
     persistence:
-        database: mongodb
-spring.data.mongodb:
-    url: mongodb+srv://admin:admin@localhost/edgar?retryWrites=true&w=majority
-    database: edgar
-    port: 27017
-    repositories.enabled: true
+        database: elasticsearch
+
+spring:
+    data:
+        elasticsearch:
+            cluster-name: your-cluster-name
+            cluster-nodes: your-elasticsearch-url:9200
+            repositories:
+                enabled: true

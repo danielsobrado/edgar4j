@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  edgar4j-elasticsearch:
+    build: .
+    container_name: edgar4j-elasticsearch
+    depends_on:
+      - elasticsearch
+    environment:
+      - SPRING_DATA_ELASTICSEARCH_CLUSTER_NAME=elasticsearch
+      - SPRING_DATA_ELASTICSEARCH_CLUSTER_NODES=elasticsearch:9200
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.16.3
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.16.3
+    container_name: kibana
+    depends_on:
+      - elasticsearch
+    ports:
+      - "5601:5601"
+
+  superset:
+    image: apache/superset:latest
+    container_name: superset
+    environment:
+      - POSTGRES_USER=superset
+      - POSTGRES_PASSWORD=superset
+      - POSTGRES_DB=superset
+      - SUPERSET_USERNAME=YOUR_SUPERSET_USERNAME
+      - SUPERSET_PASSWORD=YOUR_SUPERSET_PASSWORD
+    ports:
+      - "8088:8088"
+    depends_on:
+      - superset-db
+      - elasticsearch
+
+  superset-db:
+    image: postgres:13
+    container_name: superset-db
+    environment:
+      - POSTGRES_USER=superset
+      - POSTGRES_PASSWORD=superset
+      - POSTGRES_DB=superset
+    volumes:
+      - superset-data:/var/lib/postgresql/data
+
+volumes:
+  esdata:
+  superset-data:

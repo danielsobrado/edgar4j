@@ -1,4 +1,4 @@
-package org.jds.edgar4j.entity;
+package org.jds.edgar4j.model;
 
 import org.springframework.data.annotation.Id;
 
@@ -23,18 +23,13 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-public class Exchange {
+public class Ticker {
 
     @Id
     private String id;
   
-    private String name;
     private String code;
-    private String country;
-
-    // NASDAQ = "Nasdaq"
-    // OTC = "OTC"
-    // CBOE = "CBOE"
-    // NYSE = "NYSE"
-    // NONE = ""
+    private String name;
+    private String cik;
+    private Exchange exchange;
 }
