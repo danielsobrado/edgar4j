@@ -16,6 +16,7 @@ import org.jds.edgar4j.model.report.ClusterBuy;
 import org.jds.edgar4j.model.report.InsiderBuy;
 import org.jds.edgar4j.repository.Form4Repository;
 import org.jds.edgar4j.service.InsiderBuyAggregationService;
+import org.jds.edgar4j.service.IndustryLookupService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -39,6 +40,9 @@ public class InsiderBuyAggregationServiceImpl implements InsiderBuyAggregationSe
 
     @Autowired
     private Form4Repository form4Repository;
+
+    @Autowired
+    private IndustryLookupService industryLookupService;
 
     @Override
     public Page<ClusterBuy> getLatestClusterBuys(int days, int minInsiders, Pageable pageable) {
@@ -291,6 +295,12 @@ public class InsiderBuyAggregationServiceImpl implements InsiderBuyAggregationSe
     private InsiderBuy convertTransactionToInsiderBuy(Form4 form4, ReportingOwner owner,
                                                        NonDerivativeTransaction transaction) {
         try {
+            // Lookup industry for this company
+            String industry = null;
+            if (form4.getIssuerCik() != null) {
+                industry = industryLookupService.getIndustryByCik(form4.getIssuerCik());
+            }
+
             InsiderBuy buy = InsiderBuy.builder()
                 .accessionNumber(form4.getAccessionNumber())
                 .filingDate(form4.getFilingDate())
@@ -298,6 +308,7 @@ public class InsiderBuyAggregationServiceImpl implements InsiderBuyAggregationSe
                 .ticker(form4.getTradingSymbol())
                 .companyName(form4.getIssuerName())
                 .companyCik(form4.getIssuerCik())
+                .industry(industry)
                 .insiderName(owner.getName())
                 .insiderCik(owner.getCik())
                 .insiderTitle(owner.getRelationshipDescription())

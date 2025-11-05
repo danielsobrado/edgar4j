@@ -46,6 +46,9 @@ public class InsiderBuy {
     /** Company CIK */
     private String companyCik;
 
+    /** Industry classification (e.g., "State Commercial Banks") */
+    private String industry;
+
     /** Insider's full name */
     private String insiderName;
 

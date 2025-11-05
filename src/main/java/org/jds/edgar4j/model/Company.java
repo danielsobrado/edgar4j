@@ -13,9 +13,11 @@ import lombok.NoArgsConstructor;
 
 
 /**
+ * Company model with industry classification
+ *
  * @author J. Daniel Sobrado
- * @version 1.0
- * @since 2022-09-18
+ * @version 1.1
+ * @since 2025-11-05
  */
 @EqualsAndHashCode(callSuper=false)
 @Builder
@@ -27,11 +29,23 @@ public class Company {
 
     @Id
     private String id;
-  
+
     private String name;
     private String description;
     private String ticker;
     private String cik;
     private String taxonomy;
+
+    /** SIC (Standard Industrial Classification) code */
+    private String sic;
+
+    /** Industry classification description (from SIC code) */
+    private String industry;
+
+    /** Entity type (e.g., operating company, shell company) */
+    private String entityType;
+
+    /** State/country of incorporation */
+    private String stateOfIncorporation;
 
 }

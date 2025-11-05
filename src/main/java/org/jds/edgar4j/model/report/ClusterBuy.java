@@ -199,6 +199,7 @@ public class ClusterBuy {
         this.ticker = first.getTicker();
         this.companyName = first.getCompanyName();
         this.companyCik = first.getCompanyCik();
+        this.industry = first.getIndustry();
         this.tradeType = first.getFormattedTradeType();
     }
 

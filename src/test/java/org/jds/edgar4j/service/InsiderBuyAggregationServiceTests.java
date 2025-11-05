@@ -12,6 +12,7 @@ import org.jds.edgar4j.model.ReportingOwner;
 import org.jds.edgar4j.model.report.ClusterBuy;
 import org.jds.edgar4j.model.report.InsiderBuy;
 import org.jds.edgar4j.repository.Form4Repository;
+import org.jds.edgar4j.service.IndustryLookupService;
 import org.jds.edgar4j.service.impl.InsiderBuyAggregationServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -44,6 +45,9 @@ public class InsiderBuyAggregationServiceTests {
     @Mock
     private Form4Repository form4Repository;
 
+    @Mock
+    private IndustryLookupService industryLookupService;
+
     @InjectMocks
     private InsiderBuyAggregationServiceImpl aggregationService;
 
@@ -52,6 +56,18 @@ public class InsiderBuyAggregationServiceTests {
     @BeforeEach
     public void setUp() {
         testForm4s = createTestForm4Data();
+
+        // Setup industry lookup mock to return test industries
+        when(industryLookupService.getIndustryByCik(anyString()))
+            .thenAnswer(invocation -> {
+                String cik = invocation.getArgument(0);
+                if (cik != null && cik.contains("AAPL")) {
+                    return "Electronic Computers";
+                } else if (cik != null && cik.contains("MSFT")) {
+                    return "Prepackaged Software";
+                }
+                return "Unknown Industry";
+            });
     }
 
     @DisplayName("Test get latest cluster buys")
@@ -354,6 +370,58 @@ public class InsiderBuyAggregationServiceTests {
         // Verify
         assertNotNull(result);
         assertFalse(result.isEmpty());
+    }
+
+    @DisplayName("Test industry classification populated in cluster buys")
+    @Test
+    public void testIndustryClassificationInClusterBuys() {
+        // Setup mock
+        Page<Form4> form4Page = new PageImpl<>(testForm4s);
+        when(form4Repository.findByFilingDateBetween(any(), any(), any()))
+            .thenReturn(form4Page);
+
+        // Execute
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<ClusterBuy> result = aggregationService.getLatestClusterBuys(30, 2, pageable);
+
+        // Verify
+        assertNotNull(result);
+        assertFalse(result.isEmpty());
+
+        ClusterBuy cluster = result.getContent().get(0);
+        assertNotNull(cluster.getIndustry());
+        assertEquals("Electronic Computers", cluster.getIndustry());
+    }
+
+    @DisplayName("Test industry classification populated in insider buys")
+    @Test
+    public void testIndustryClassificationInInsiderBuys() {
+        // Setup mock
+        Page<Form4> form4Page = new PageImpl<>(testForm4s);
+        when(form4Repository.findByFilingDateBetween(any(), any(), any()))
+            .thenReturn(form4Page);
+
+        // Execute
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<InsiderBuy> result = aggregationService.getLatestInsiderBuys(30, pageable);
+
+        // Verify
+        assertNotNull(result);
+        assertFalse(result.isEmpty());
+
+        // Check AAPL buys have correct industry
+        long appleCount = result.getContent().stream()
+            .filter(buy -> "AAPL".equals(buy.getTicker()))
+            .filter(buy -> "Electronic Computers".equals(buy.getIndustry()))
+            .count();
+        assertEquals(2, appleCount);
+
+        // Check MSFT buy has correct industry
+        long msftCount = result.getContent().stream()
+            .filter(buy -> "MSFT".equals(buy.getTicker()))
+            .filter(buy -> "Prepackaged Software".equals(buy.getIndustry()))
+            .count();
+        assertEquals(1, msftCount);
     }
 
     /**
