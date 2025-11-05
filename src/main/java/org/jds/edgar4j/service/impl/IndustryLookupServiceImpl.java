@@ -32,7 +32,7 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 public class IndustryLookupServiceImpl implements IndustryLookupService {
 
-    @Value("${edgar4j.urls.submissionsCIKUrl}")
+    @Value("${edgar4j.urls.submissionsCIKUrl:https://data.sec.gov/submissions/CIK}")
     private String submissionsCIKUrl;
 
     private final HttpClient httpClient;
@@ -40,13 +40,25 @@ public class IndustryLookupServiceImpl implements IndustryLookupService {
     private final Map<String, Company> cache;
     private final DecimalFormat cikFormatter;
 
+    /**
+     * Default constructor for production use
+     */
     public IndustryLookupServiceImpl() {
-        this.httpClient = HttpClient.newBuilder()
+        this(HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
-            .build();
+            .build());
+    }
+
+    /**
+     * Constructor for testing with mocked HttpClient
+     * @param httpClient the HTTP client to use
+     */
+    public IndustryLookupServiceImpl(HttpClient httpClient) {
+        this.httpClient = httpClient;
         this.objectMapper = new ObjectMapper();
         this.cache = new ConcurrentHashMap<>();
         this.cikFormatter = new DecimalFormat("0000000000");
+        this.submissionsCIKUrl = "https://data.sec.gov/submissions/CIK";
     }
 
     @Override
