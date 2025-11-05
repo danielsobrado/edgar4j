@@ -1,0 +1,195 @@
+{
+  "properties": {
+    "accessionNumber": {
+      "type": "keyword"
+    },
+    "filingDate": {
+      "type": "date",
+      "format": "strict_date_optional_time||epoch_millis"
+    },
+    "periodOfReport": {
+      "type": "date",
+      "format": "strict_date_optional_time||epoch_millis"
+    },
+    "issuerCik": {
+      "type": "keyword"
+    },
+    "issuerName": {
+      "type": "text",
+      "fields": {
+        "keyword": {
+          "type": "keyword",
+          "ignore_above": 256
+        }
+      }
+    },
+    "tradingSymbol": {
+      "type": "keyword"
+    },
+    "reportingOwners": {
+      "type": "nested",
+      "properties": {
+        "cik": {
+          "type": "keyword"
+        },
+        "name": {
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
+        },
+        "lastName": {
+          "type": "keyword"
+        },
+        "firstName": {
+          "type": "keyword"
+        },
+        "middleName": {
+          "type": "keyword"
+        },
+        "isDirector": {
+          "type": "boolean"
+        },
+        "isOfficer": {
+          "type": "boolean"
+        },
+        "isTenPercentOwner": {
+          "type": "boolean"
+        },
+        "isOther": {
+          "type": "boolean"
+        },
+        "officerTitle": {
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword"
+            }
+          }
+        },
+        "otherText": {
+          "type": "text"
+        }
+      }
+    },
+    "nonDerivativeTransactions": {
+      "type": "nested",
+      "properties": {
+        "securityTitle": {
+          "type": "keyword"
+        },
+        "transactionDate": {
+          "type": "date",
+          "format": "strict_date_optional_time||epoch_millis"
+        },
+        "deemedExecutionDate": {
+          "type": "date",
+          "format": "strict_date_optional_time||epoch_millis"
+        },
+        "transactionCode": {
+          "type": "keyword"
+        },
+        "transactionCodeV": {
+          "type": "keyword"
+        },
+        "transactionShares": {
+          "type": "double"
+        },
+        "acquiredDisposedCode": {
+          "type": "keyword"
+        },
+        "transactionPricePerShare": {
+          "type": "double"
+        },
+        "sharesOwnedFollowingTransaction": {
+          "type": "double"
+        },
+        "directOrIndirectOwnership": {
+          "type": "keyword"
+        },
+        "natureOfOwnership": {
+          "type": "text"
+        }
+      }
+    },
+    "derivativeTransactions": {
+      "type": "nested",
+      "properties": {
+        "securityTitle": {
+          "type": "keyword"
+        },
+        "conversionOrExercisePrice": {
+          "type": "double"
+        },
+        "transactionDate": {
+          "type": "date",
+          "format": "strict_date_optional_time||epoch_millis"
+        },
+        "transactionCode": {
+          "type": "keyword"
+        },
+        "securitiesAcquired": {
+          "type": "double"
+        },
+        "securitiesDisposed": {
+          "type": "double"
+        },
+        "dateExercisable": {
+          "type": "date",
+          "format": "strict_date_optional_time||epoch_millis"
+        },
+        "expirationDate": {
+          "type": "date",
+          "format": "strict_date_optional_time||epoch_millis"
+        },
+        "underlyingSecurityTitle": {
+          "type": "keyword"
+        },
+        "underlyingSecurityShares": {
+          "type": "double"
+        },
+        "derivativeSecurityPrice": {
+          "type": "double"
+        },
+        "securitiesOwnedFollowingTransaction": {
+          "type": "double"
+        },
+        "directOrIndirectOwnership": {
+          "type": "keyword"
+        }
+      }
+    },
+    "footnotes": {
+      "type": "text"
+    },
+    "remarks": {
+      "type": "text"
+    },
+    "signature": {
+      "type": "text"
+    },
+    "signatureDate": {
+      "type": "date",
+      "format": "strict_date_optional_time||epoch_millis"
+    },
+    "isAmendment": {
+      "type": "boolean"
+    },
+    "originalFilingDate": {
+      "type": "date",
+      "format": "strict_date_optional_time||epoch_millis"
+    },
+    "notSubjectToSection16": {
+      "type": "boolean"
+    },
+    "formFiledByMultiplePersons": {
+      "type": "boolean"
+    },
+    "documentUrl": {
+      "type": "keyword"
+    }
+  }
+}
