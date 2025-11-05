@@ -1,0 +1,46 @@
+{
+  "mappings": {
+    "properties": {
+      "accessionNumber": {
+        "type": "keyword"
+      },
+      "cik": {
+        "type": "keyword"
+      },
+      "filingDate": {
+        "type": "date",
+        "format": "strict_date"
+      },
+      "downloadedAt": {
+        "type": "date"
+      },
+      "status": {
+        "type": "keyword"
+      },
+      "sourceUrl": {
+        "type": "text",
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "ignore_above": 256
+          }
+        }
+      },
+      "errorMessage": {
+        "type": "text"
+      },
+      "retryCount": {
+        "type": "integer"
+      },
+      "lastAttemptAt": {
+        "type": "date"
+      },
+      "processedAt": {
+        "type": "date"
+      },
+      "processingDurationMs": {
+        "type": "long"
+      }
+    }
+  }
+}

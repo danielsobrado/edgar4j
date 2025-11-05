@@ -8,6 +8,7 @@ import org.elasticsearch.client.indices.GetIndexRequest;
 import org.elasticsearch.client.indices.PutMappingRequest;
 import org.elasticsearch.xcontent.XContentType;
 import org.jds.edgar4j.model.DailyMasterIndex;
+import org.jds.edgar4j.model.DownloadHistory;
 import org.jds.edgar4j.model.Form4;
 import org.jds.edgar4j.model.MasterIndexEntry;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,6 +34,7 @@ public class ElasticsearchStartup implements ApplicationRunner {
         createIndexAndMappingIfNeeded(MasterIndexEntry.class, "master_index_entry", "mappings/master_index_entry_mapping.json");
         createIndexAndMappingIfNeeded(DailyMasterIndex.class, "daily_master_index", "mappings/daily_master_index_mapping.json");
         createIndexAndMappingIfNeeded(Form4.class, "form4", "mappings/form4_mapping.json");
+        createIndexAndMappingIfNeeded(DownloadHistory.class, "download_history", "mappings/download_history_mapping.json");
     }
 
     private void createIndexAndMappingIfNeeded(Class<?> entityClass, String indexName, String mappingResourcePath) {
