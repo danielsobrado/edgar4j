@@ -4,6 +4,9 @@
       "accessionNumber": {
         "type": "keyword"
       },
+      "formType": {
+        "type": "keyword"
+      },
       "cik": {
         "type": "keyword"
       },

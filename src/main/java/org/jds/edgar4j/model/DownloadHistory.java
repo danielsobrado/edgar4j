@@ -14,10 +14,11 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * Tracks Form 4 download history for pipeline management
+ * Tracks insider form download history for pipeline management
+ * Supports Forms 3, 4, and 5
  *
  * @author J. Daniel Sobrado
- * @version 1.0
+ * @version 2.0
  * @since 2025-11-05
  */
 @Data
@@ -35,6 +36,12 @@ public class DownloadHistory {
      */
     @Field(type = FieldType.Keyword)
     private String accessionNumber;
+
+    /**
+     * Form type (3, 4, or 5)
+     */
+    @Field(type = FieldType.Keyword)
+    private String formType;
 
     /**
      * Company CIK

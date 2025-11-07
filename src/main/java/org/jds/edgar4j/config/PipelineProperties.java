@@ -6,10 +6,11 @@ import org.springframework.context.annotation.Configuration;
 import lombok.Data;
 
 /**
- * Configuration properties for Form 4 download pipeline
+ * Configuration properties for insider form download pipeline
+ * Supports Forms 3, 4, and 5
  *
  * @author J. Daniel Sobrado
- * @version 1.0
+ * @version 2.0
  * @since 2025-11-05
  */
 @Data
@@ -26,6 +27,12 @@ public class PipelineProperties {
      * Cron expression for scheduled downloads (default: daily at 6 PM EST)
      */
     private String schedule = "0 0 18 * * ?";
+
+    /**
+     * Comma-separated list of form types to download (3, 4, 5)
+     * Default: "3,4,5" (all insider forms)
+     */
+    private String formTypes = "3,4,5";
 
     /**
      * Number of days to look back for new filings (default: 3 days)
@@ -78,9 +85,10 @@ public class PipelineProperties {
     private String userAgent = "edgar4j/1.0 (compliance@example.com)";
 
     /**
-     * SEC RSS feed URL for latest Form 4 filings
+     * SEC RSS feed URL for latest insider form filings
+     * Placeholders: {type}, {start}, {count}
      */
-    private String rssFeedUrl = "https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&type=4&company=&dateb=&owner=include&start={start}&count={count}&output=atom";
+    private String rssFeedUrl = "https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&type={type}&company=&dateb=&owner=include&start={start}&count={count}&output=atom";
 
     /**
      * SEC EDGAR archives base URL
