@@ -1,172 +1,57 @@
 package org.jds.edgar4j.model;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-
-import org.springframework.data.annotation.Id;
-import org.springframework.data.elasticsearch.annotations.Document;
-import org.springframework.data.elasticsearch.annotations.Field;
-import org.springframework.data.elasticsearch.annotations.FieldType;
-
-import com.fasterxml.jackson.databind.PropertyNamingStrategies;
-import com.fasterxml.jackson.databind.annotation.JsonNaming;
-
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
-import lombok.NoArgsConstructor;
-
 /**
- * Enhanced SEC Form 4 model representing a Statement of Changes in Beneficial Ownership
- * Filed by company insiders (directors, officers, 10% owners) when they buy or sell company stock
+ * Backwards compatibility wrapper for Form 4
+ * This class is deprecated - use InsiderForm with formType="4" instead
  *
+ * Form 4: Statement of Changes in Beneficial Ownership
+ * Filed by company insiders when they buy or sell company stock
+ *
+ * @deprecated Use {@link InsiderForm} with formType="4" instead
  * @author J. Daniel Sobrado
- * @version 2.0
+ * @version 3.0
  * @since 2025-11-05
  */
-@EqualsAndHashCode(callSuper=false)
-@Builder
-@Data
-@AllArgsConstructor
-@NoArgsConstructor
-@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-@Document(indexName = "form4")
-public class Form4 {
+@Deprecated
+public class Form4 extends InsiderForm {
 
-    /** Unique identifier - combination of accessionNumber */
-    @Id
-    private String id;
-
-    /** SEC Accession Number (unique filing identifier) */
-    @Field(type = FieldType.Keyword)
-    private String accessionNumber;
-
-    /** Date and time the form was filed with SEC */
-    @Field(type = FieldType.Date)
-    private LocalDateTime filingDate;
-
-    /** Date of earliest transaction reported in this filing */
-    @Field(type = FieldType.Date)
-    private LocalDate periodOfReport;
-
-    /** Issuer (company) CIK */
-    @Field(type = FieldType.Keyword)
-    private String issuerCik;
-
-    /** Issuer (company) name */
-    @Field(type = FieldType.Text)
-    private String issuerName;
-
-    /** Trading symbol (ticker) */
-    @Field(type = FieldType.Keyword)
-    private String tradingSymbol;
-
-    /** Reporting owner(s) information - can have multiple owners in one filing */
-    @Field(type = FieldType.Nested)
-    @Builder.Default
-    private List<ReportingOwner> reportingOwners = new ArrayList<>();
-
-    /** Non-derivative transactions (Table I) - common stock, preferred stock, etc. */
-    @Field(type = FieldType.Nested)
-    @Builder.Default
-    private List<NonDerivativeTransaction> nonDerivativeTransactions = new ArrayList<>();
-
-    /** Derivative transactions (Table II) - options, warrants, RSUs, etc. */
-    @Field(type = FieldType.Nested)
-    @Builder.Default
-    private List<DerivativeTransaction> derivativeTransactions = new ArrayList<>();
-
-    /** Footnotes and remarks */
-    @Field(type = FieldType.Text)
-    private String footnotes;
-
-    /** Remarks */
-    @Field(type = FieldType.Text)
-    private String remarks;
-
-    /** Signature */
-    @Field(type = FieldType.Text)
-    private String signature;
-
-    /** Signature date */
-    @Field(type = FieldType.Date)
-    private LocalDate signatureDate;
-
-    /** Is this an amendment to a previously filed Form 4? */
-    private boolean isAmendment;
-
-    /** Original filing date (if amendment) */
-    @Field(type = FieldType.Date)
-    private LocalDate originalFilingDate;
-
-    /** No longer subject to Section 16 */
-    private boolean notSubjectToSection16;
-
-    /** Form filed by multiple reporting persons */
-    private boolean formFiledByMultiplePersons;
-
-    /** XML document URL */
-    @Field(type = FieldType.Keyword)
-    private String documentUrl;
-
-    /**
-     * Get the primary reporting owner (first owner in the list)
-     * @return primary reporting owner or null if none
-     */
-    public ReportingOwner getPrimaryReportingOwner() {
-        return reportingOwners != null && !reportingOwners.isEmpty()
-            ? reportingOwners.get(0)
-            : null;
+    public Form4() {
+        super();
+        setFormType("4");
     }
 
     /**
-     * Check if this filing contains any purchase transactions
-     * @return true if there are any purchases
+     * Create Form4 from InsiderForm
+     * @param insiderForm the insider form to convert
+     * @return Form4 instance
      */
-    public boolean hasPurchases() {
-        if (nonDerivativeTransactions != null) {
-            return nonDerivativeTransactions.stream().anyMatch(NonDerivativeTransaction::isPurchase);
+    public static Form4 from(InsiderForm insiderForm) {
+        if (!"4".equals(insiderForm.getFormType())) {
+            throw new IllegalArgumentException("Cannot create Form4 from formType=" + insiderForm.getFormType());
         }
-        return false;
-    }
 
-    /**
-     * Check if this filing contains any sale transactions
-     * @return true if there are any sales
-     */
-    public boolean hasSales() {
-        if (nonDerivativeTransactions != null) {
-            return nonDerivativeTransactions.stream().anyMatch(NonDerivativeTransaction::isSale);
-        }
-        return false;
-    }
+        Form4 form4 = new Form4();
+        // Copy all fields from parent
+        form4.setId(insiderForm.getId());
+        form4.setAccessionNumber(insiderForm.getAccessionNumber());
+        form4.setFilingDate(insiderForm.getFilingDate());
+        form4.setPeriodOfReport(insiderForm.getPeriodOfReport());
+        form4.setIssuerCik(insiderForm.getIssuerCik());
+        form4.setIssuerName(insiderForm.getIssuerName());
+        form4.setTradingSymbol(insiderForm.getTradingSymbol());
+        form4.setReportingOwners(insiderForm.getReportingOwners());
+        form4.setNonDerivativeTransactions(insiderForm.getNonDerivativeTransactions());
+        form4.setDerivativeTransactions(insiderForm.getDerivativeTransactions());
+        form4.setFootnotes(insiderForm.getFootnotes());
+        form4.setRemarks(insiderForm.getRemarks());
+        form4.setSignature(insiderForm.getSignature());
+        form4.setSignatureDate(insiderForm.getSignatureDate());
+        form4.setAmendment(insiderForm.isAmendment());
+        form4.setOriginalFilingDate(insiderForm.getOriginalFilingDate());
+        form4.setNotSubjectToSection16(insiderForm.isNotSubjectToSection16());
+        form4.setFormFiledByMultiplePersons(insiderForm.isFormFiledByMultiplePersons());
+        form4.setDocumentUrl(insiderForm.getDocumentUrl());
 
-    /**
-     * Get all purchase transactions from this filing
-     * @return list of purchase transactions
-     */
-    public List<NonDerivativeTransaction> getPurchaseTransactions() {
-        if (nonDerivativeTransactions == null) {
-            return new ArrayList<>();
-        }
-        return nonDerivativeTransactions.stream()
-            .filter(NonDerivativeTransaction::isPurchase)
-            .toList();
-    }
-
-    /**
-     * Get all sale transactions from this filing
-     * @return list of sale transactions
-     */
-    public List<NonDerivativeTransaction> getSaleTransactions() {
-        if (nonDerivativeTransactions == null) {
-            return new ArrayList<>();
-        }
-        return nonDerivativeTransactions.stream()
-            .filter(NonDerivativeTransaction::isSale)
-            .toList();
+        return form4;
     }
 }
