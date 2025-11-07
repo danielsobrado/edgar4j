@@ -1,0 +1,218 @@
+{
+  "mappings": {
+    "properties": {
+      "formType": {
+        "type": "keyword"
+      },
+      "accessionNumber": {
+        "type": "keyword"
+      },
+      "filingDate": {
+        "type": "date"
+      },
+      "periodOfReport": {
+        "type": "date",
+        "format": "strict_date"
+      },
+      "issuerCik": {
+        "type": "keyword"
+      },
+      "issuerName": {
+        "type": "text",
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "ignore_above": 256
+          }
+        }
+      },
+      "tradingSymbol": {
+        "type": "keyword"
+      },
+      "reportingOwners": {
+        "type": "nested",
+        "properties": {
+          "cik": {
+            "type": "keyword"
+          },
+          "name": {
+            "type": "text",
+            "fields": {
+              "keyword": {
+                "type": "keyword",
+                "ignore_above": 256
+              }
+            }
+          },
+          "street1": {
+            "type": "text"
+          },
+          "street2": {
+            "type": "text"
+          },
+          "city": {
+            "type": "text"
+          },
+          "stateOrCountry": {
+            "type": "keyword"
+          },
+          "zipCode": {
+            "type": "keyword"
+          },
+          "isDirector": {
+            "type": "boolean"
+          },
+          "isOfficer": {
+            "type": "boolean"
+          },
+          "isTenPercentOwner": {
+            "type": "boolean"
+          },
+          "isOther": {
+            "type": "boolean"
+          },
+          "officerTitle": {
+            "type": "text"
+          },
+          "otherText": {
+            "type": "text"
+          }
+        }
+      },
+      "nonDerivativeTransactions": {
+        "type": "nested",
+        "properties": {
+          "securityTitle": {
+            "type": "text"
+          },
+          "transactionDate": {
+            "type": "date",
+            "format": "strict_date"
+          },
+          "deemedExecutionDate": {
+            "type": "date",
+            "format": "strict_date"
+          },
+          "transactionCode": {
+            "type": "keyword"
+          },
+          "equitySwapInvolved": {
+            "type": "boolean"
+          },
+          "transactionShares": {
+            "type": "scaled_float",
+            "scaling_factor": 100
+          },
+          "transactionPricePerShare": {
+            "type": "scaled_float",
+            "scaling_factor": 100
+          },
+          "acquiredDisposedCode": {
+            "type": "keyword"
+          },
+          "sharesOwnedFollowingTransaction": {
+            "type": "scaled_float",
+            "scaling_factor": 100
+          },
+          "directOrIndirectOwnership": {
+            "type": "keyword"
+          },
+          "natureOfOwnership": {
+            "type": "text"
+          }
+        }
+      },
+      "derivativeTransactions": {
+        "type": "nested",
+        "properties": {
+          "securityTitle": {
+            "type": "text"
+          },
+          "conversionOrExercisePrice": {
+            "type": "scaled_float",
+            "scaling_factor": 100
+          },
+          "transactionDate": {
+            "type": "date",
+            "format": "strict_date"
+          },
+          "deemedExecutionDate": {
+            "type": "date",
+            "format": "strict_date"
+          },
+          "transactionCode": {
+            "type": "keyword"
+          },
+          "equitySwapInvolved": {
+            "type": "boolean"
+          },
+          "securitiesAcquired": {
+            "type": "scaled_float",
+            "scaling_factor": 100
+          },
+          "securitiesDisposed": {
+            "type": "scaled_float",
+            "scaling_factor": 100
+          },
+          "transactionPricePerShare": {
+            "type": "scaled_float",
+            "scaling_factor": 100
+          },
+          "acquiredDisposedCode": {
+            "type": "keyword"
+          },
+          "expirationDate": {
+            "type": "date",
+            "format": "strict_date"
+          },
+          "sharesOwnedFollowingTransaction": {
+            "type": "scaled_float",
+            "scaling_factor": 100
+          },
+          "underlyingSecurityShares": {
+            "type": "scaled_float",
+            "scaling_factor": 100
+          },
+          "underlyingSecurityTitle": {
+            "type": "text"
+          },
+          "directOrIndirectOwnership": {
+            "type": "keyword"
+          },
+          "natureOfOwnership": {
+            "type": "text"
+          }
+        }
+      },
+      "footnotes": {
+        "type": "text"
+      },
+      "remarks": {
+        "type": "text"
+      },
+      "signature": {
+        "type": "text"
+      },
+      "signatureDate": {
+        "type": "date",
+        "format": "strict_date"
+      },
+      "isAmendment": {
+        "type": "boolean"
+      },
+      "originalFilingDate": {
+        "type": "date",
+        "format": "strict_date"
+      },
+      "notSubjectToSection16": {
+        "type": "boolean"
+      },
+      "formFiledByMultiplePersons": {
+        "type": "boolean"
+      },
+      "documentUrl": {
+        "type": "keyword"
+      }
+    }
+  }
+}
