@@ -1,0 +1,115 @@
+{
+  "mappings": {
+    "properties": {
+      "accessionNumber": {
+        "type": "keyword"
+      },
+      "filingDate": {
+        "type": "date"
+      },
+      "periodOfReport": {
+        "type": "date",
+        "format": "strict_date"
+      },
+      "filerCik": {
+        "type": "keyword"
+      },
+      "filerName": {
+        "type": "text",
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "ignore_above": 256
+          }
+        }
+      },
+      "filerIrsNumber": {
+        "type": "keyword"
+      },
+      "filerStreet1": {
+        "type": "text"
+      },
+      "filerStreet2": {
+        "type": "text"
+      },
+      "filerCity": {
+        "type": "keyword"
+      },
+      "filerState": {
+        "type": "keyword"
+      },
+      "filerZipCode": {
+        "type": "keyword"
+      },
+      "reportType": {
+        "type": "keyword"
+      },
+      "isAmendment": {
+        "type": "boolean"
+      },
+      "amendmentNumber": {
+        "type": "integer"
+      },
+      "totalValue": {
+        "type": "double"
+      },
+      "holdingsCount": {
+        "type": "integer"
+      },
+      "holdings": {
+        "type": "nested",
+        "properties": {
+          "nameOfIssuer": {
+            "type": "text",
+            "fields": {
+              "keyword": {
+                "type": "keyword",
+                "ignore_above": 256
+              }
+            }
+          },
+          "titleOfClass": {
+            "type": "keyword"
+          },
+          "cusip": {
+            "type": "keyword"
+          },
+          "value": {
+            "type": "double"
+          },
+          "sharesOrPrincipalAmount": {
+            "type": "long"
+          },
+          "shPrn": {
+            "type": "keyword"
+          },
+          "putCall": {
+            "type": "keyword"
+          },
+          "investmentDiscretion": {
+            "type": "keyword"
+          },
+          "otherManager": {
+            "type": "integer"
+          },
+          "votingAuthoritySole": {
+            "type": "long"
+          },
+          "votingAuthorityShared": {
+            "type": "long"
+          },
+          "votingAuthorityNone": {
+            "type": "long"
+          }
+        }
+      },
+      "signature": {
+        "type": "text"
+      },
+      "signatureDate": {
+        "type": "date",
+        "format": "strict_date"
+      }
+    }
+  }
+}

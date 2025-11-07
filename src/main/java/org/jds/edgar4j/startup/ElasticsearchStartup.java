@@ -10,6 +10,7 @@ import org.elasticsearch.xcontent.XContentType;
 import org.jds.edgar4j.model.DailyMasterIndex;
 import org.jds.edgar4j.model.DownloadHistory;
 import org.jds.edgar4j.model.Form4;
+import org.jds.edgar4j.model.Form13F;
 import org.jds.edgar4j.model.InsiderForm;
 import org.jds.edgar4j.model.MasterIndexEntry;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,6 +37,7 @@ public class ElasticsearchStartup implements ApplicationRunner {
         createIndexAndMappingIfNeeded(DailyMasterIndex.class, "daily_master_index", "mappings/daily_master_index_mapping.json");
         createIndexAndMappingIfNeeded(Form4.class, "form4", "mappings/form4_mapping.json");
         createIndexAndMappingIfNeeded(InsiderForm.class, "insider_forms", "mappings/insider_form_mapping.json");
+        createIndexAndMappingIfNeeded(Form13F.class, "form13f", "mappings/form13f_mapping.json");
         createIndexAndMappingIfNeeded(DownloadHistory.class, "download_history", "mappings/download_history_mapping.json");
     }
 
