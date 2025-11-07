@@ -9,12 +9,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import org.jds.edgar4j.model.Form4;
+import org.jds.edgar4j.model.InsiderForm;
 import org.jds.edgar4j.model.NonDerivativeTransaction;
 import org.jds.edgar4j.model.ReportingOwner;
 import org.jds.edgar4j.model.report.ClusterBuy;
 import org.jds.edgar4j.model.report.InsiderBuy;
-import org.jds.edgar4j.repository.Form4Repository;
+import org.jds.edgar4j.repository.InsiderFormRepository;
 import org.jds.edgar4j.service.InsiderBuyAggregationService;
 import org.jds.edgar4j.service.IndustryLookupService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,10 +28,11 @@ import lombok.extern.slf4j.Slf4j;
 
 /**
  * Implementation of insider buy aggregation service
- * Analyzes Form 4 filings to identify insider buying patterns and clusters
+ * Analyzes Forms 4 and 5 to identify insider buying patterns and clusters
+ * (Form 3 has no transactions, only initial holdings)
  *
  * @author J. Daniel Sobrado
- * @version 1.0
+ * @version 2.0
  * @since 2025-11-05
  */
 @Slf4j
@@ -39,7 +40,7 @@ import lombok.extern.slf4j.Slf4j;
 public class InsiderBuyAggregationServiceImpl implements InsiderBuyAggregationService {
 
     @Autowired
-    private Form4Repository form4Repository;
+    private InsiderFormRepository insiderFormRepository;
 
     @Autowired
     private IndustryLookupService industryLookupService;
@@ -52,13 +53,15 @@ public class InsiderBuyAggregationServiceImpl implements InsiderBuyAggregationSe
         log.info("Fetching cluster buys from {} to {} with min {} insiders",
             startDate, endDate, minInsiders);
 
-        // Get all Form 4s in the date range
-        List<Form4> form4s = form4Repository.findByFilingDateBetween(
+        // Get all Forms 4 and 5 in the date range (Form 3 has no transactions)
+        List<InsiderForm> forms = insiderFormRepository.findByFilingDateBetween(
             startDate, endDate, PageRequest.of(0, 10000)
-        ).getContent();
+        ).getContent().stream()
+            .filter(form -> "4".equals(form.getFormType()) || "5".equals(form.getFormType()))
+            .collect(Collectors.toList());
 
         // Convert to InsiderBuys (only purchases)
-        List<InsiderBuy> insiderBuys = convertToInsiderBuys(form4s, true);
+        List<InsiderBuy> insiderBuys = convertToInsiderBuys(forms, true);
 
         // Group into clusters
         List<ClusterBuy> clusterBuys = groupIntoClusterBuys(insiderBuys, minInsiders);
@@ -78,13 +81,15 @@ public class InsiderBuyAggregationServiceImpl implements InsiderBuyAggregationSe
 
         log.info("Fetching insider buys from {} to {}", startDate, endDate);
 
-        // Get all Form 4s in the date range
-        List<Form4> form4s = form4Repository.findByFilingDateBetween(
+        // Get all Forms 4 and 5 in the date range (Form 3 has no transactions)
+        List<InsiderForm> forms = insiderFormRepository.findByFilingDateBetween(
             startDate, endDate, PageRequest.of(0, 10000)
-        ).getContent();
+        ).getContent().stream()
+            .filter(form -> "4".equals(form.getFormType()) || "5".equals(form.getFormType()))
+            .collect(Collectors.toList());
 
         // Convert to InsiderBuys (only purchases)
-        List<InsiderBuy> insiderBuys = convertToInsiderBuys(form4s, true);
+        List<InsiderBuy> insiderBuys = convertToInsiderBuys(forms, true);
 
         // Sort by filing date descending
         insiderBuys.sort(Comparator.comparing(InsiderBuy::getFilingDate,
@@ -101,13 +106,15 @@ public class InsiderBuyAggregationServiceImpl implements InsiderBuyAggregationSe
 
         log.info("Fetching cluster buys for {} from {} to {}", ticker, startDate, endDate);
 
-        // Get Form 4s for this ticker
-        List<Form4> form4s = form4Repository.findByTradingSymbolAndFilingDateBetween(
+        // Get Forms 4 and 5 for this ticker (Form 3 has no transactions)
+        List<InsiderForm> forms = insiderFormRepository.findByTradingSymbolAndFilingDateBetween(
             ticker, startDate, endDate, PageRequest.of(0, 1000)
-        ).getContent();
+        ).getContent().stream()
+            .filter(form -> "4".equals(form.getFormType()) || "5".equals(form.getFormType()))
+            .collect(Collectors.toList());
 
         // Convert to InsiderBuys
-        List<InsiderBuy> insiderBuys = convertToInsiderBuys(form4s, true);
+        List<InsiderBuy> insiderBuys = convertToInsiderBuys(forms, true);
 
         // Group into clusters
         List<ClusterBuy> clusterBuys = groupIntoClusterBuys(insiderBuys, minInsiders);
@@ -124,13 +131,15 @@ public class InsiderBuyAggregationServiceImpl implements InsiderBuyAggregationSe
         LocalDateTime endDate = LocalDateTime.now();
         LocalDateTime startDate = endDate.minusDays(days);
 
-        // Get Form 4s for this ticker
-        List<Form4> form4s = form4Repository.findByTradingSymbolAndFilingDateBetween(
+        // Get Forms 4 and 5 for this ticker (Form 3 has no transactions)
+        List<InsiderForm> forms = insiderFormRepository.findByTradingSymbolAndFilingDateBetween(
             ticker, startDate, endDate, PageRequest.of(0, 1000)
-        ).getContent();
+        ).getContent().stream()
+            .filter(form -> "4".equals(form.getFormType()) || "5".equals(form.getFormType()))
+            .collect(Collectors.toList());
 
         // Convert to InsiderBuys
-        List<InsiderBuy> insiderBuys = convertToInsiderBuys(form4s, true);
+        List<InsiderBuy> insiderBuys = convertToInsiderBuys(forms, true);
 
         // Sort by filing date descending
         insiderBuys.sort(Comparator.comparing(InsiderBuy::getFilingDate,
@@ -145,12 +154,12 @@ public class InsiderBuyAggregationServiceImpl implements InsiderBuyAggregationSe
         LocalDateTime startDate = endDate.minusDays(days);
 
         // Get all recent Form 4s
-        List<Form4> form4s = form4Repository.findByFilingDateBetween(
+        List<InsiderForm> forms = insiderFormRepository.findByFilingDateBetween(
             startDate, endDate, PageRequest.of(0, 10000)
         ).getContent();
 
         // Convert to InsiderBuys and filter by insider CIK
-        List<InsiderBuy> insiderBuys = convertToInsiderBuys(form4s, true).stream()
+        List<InsiderBuy> insiderBuys = convertToInsiderBuys(forms, true).stream()
             .filter(buy -> insiderCik.equals(buy.getInsiderCik()))
             .sorted(Comparator.comparing(InsiderBuy::getFilingDate,
                 Comparator.nullsLast(Comparator.reverseOrder())))
@@ -165,11 +174,13 @@ public class InsiderBuyAggregationServiceImpl implements InsiderBuyAggregationSe
         LocalDateTime startDateTime = startDate.atStartOfDay();
         LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
 
-        List<Form4> form4s = form4Repository.findByPeriodOfReportBetween(
+        List<InsiderForm> forms = insiderFormRepository.findByPeriodOfReportBetween(
             startDate, endDate, PageRequest.of(0, 10000)
-        ).getContent();
+        ).getContent().stream()
+            .filter(form -> "4".equals(form.getFormType()) || "5".equals(form.getFormType()))
+            .collect(Collectors.toList());
 
-        List<InsiderBuy> insiderBuys = convertToInsiderBuys(form4s, true);
+        List<InsiderBuy> insiderBuys = convertToInsiderBuys(forms, true);
         List<ClusterBuy> clusterBuys = groupIntoClusterBuys(insiderBuys, minInsiders);
 
         clusterBuys.sort(Comparator.comparing(ClusterBuy::getFilingDate,
@@ -181,11 +192,13 @@ public class InsiderBuyAggregationServiceImpl implements InsiderBuyAggregationSe
     @Override
     public Page<InsiderBuy> getInsiderBuysByDateRange(LocalDate startDate, LocalDate endDate,
                                                        Pageable pageable) {
-        List<Form4> form4s = form4Repository.findByPeriodOfReportBetween(
+        List<InsiderForm> forms = insiderFormRepository.findByPeriodOfReportBetween(
             startDate, endDate, PageRequest.of(0, 10000)
-        ).getContent();
+        ).getContent().stream()
+            .filter(form -> "4".equals(form.getFormType()) || "5".equals(form.getFormType()))
+            .collect(Collectors.toList());
 
-        List<InsiderBuy> insiderBuys = convertToInsiderBuys(form4s, true);
+        List<InsiderBuy> insiderBuys = convertToInsiderBuys(forms, true);
 
         insiderBuys.sort(Comparator.comparing(InsiderBuy::getFilingDate,
             Comparator.nullsLast(Comparator.reverseOrder())));
@@ -198,11 +211,11 @@ public class InsiderBuyAggregationServiceImpl implements InsiderBuyAggregationSe
         LocalDateTime endDate = LocalDateTime.now();
         LocalDateTime startDate = endDate.minusDays(days);
 
-        List<Form4> form4s = form4Repository.findByFilingDateBetween(
+        List<InsiderForm> forms = insiderFormRepository.findByFilingDateBetween(
             startDate, endDate, PageRequest.of(0, 10000)
         ).getContent();
 
-        List<InsiderBuy> insiderBuys = convertToInsiderBuys(form4s, true);
+        List<InsiderBuy> insiderBuys = convertToInsiderBuys(forms, true);
         List<ClusterBuy> clusterBuys = groupIntoClusterBuys(insiderBuys, 1);
 
         return clusterBuys.stream()
@@ -217,11 +230,11 @@ public class InsiderBuyAggregationServiceImpl implements InsiderBuyAggregationSe
         LocalDateTime endDate = LocalDateTime.now();
         LocalDateTime startDate = endDate.minusDays(days);
 
-        List<Form4> form4s = form4Repository.findByFilingDateBetween(
+        List<InsiderForm> forms = insiderFormRepository.findByFilingDateBetween(
             startDate, endDate, PageRequest.of(0, 10000)
         ).getContent();
 
-        List<InsiderBuy> insiderBuys = convertToInsiderBuys(form4s, true);
+        List<InsiderBuy> insiderBuys = convertToInsiderBuys(forms, true);
 
         return insiderBuys.stream()
             .sorted(Comparator.comparing(InsiderBuy::getTransactionValue,
@@ -235,11 +248,11 @@ public class InsiderBuyAggregationServiceImpl implements InsiderBuyAggregationSe
         LocalDateTime endDate = LocalDateTime.now();
         LocalDateTime startDate = endDate.minusDays(days);
 
-        List<Form4> form4s = form4Repository.findByFilingDateBetween(
+        List<InsiderForm> forms = insiderFormRepository.findByFilingDateBetween(
             startDate, endDate, PageRequest.of(0, 10000)
         ).getContent();
 
-        List<InsiderBuy> insiderBuys = convertToInsiderBuys(form4s, true);
+        List<InsiderBuy> insiderBuys = convertToInsiderBuys(forms, true);
         List<ClusterBuy> clusterBuys = groupIntoClusterBuys(insiderBuys, 2);
 
         return clusterBuys.stream()
@@ -251,63 +264,64 @@ public class InsiderBuyAggregationServiceImpl implements InsiderBuyAggregationSe
     }
 
     /**
-     * Convert Form 4 filings to InsiderBuy objects
+     * Convert insider forms to InsiderBuy objects
+     * Processes Forms 4 and 5 (Form 3 has no transactions)
      *
-     * @param form4s list of Form 4 filings
+     * @param forms list of insider forms
      * @param purchasesOnly if true, only include purchase transactions
      * @return list of InsiderBuy objects
      */
-    private List<InsiderBuy> convertToInsiderBuys(List<Form4> form4s, boolean purchasesOnly) {
+    private List<InsiderBuy> convertToInsiderBuys(List<InsiderForm> forms, boolean purchasesOnly) {
         List<InsiderBuy> insiderBuys = new ArrayList<>();
 
-        for (Form4 form4 : form4s) {
+        for (InsiderForm form : forms) {
             // Skip if no ticker
-            if (form4.getTradingSymbol() == null || form4.getTradingSymbol().isEmpty()) {
+            if (form.getTradingSymbol() == null || form.getTradingSymbol().isEmpty()) {
                 continue;
             }
 
             // Get primary reporting owner
-            ReportingOwner owner = form4.getPrimaryReportingOwner();
+            ReportingOwner owner = form.getPrimaryReportingOwner();
             if (owner == null) {
                 continue;
             }
 
             // Process non-derivative transactions
             List<NonDerivativeTransaction> transactions = purchasesOnly
-                ? form4.getPurchaseTransactions()
-                : form4.getNonDerivativeTransactions();
+                ? form.getPurchaseTransactions()
+                : form.getNonDerivativeTransactions();
 
             for (NonDerivativeTransaction transaction : transactions) {
-                InsiderBuy buy = convertTransactionToInsiderBuy(form4, owner, transaction);
+                InsiderBuy buy = convertTransactionToInsiderBuy(form, owner, transaction);
                 if (buy != null) {
                     insiderBuys.add(buy);
                 }
             }
         }
 
-        log.info("Converted {} Form 4s to {} insider buys", form4s.size(), insiderBuys.size());
+        log.info("Converted {} insider forms to {} insider buys", forms.size(), insiderBuys.size());
         return insiderBuys;
     }
 
     /**
      * Convert a single transaction to an InsiderBuy object
      */
-    private InsiderBuy convertTransactionToInsiderBuy(Form4 form4, ReportingOwner owner,
+    private InsiderBuy convertTransactionToInsiderBuy(InsiderForm form, ReportingOwner owner,
                                                        NonDerivativeTransaction transaction) {
         try {
             // Lookup industry for this company
             String industry = null;
-            if (form4.getIssuerCik() != null) {
-                industry = industryLookupService.getIndustryByCik(form4.getIssuerCik());
+            if (form.getIssuerCik() != null) {
+                industry = industryLookupService.getIndustryByCik(form.getIssuerCik());
             }
 
             InsiderBuy buy = InsiderBuy.builder()
-                .accessionNumber(form4.getAccessionNumber())
-                .filingDate(form4.getFilingDate())
+                .accessionNumber(form.getAccessionNumber())
+                .filingDate(form.getFilingDate())
                 .tradeDate(transaction.getTransactionDate())
-                .ticker(form4.getTradingSymbol())
-                .companyName(form4.getIssuerName())
-                .companyCik(form4.getIssuerCik())
+                .ticker(form.getTradingSymbol())
+                .companyName(form.getIssuerName())
+                .companyCik(form.getIssuerCik())
                 .industry(industry)
                 .insiderName(owner.getName())
                 .insiderCik(owner.getCik())

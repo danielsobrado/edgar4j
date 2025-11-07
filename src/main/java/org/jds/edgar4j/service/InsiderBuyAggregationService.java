@@ -9,11 +9,12 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 /**
- * Service for aggregating and analyzing insider buy transactions from Form 4 filings
+ * Service for aggregating and analyzing insider buy transactions from insider forms
+ * Analyzes Forms 4 and 5 (Forms 3 typically have no transactions)
  * Generates cluster buy reports and individual insider buy reports
  *
  * @author J. Daniel Sobrado
- * @version 1.0
+ * @version 2.0
  * @since 2025-11-05
  */
 public interface InsiderBuyAggregationService {
