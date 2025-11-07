@@ -8,9 +8,12 @@ import java.util.Map;
 import org.jds.edgar4j.model.DownloadHistory;
 import org.jds.edgar4j.model.DownloadHistory.ProcessingStatus;
 import org.jds.edgar4j.repository.DownloadHistoryRepository;
+import java.util.HashSet;
+import java.util.Set;
+
 import org.jds.edgar4j.service.BackfillService;
 import org.jds.edgar4j.service.Form4DownloadService;
-import org.jds.edgar4j.service.Form4DownloadService.DownloadStatistics;
+import org.jds.edgar4j.service.InsiderFormDownloadService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -21,10 +24,11 @@ import org.springframework.web.bind.annotation.*;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * REST API controller for Form 4 download pipeline management
+ * REST API controller for insider form download pipeline management
+ * Supports Forms 3, 4, and 5
  *
  * @author J. Daniel Sobrado
- * @version 1.0
+ * @version 2.0
  * @since 2025-11-05
  */
 @Slf4j
@@ -33,7 +37,10 @@ import lombok.extern.slf4j.Slf4j;
 public class PipelineController {
 
     @Autowired
-    private Form4DownloadService downloadService;
+    private Form4DownloadService downloadService;  // Backwards compatibility
+
+    @Autowired
+    private InsiderFormDownloadService insiderFormDownloadService;
 
     @Autowired
     private BackfillService backfillService;
@@ -42,13 +49,13 @@ public class PipelineController {
     private DownloadHistoryRepository downloadHistoryRepository;
 
     /**
-     * Get pipeline statistics
+     * Get pipeline statistics (includes breakdown by form type)
      * GET /api/pipeline/statistics
      */
     @GetMapping("/statistics")
-    public ResponseEntity<DownloadStatistics> getStatistics() {
+    public ResponseEntity<InsiderFormDownloadService.DownloadStatistics> getStatistics() {
         log.info("Getting pipeline statistics");
-        DownloadStatistics stats = downloadService.getStatistics();
+        InsiderFormDownloadService.DownloadStatistics stats = insiderFormDownloadService.getStatistics();
         return ResponseEntity.ok(stats);
     }
 
@@ -270,12 +277,122 @@ public class PipelineController {
     }
 
     /**
+     * Download insider forms for a specific date (Forms 3, 4, 5)
+     * POST /api/pipeline/insider-forms/download/date/{date}?formTypes=3,4,5
+     */
+    @PostMapping("/insider-forms/download/date/{date}")
+    public ResponseEntity<Map<String, Object>> downloadInsiderFormsForDate(
+        @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+        @RequestParam(defaultValue = "3,4,5") String formTypes) {
+
+        log.info("Manual insider form download requested for date: {} (types: {})", date, formTypes);
+
+        Set<String> formTypeSet = parseFormTypes(formTypes);
+        int downloaded = insiderFormDownloadService.downloadForDate(date, formTypeSet);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("date", date);
+        response.put("formTypes", formTypeSet);
+        response.put("downloaded", downloaded);
+        response.put("status", "completed");
+
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Download insider forms for a date range (Forms 3, 4, 5)
+     * POST /api/pipeline/insider-forms/download/range?startDate={start}&endDate={end}&formTypes=3,4,5
+     */
+    @PostMapping("/insider-forms/download/range")
+    public ResponseEntity<Map<String, Object>> downloadInsiderFormsForDateRange(
+        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+        @RequestParam(defaultValue = "3,4,5") String formTypes) {
+
+        log.info("Manual insider form download requested for range: {} to {} (types: {})",
+            startDate, endDate, formTypes);
+
+        Set<String> formTypeSet = parseFormTypes(formTypes);
+        int downloaded = insiderFormDownloadService.downloadForDateRange(startDate, endDate, formTypeSet);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("startDate", startDate);
+        response.put("endDate", endDate);
+        response.put("formTypes", formTypeSet);
+        response.put("downloaded", downloaded);
+        response.put("status", "completed");
+
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Download latest insider forms (Forms 3, 4, 5)
+     * POST /api/pipeline/insider-forms/download/latest?count={count}&formTypes=3,4,5
+     */
+    @PostMapping("/insider-forms/download/latest")
+    public ResponseEntity<Map<String, Object>> downloadLatestInsiderForms(
+        @RequestParam(defaultValue = "100") int count,
+        @RequestParam(defaultValue = "3,4,5") String formTypes) {
+
+        log.info("Manual insider form download requested for latest {} filings (types: {})",
+            count, formTypes);
+
+        Set<String> formTypeSet = parseFormTypes(formTypes);
+        int downloaded = insiderFormDownloadService.downloadLatestFilings(formTypeSet, count);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("requested", count);
+        response.put("formTypes", formTypeSet);
+        response.put("downloaded", downloaded);
+        response.put("status", "completed");
+
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Download specific insider form by accession number and form type
+     * POST /api/pipeline/insider-forms/download/accession/{accessionNumber}?formType=4
+     */
+    @PostMapping("/insider-forms/download/accession/{accessionNumber}")
+    public ResponseEntity<Map<String, Object>> downloadInsiderFormByAccessionNumber(
+        @PathVariable String accessionNumber,
+        @RequestParam(defaultValue = "4") String formType) {
+
+        log.info("Manual insider form download requested for accession: {} (type: {})",
+            accessionNumber, formType);
+
+        boolean success = insiderFormDownloadService.downloadByAccessionNumber(accessionNumber, formType);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("accessionNumber", accessionNumber);
+        response.put("formType", formType);
+        response.put("success", success);
+        response.put("status", success ? "completed" : "failed");
+
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Parse comma-separated form types into a Set
+     */
+    private Set<String> parseFormTypes(String formTypes) {
+        Set<String> formTypeSet = new HashSet<>();
+        if (formTypes != null && !formTypes.isEmpty()) {
+            String[] types = formTypes.split(",");
+            for (String type : types) {
+                formTypeSet.add(type.trim());
+            }
+        }
+        return formTypeSet;
+    }
+
+    /**
      * Health check endpoint
      * GET /api/pipeline/health
      */
     @GetMapping("/health")
     public ResponseEntity<Map<String, Object>> health() {
-        DownloadStatistics stats = downloadService.getStatistics();
+        InsiderFormDownloadService.DownloadStatistics stats = insiderFormDownloadService.getStatistics();
 
         Map<String, Object> health = new HashMap<>();
         health.put("status", "UP");
