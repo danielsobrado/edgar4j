@@ -1,0 +1,69 @@
+{
+  "mappings": {
+    "properties": {
+      "accessionNumber": {
+        "type": "keyword"
+      },
+      "filingDate": {
+        "type": "date"
+      },
+      "eventDate": {
+        "type": "date",
+        "format": "strict_date"
+      },
+      "companyCik": {
+        "type": "keyword"
+      },
+      "companyName": {
+        "type": "text",
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "ignore_above": 256
+          }
+        }
+      },
+      "tradingSymbol": {
+        "type": "keyword"
+      },
+      "irsNumber": {
+        "type": "keyword"
+      },
+      "stateOfIncorporation": {
+        "type": "keyword"
+      },
+      "fiscalYearEnd": {
+        "type": "keyword"
+      },
+      "items": {
+        "type": "keyword"
+      },
+      "eventItems": {
+        "type": "nested",
+        "properties": {
+          "itemNumber": {
+            "type": "keyword"
+          },
+          "title": {
+            "type": "text"
+          },
+          "category": {
+            "type": "keyword"
+          },
+          "content": {
+            "type": "text"
+          }
+        }
+      },
+      "textContent": {
+        "type": "text"
+      },
+      "industry": {
+        "type": "keyword"
+      },
+      "isAmendment": {
+        "type": "boolean"
+      }
+    }
+  }
+}
