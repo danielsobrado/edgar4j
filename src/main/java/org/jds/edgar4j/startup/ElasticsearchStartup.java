@@ -1,12 +1,5 @@
 package org.jds.edgar4j.startup;
 
-import org.elasticsearch.client.RequestOptions;
-import org.elasticsearch.client.RestHighLevelClient;
-import org.elasticsearch.client.indices.CreateIndexRequest;
-import org.elasticsearch.client.indices.CreateIndexResponse;
-import org.elasticsearch.client.indices.GetIndexRequest;
-import org.elasticsearch.client.indices.PutMappingRequest;
-import org.elasticsearch.xcontent.XContentType;
 import org.jds.edgar4j.model.DailyMasterIndex;
 import org.jds.edgar4j.model.MasterIndexEntry;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,6 +7,10 @@ import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
+import org.springframework.data.elasticsearch.core.document.Document;
+import org.springframework.data.elasticsearch.core.IndexOperations;
+import org.springframework.data.elasticsearch.core.mapping.IndexCoordinates;
 import org.springframework.stereotype.Component;
 
 import java.io.BufferedReader;
@@ -26,8 +23,12 @@ import java.io.InputStreamReader;
 public class ElasticsearchStartup implements ApplicationRunner {
 
 
+    private final ElasticsearchOperations elasticsearchOperations;
+
     @Autowired
-    private RestHighLevelClient restHighLevelClient;
+    public ElasticsearchStartup(ElasticsearchOperations elasticsearchOperations) {
+        this.elasticsearchOperations = elasticsearchOperations;
+    }
 
     @Override
     public void run(ApplicationArguments args) {
@@ -37,19 +38,15 @@ public class ElasticsearchStartup implements ApplicationRunner {
 
     private void createIndexAndMappingIfNeeded(Class<?> entityClass, String indexName, String mappingResourcePath) {
         try {
-            GetIndexRequest getIndexRequest = new GetIndexRequest(indexName);
-            boolean indexExists = restHighLevelClient.indices().exists(getIndexRequest, RequestOptions.DEFAULT);
+            IndexOperations indexOperations = elasticsearchOperations.indexOps(IndexCoordinates.of(indexName));
+            boolean indexExists = indexOperations.exists();
 
             if (!indexExists) {
-                CreateIndexRequest createIndexRequest = new CreateIndexRequest(indexName);
-                CreateIndexResponse createIndexResponse = restHighLevelClient.indices().create(createIndexRequest, RequestOptions.DEFAULT);
+                indexOperations.create();
 
-                if (createIndexResponse.isAcknowledged()) {
-                    String mappingJson = loadResourceAsString(mappingResourcePath);
-
-                    PutMappingRequest putMappingRequest = new PutMappingRequest(indexName).source(mappingJson, XContentType.JSON);
-                    restHighLevelClient.indices().putMapping(putMappingRequest, RequestOptions.DEFAULT);
-                }
+                String mappingJson = loadResourceAsString(mappingResourcePath);
+                Document mappingDocument = Document.parse(mappingJson);
+                indexOperations.putMapping(mappingDocument);
             }
         } catch (Exception e) {
             throw new RuntimeException("Error creating index and mapping for " + entityClass.getSimpleName(), e);
