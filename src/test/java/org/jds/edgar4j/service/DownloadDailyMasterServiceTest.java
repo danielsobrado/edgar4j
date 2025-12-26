@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
@@ -19,6 +20,7 @@ public class DownloadDailyMasterServiceTest {
     @Mock
     private Edgar4JProperties edgar4jProperties;
 
+    @Spy
     @InjectMocks
     private DownloadDailyMasterService downloadDailyMasterService;
 
@@ -32,16 +34,20 @@ public class DownloadDailyMasterServiceTest {
     }
 
     @Test
-    public void testDownloadDailyMaster() {
+    public void testDownloadDailyMaster() throws Exception {
         LocalDate inputDate = LocalDate.of(2019, 2, 14);
         String inputDateString = inputDate.format(DateTimeFormatter.ofPattern("MM/dd/yyyy"));
-        String dailyMasterUrl = "https://www.sec.gov/Archives/edgar/daily-index/test-url";
+        String dailyIndexesPath = "target/test-daily-indexes";
+        String userAgent = "edgar4j-test-agent";
 
-        when(edgar4jProperties.getDailyMasterUrl(inputDate)).thenReturn(dailyMasterUrl);
+        when(edgar4jProperties.getDailyIndexesPath()).thenReturn(dailyIndexesPath);
+        when(edgar4jProperties.getUserAgent()).thenReturn(userAgent);
+        doReturn(true).when(downloadDailyMasterService)
+                .downloadFile(anyString(), anyString(), anyString());
 
         downloadDailyMasterService.downloadDailyMaster(inputDateString);
 
         verify(edgar4jProperties, times(1)).getUserAgent();
-        verify(edgar4jProperties, times(1)).getDailyIndexesPath();
+        verify(edgar4jProperties, times(2)).getDailyIndexesPath();
     }
 }

@@ -28,6 +28,21 @@ edgar4j:
     companyTickersMFsUrl: https://www.sec.gov/files/company_tickers_mf.json
   persistence:
     database: mongodb
+  sec:
+    user-agent: ${SEC_USER_AGENT:Edgar4j/1.0 (contact@example.com)}
+    rate-limit-per-second: 10
+  jobs:
+    ticker-sync:
+      enabled: ${TICKER_SYNC_ENABLED:true}
+      cron: "0 0 6 * * *"
+    filing-sync:
+      enabled: ${FILING_SYNC_ENABLED:true}
+      cron: "0 0 */4 * * *"
+      batch-size: 100
+      delay-between-companies-ms: 1000
+    data-integrity:
+      enabled: ${DATA_INTEGRITY_ENABLED:true}
+      cron: "0 0 0 * * *"
 
 management:
   endpoints:

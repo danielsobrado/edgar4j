@@ -34,3 +34,24 @@ build/
 .dccache
 
 *.local.json
+
+### Environment files ###
+.env
+.env.local
+.env.*.local
+!.env.example
+
+### Docker ###
+docker-compose.override.yml
+
+### Logs ###
+*.log
+logs/
+
+### Frontend ###
+frontend/node_modules/
+frontend/dist/
+frontend/.env.local
+
+### Claude Code ###
+.claude/

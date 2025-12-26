@@ -62,7 +62,7 @@ public class DownloadDailyMasterService {
         );
     }
 
-    private boolean downloadFile(String url, String filepath, String userAgent) throws IOException,
+    boolean downloadFile(String url, String filepath, String userAgent) throws IOException,
             InterruptedException {
         log.info("Downloading file from: {}", url);
         ProcessBuilder processBuilder = new ProcessBuilder("curl", "-s", "-A", userAgent, "-o", filepath, url);

@@ -1,0 +1,28 @@
+# Docker profile configuration
+# This profile is used when running in Docker containers
+
+server:
+  port: 8080
+
+spring:
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://admin:admin123@mongodb:27017/edgar?authSource=admin}
+      database: ${MONGODB_DATABASE:edgar}
+
+edgar4j:
+  sec:
+    user-agent: ${SEC_USER_AGENT:Edgar4j/1.0 (contact@example.com)}
+  jobs:
+    ticker-sync:
+      enabled: true
+    filing-sync:
+      enabled: true
+    data-integrity:
+      enabled: true
+
+logging:
+  level:
+    org.jds.edgar4j: INFO
+    org.springframework.data.mongodb: WARN
+    org.springframework.web: WARN
