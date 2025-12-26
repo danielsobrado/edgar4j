@@ -1,8 +1,11 @@
 package org.jds.edgar4j.entity;
 
 import java.util.Date;
+import java.util.List;
 
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
+import org.springframework.data.mongodb.core.mapping.Document;
 
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
@@ -25,6 +28,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+@Document(collection = "submissions")
 public class Submissions {
 
     @Id
@@ -32,14 +36,16 @@ public class Submissions {
 
     private String name;
     private String companyName;
+
+    @Indexed(unique = true)
     private String cik;
     private String entityType;
     private String sic;
     private String sicDescription;
     private boolean insiderTransactionForOwnerExists;
     private boolean insiderTransactionForIssuerExists;
-    private Ticker[] tickers;
-    private Exchange[] exchanges;
+    private List<String> tickers;
+    private List<String> exchanges;
     private String ein;
     private String description;
     private String website;

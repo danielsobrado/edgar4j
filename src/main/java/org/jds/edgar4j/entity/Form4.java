@@ -2,6 +2,9 @@ package org.jds.edgar4j.entity;
 
 import java.util.Date;
 
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 
@@ -22,8 +25,14 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+@Document(collection = "form4")
 public class Form4 {
 
+    @Id
+    private String id;
+
+    private String accessionNumber;
+    private String cik;
     private String securityTitle;
     private Date transactionDate;
     private float transactionValue;

@@ -1,15 +1,18 @@
 package org.jds.edgar4j.service.impl;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.text.DecimalFormat;
+import java.util.List;
 
+import org.jds.edgar4j.entity.Filling;
+import org.jds.edgar4j.entity.Submissions;
+import org.jds.edgar4j.integration.SecApiClient;
+import org.jds.edgar4j.integration.SecResponseParser;
+import org.jds.edgar4j.integration.model.SecSubmissionResponse;
+import org.jds.edgar4j.repository.FillingRepository;
+import org.jds.edgar4j.repository.SubmissionsRepository;
 import org.jds.edgar4j.service.DownloadSubmissionsService;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -19,35 +22,58 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class DownloadSubmissionsServiceImpl implements DownloadSubmissionsService {
 
-    @Value("${edgar4j.urls.submissionsCIKUrl}")
-    private String submissionsCIKUrl;
+    private final SecApiClient secApiClient;
+    private final SecResponseParser responseParser;
+    private final SubmissionsRepository submissionsRepository;
+    private final FillingRepository fillingRepository;
 
     @Override
     public void downloadSubmissions(String cik) {
         log.info("Download submissions for CIK: {}", cik);
 
-        long cikLong;
         try {
-                cikLong = Long.parseLong(cik);
+            long cikLong = Long.parseLong(cik);
+            log.debug("Parsed CIK: {}", cikLong);
         } catch (NumberFormatException e) {
-                log.error("CIK is not a number: {}", cik);
-                return;
+            log.error("CIK is not a number: {}", cik);
+            throw new IllegalArgumentException("Invalid CIK format: " + cik);
         }
 
-        DecimalFormat df = new DecimalFormat("0000000000");
+        String jsonResponse = secApiClient.fetchSubmissions(cik);
+        log.debug("Received response length: {} characters", jsonResponse.length());
 
-        final HttpClient client = HttpClient.newHttpClient();
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(submissionsCIKUrl+df.format(cikLong)+".json"))
-                .build();
-        client.sendAsync(request, HttpResponse.BodyHandlers.ofString())
-                .thenApply(HttpResponse::body)
-                .thenAccept(System.out::println)
-                .join();
-        
+        SecSubmissionResponse response = responseParser.parseSubmissionResponse(jsonResponse);
+        log.info("Parsed submissions for company: {}", response.getName());
+
+        Submissions submissions = responseParser.toSubmissions(response);
+
+        Submissions existingSubmissions = submissionsRepository.findByCik(cik).orElse(null);
+        if (existingSubmissions != null) {
+            submissions.setId(existingSubmissions.getId());
+            log.info("Updating existing submissions for CIK: {}", cik);
+        } else {
+            log.info("Creating new submissions for CIK: {}", cik);
+        }
+
+        submissionsRepository.save(submissions);
+        log.info("Saved submissions for CIK: {}", cik);
+
+        List<Filling> fillings = responseParser.toFillings(response);
+        log.info("Parsed {} filings for CIK: {}", fillings.size(), cik);
+
+        for (Filling filling : fillings) {
+            if (filling.getAccessionNumber() != null) {
+                Filling existingFilling = fillingRepository.findByAccessionNumber(filling.getAccessionNumber()).orElse(null);
+                if (existingFilling != null) {
+                    filling.setId(existingFilling.getId());
+                }
+            }
+        }
+
+        fillingRepository.saveAll(fillings);
+        log.info("Saved {} filings for CIK: {}", fillings.size(), cik);
     }
-
-    
 }

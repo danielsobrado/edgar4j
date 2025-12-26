@@ -1,20 +1,45 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: edgar4j
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27017/edgar}
+      database: ${MONGODB_DATABASE:edgar}
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: false
 
 edgar4j:
-    urls:
-        baseSecUrl: https://www.sec.gov
-        baseDataSecUrl: https://data.sec.gov
-        edgarDataArchivesUrl: https://www.sec.gov/Archives/edgar/data
-        submissionsUrl: https://data.sec.gov/submissions
-        submissionsCIKUrl: https://data.sec.gov/submissions/CIK
-        bulkSubmissionsFileUrl: https://www.sec.gov/Archives/edgar/daily-index/bulkdata/submissions.zip 
-        bulkCompanyFactsFileUrl: https://www.sec.gov/Archives/edgar/daily-index/xbrl/companyfacts.zip
-        companyTickersUrl: https://www.sec.gov/files/company_tickers.json
-        companyTickersExchangesUrl: https://www.sec.gov/files/company_tickers_exchange.json
-        companyTickersMFsUrl: https://www.sec.gov/files/company_tickers_mf.json
-    persistence:
-        database: mongodb
-spring.data.mongodb:
-    url: mongodb+srv://admin:admin@localhost/edgar?retryWrites=true&w=majority
-    database: edgar
-    port: 27017
-    repositories.enabled: true
+  urls:
+    baseSecUrl: https://www.sec.gov
+    baseDataSecUrl: https://data.sec.gov
+    edgarDataArchivesUrl: https://www.sec.gov/Archives/edgar/data
+    submissionsUrl: https://data.sec.gov/submissions
+    submissionsCIKUrl: https://data.sec.gov/submissions/CIK
+    bulkSubmissionsFileUrl: https://www.sec.gov/Archives/edgar/daily-index/bulkdata/submissions.zip
+    bulkCompanyFactsFileUrl: https://www.sec.gov/Archives/edgar/daily-index/xbrl/companyfacts.zip
+    companyTickersUrl: https://www.sec.gov/files/company_tickers.json
+    companyTickersExchangesUrl: https://www.sec.gov/files/company_tickers_exchange.json
+    companyTickersMFsUrl: https://www.sec.gov/files/company_tickers_mf.json
+  persistence:
+    database: mongodb
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    org.jds.edgar4j: DEBUG
+    org.springframework.data.mongodb: INFO
+    org.springframework.web: INFO

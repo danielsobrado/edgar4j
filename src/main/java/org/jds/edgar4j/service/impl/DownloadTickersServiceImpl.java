@@ -1,14 +1,15 @@
 package org.jds.edgar4j.service.impl;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
+import java.util.List;
 
+import org.jds.edgar4j.entity.Ticker;
+import org.jds.edgar4j.integration.SecApiClient;
+import org.jds.edgar4j.integration.SecResponseParser;
+import org.jds.edgar4j.repository.TickerRepository;
 import org.jds.edgar4j.service.DownloadTickersService;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -18,56 +19,64 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class DownloadTickersServiceImpl implements DownloadTickersService {
 
-    @Value("${edgar4j.urls.companyTickersUrl}")
-    private String companyTickersUrl;
-
-    @Value("${edgar4j.urls.companyTickersExchangesUrl}")
-    private String companyTickersExchangesUrl;
-
-    @Value("${edgar4j.urls.companyTickersMFsUrl}")
-    private String companyTickersMFsUrl;
+    private final SecApiClient secApiClient;
+    private final SecResponseParser responseParser;
+    private final TickerRepository tickerRepository;
 
     @Override
     public void downloadTickers() {
         log.info("Download tickers");
-        final HttpClient client = HttpClient.newHttpClient();
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(companyTickersUrl))
-                .build();
-        client.sendAsync(request, HttpResponse.BodyHandlers.ofString())
-                .thenApply(HttpResponse::body)
-                .thenAccept(System.out::println)
-                .join();
-        
+
+        String jsonResponse = secApiClient.fetchCompanyTickers();
+        log.debug("Received tickers response length: {} characters", jsonResponse.length());
+
+        List<Ticker> tickers = responseParser.parseTickersJson(jsonResponse);
+        log.info("Parsed {} tickers", tickers.size());
+
+        saveTickers(tickers);
+        log.info("Saved {} tickers", tickers.size());
     }
 
     @Override
     public void downloadTickersExchanges() {
-        log.info("Download tickers exchanges");
-        final HttpClient client = HttpClient.newHttpClient();
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(companyTickersExchangesUrl))
-                .build();
-        client.sendAsync(request, HttpResponse.BodyHandlers.ofString())
-                .thenApply(HttpResponse::body)
-                .thenAccept(System.out::println)
-                .join();
+        log.info("Download tickers with exchanges");
+
+        String jsonResponse = secApiClient.fetchCompanyTickersExchanges();
+        log.debug("Received tickers exchanges response length: {} characters", jsonResponse.length());
+
+        List<Ticker> tickers = responseParser.parseTickersExchangeJson(jsonResponse);
+        log.info("Parsed {} tickers with exchanges", tickers.size());
+
+        saveTickers(tickers);
+        log.info("Saved {} tickers with exchanges", tickers.size());
     }
 
     @Override
     public void downloadTickersMFs() {
-        log.info("Download tickers MFs");
-        final HttpClient client = HttpClient.newHttpClient();
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(companyTickersMFsUrl))
-                .build();
-        client.sendAsync(request, HttpResponse.BodyHandlers.ofString())
-                .thenApply(HttpResponse::body)
-                .thenAccept(System.out::println)
-                .join();
+        log.info("Download mutual fund tickers");
+
+        String jsonResponse = secApiClient.fetchCompanyTickersMutualFunds();
+        log.debug("Received mutual fund tickers response length: {} characters", jsonResponse.length());
+
+        List<Ticker> tickers = responseParser.parseTickersJson(jsonResponse);
+        log.info("Parsed {} mutual fund tickers", tickers.size());
+
+        saveTickers(tickers);
+        log.info("Saved {} mutual fund tickers", tickers.size());
     }
 
-    
+    private void saveTickers(List<Ticker> tickers) {
+        for (Ticker ticker : tickers) {
+            if (ticker.getCode() != null) {
+                Ticker existingTicker = tickerRepository.findByCode(ticker.getCode()).orElse(null);
+                if (existingTicker != null) {
+                    ticker.setId(existingTicker.getId());
+                }
+            }
+        }
+        tickerRepository.saveAll(tickers);
+    }
 }
