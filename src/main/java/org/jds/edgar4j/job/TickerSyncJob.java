@@ -49,8 +49,10 @@ public class TickerSyncJob {
             log.info("Starting ticker sync job at {}", LocalDateTime.now());
             long startTime = System.currentTimeMillis();
 
-            // Download all tickers
-            downloadTickersService.downloadAllTickers();
+            // Download all ticker variants
+            downloadTickersService.downloadTickers();
+            downloadTickersService.downloadTickersExchanges();
+            downloadTickersService.downloadTickersMFs();
 
             long duration = System.currentTimeMillis() - startTime;
             log.info("Ticker sync job completed in {} ms", duration);

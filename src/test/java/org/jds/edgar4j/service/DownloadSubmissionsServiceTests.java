@@ -6,7 +6,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.ActiveProfiles;
 
 /**
  * @author J. Daniel Sobrado
@@ -15,7 +15,7 @@ import org.springframework.test.context.TestPropertySource;
  */
 @SpringBootTest
 @EnabledIfEnvironmentVariable(named = "RUN_INTEGRATION_TESTS", matches = "true")
-@TestPropertySource(properties = "spring.mongodb.embedded.version=3.5.5")
+@ActiveProfiles("test")
 public class DownloadSubmissionsServiceTests {
 
     @Autowired
