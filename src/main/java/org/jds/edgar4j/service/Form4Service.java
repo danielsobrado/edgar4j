@@ -3,7 +3,7 @@ package org.jds.edgar4j.service;
 import java.net.http.HttpResponse;
 import java.util.concurrent.CompletableFuture;
 
-import org.jds.edgar4j.entity.Form4;
+import org.jds.edgar4j.model.Form4;
 import org.springframework.stereotype.Service;
 
 /**
@@ -18,3 +18,4 @@ public interface Form4Service {
     Form4 parseForm4(String raw);
 
 }
+

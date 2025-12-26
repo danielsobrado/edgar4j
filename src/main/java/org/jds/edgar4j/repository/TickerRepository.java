@@ -3,8 +3,8 @@ package org.jds.edgar4j.repository;
 import java.util.List;
 import java.util.Optional;
 
-import org.jds.edgar4j.entity.Exchange;
-import org.jds.edgar4j.entity.Ticker;
+import org.jds.edgar4j.model.Exchange;
+import org.jds.edgar4j.model.Ticker;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
@@ -44,3 +44,4 @@ public interface TickerRepository extends MongoRepository<Ticker, String> {
     @Query(value = "{ 'exchange.code': ?0 }", count = true)
     long countByExchangeCode(String exchangeCode);
 }
+

@@ -3,7 +3,7 @@ package org.jds.edgar4j.repository;
 import java.util.List;
 import java.util.Optional;
 
-import org.jds.edgar4j.entity.FormType;
+import org.jds.edgar4j.model.FormType;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
 import org.springframework.stereotype.Repository;
@@ -22,3 +22,4 @@ public interface FormTypeRepository extends MongoRepository<FormType, String> {
 
     boolean existsByNumber(String number);
 }
+

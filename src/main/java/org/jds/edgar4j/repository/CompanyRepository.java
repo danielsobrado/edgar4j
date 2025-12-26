@@ -3,7 +3,7 @@ package org.jds.edgar4j.repository;
 import java.util.List;
 import java.util.Optional;
 
-import org.jds.edgar4j.entity.Company;
+import org.jds.edgar4j.model.Company;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
@@ -30,3 +30,4 @@ public interface CompanyRepository extends MongoRepository<Company, String> {
 
     long countByTaxonomy(String taxonomy);
 }
+

@@ -1,4 +1,4 @@
-package org.jds.edgar4j.entity;
+package org.jds.edgar4j.model;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.Indexed;
@@ -43,3 +43,4 @@ public class Company {
     private String taxonomy;
 
 }
+

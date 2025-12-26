@@ -5,7 +5,7 @@ import java.util.Optional;
 
 import org.jds.edgar4j.dto.request.DownloadRequest;
 import org.jds.edgar4j.dto.response.DownloadJobResponse;
-import org.jds.edgar4j.entity.DownloadJob;
+import org.jds.edgar4j.model.DownloadJob;
 
 public interface DownloadJobService {
 
@@ -25,3 +25,4 @@ public interface DownloadJobService {
 
     void cancelJob(String jobId);
 }
+

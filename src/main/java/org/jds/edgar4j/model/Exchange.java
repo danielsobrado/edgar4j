@@ -1,4 +1,4 @@
-package org.jds.edgar4j.entity;
+package org.jds.edgar4j.model;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.Indexed;
@@ -25,19 +25,23 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-@Document(collection = "tickers")
-public class Ticker {
+@Document(collection = "exchanges")
+public class Exchange {
 
     @Id
     private String id;
 
+    private String name;
+
     @Indexed(unique = true)
     private String code;
 
-    private String name;
+    private String country;
 
-    @Indexed
-    private String cik;
-
-    private Exchange exchange;
+    // NASDAQ = "Nasdaq"
+    // OTC = "OTC"
+    // CBOE = "CBOE"
+    // NYSE = "NYSE"
+    // NONE = ""
 }
+

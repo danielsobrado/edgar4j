@@ -8,7 +8,7 @@ import org.jds.edgar4j.dto.request.FilingSearchRequest;
 import org.jds.edgar4j.dto.response.FilingDetailResponse;
 import org.jds.edgar4j.dto.response.FilingResponse;
 import org.jds.edgar4j.dto.response.PaginatedResponse;
-import org.jds.edgar4j.entity.Filling;
+import org.jds.edgar4j.model.Filling;
 import org.jds.edgar4j.repository.FillingRepository;
 import org.jds.edgar4j.service.FilingService;
 import org.springframework.data.domain.Page;
@@ -162,3 +162,4 @@ public class FilingServiceImpl implements FilingService {
                 .build();
     }
 }
+

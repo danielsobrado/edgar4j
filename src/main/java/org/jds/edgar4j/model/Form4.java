@@ -1,4 +1,4 @@
-package org.jds.edgar4j.entity;
+package org.jds.edgar4j.model;
 
 import java.util.Date;
 
@@ -50,3 +50,4 @@ public class Form4 {
     private boolean isOther;
     
 }
+

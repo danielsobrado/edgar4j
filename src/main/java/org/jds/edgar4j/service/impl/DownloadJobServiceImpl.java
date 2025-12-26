@@ -8,9 +8,9 @@ import java.util.stream.Collectors;
 
 import org.jds.edgar4j.dto.request.DownloadRequest;
 import org.jds.edgar4j.dto.response.DownloadJobResponse;
-import org.jds.edgar4j.entity.DownloadJob;
-import org.jds.edgar4j.entity.DownloadJob.JobStatus;
-import org.jds.edgar4j.entity.DownloadJob.JobType;
+import org.jds.edgar4j.model.DownloadJob;
+import org.jds.edgar4j.model.DownloadJob.JobStatus;
+import org.jds.edgar4j.model.DownloadJob.JobType;
 import org.jds.edgar4j.repository.DownloadJobRepository;
 import org.jds.edgar4j.service.DownloadJobService;
 import org.jds.edgar4j.service.DownloadSubmissionsService;
@@ -197,3 +197,4 @@ public class DownloadJobServiceImpl implements DownloadJobService {
                 .build();
     }
 }
+

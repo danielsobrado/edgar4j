@@ -3,7 +3,7 @@ package org.jds.edgar4j.repository;
 import java.util.Date;
 import java.util.List;
 
-import org.jds.edgar4j.entity.Form4;
+import org.jds.edgar4j.model.Form4;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
@@ -47,3 +47,4 @@ public interface Form4Repository extends MongoRepository<Form4, String> {
     @Query(value = "{ 'boughtSold': 'S' }", count = true)
     long countSells();
 }
+

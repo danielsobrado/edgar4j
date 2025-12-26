@@ -7,7 +7,7 @@ import org.jds.edgar4j.dto.request.FilingSearchRequest;
 import org.jds.edgar4j.dto.response.FilingDetailResponse;
 import org.jds.edgar4j.dto.response.FilingResponse;
 import org.jds.edgar4j.dto.response.PaginatedResponse;
-import org.jds.edgar4j.entity.Filling;
+import org.jds.edgar4j.model.Filling;
 
 public interface FilingService {
 
@@ -31,3 +31,4 @@ public interface FilingService {
 
     long countFilingsByFormType(String formType);
 }
+

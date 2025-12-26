@@ -7,11 +7,11 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
-import org.jds.edgar4j.entity.Exchange;
-import org.jds.edgar4j.entity.Filling;
-import org.jds.edgar4j.entity.FormType;
-import org.jds.edgar4j.entity.Submissions;
-import org.jds.edgar4j.entity.Ticker;
+import org.jds.edgar4j.model.Exchange;
+import org.jds.edgar4j.model.Filling;
+import org.jds.edgar4j.model.FormType;
+import org.jds.edgar4j.model.Submissions;
+import org.jds.edgar4j.model.Ticker;
 import org.jds.edgar4j.integration.model.SecSubmissionResponse;
 import org.jds.edgar4j.integration.model.SecTickerExchangeResponse;
 import org.springframework.stereotype.Component;
@@ -187,3 +187,4 @@ public class SecResponseParser {
         return list.get(index);
     }
 }
+

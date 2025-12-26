@@ -1,4 +1,4 @@
-package org.jds.edgar4j.entity;
+package org.jds.edgar4j.model;
 
 import java.util.Date;
 import java.util.List;
@@ -60,3 +60,4 @@ public class Submissions {
     private Date fillingTo;
 
 }
+

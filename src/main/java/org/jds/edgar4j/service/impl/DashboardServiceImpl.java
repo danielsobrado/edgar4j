@@ -7,7 +7,7 @@ import java.util.stream.Collectors;
 import org.jds.edgar4j.dto.response.DashboardStatsResponse;
 import org.jds.edgar4j.dto.response.FilingResponse;
 import org.jds.edgar4j.dto.response.RecentSearchResponse;
-import org.jds.edgar4j.entity.SearchHistory;
+import org.jds.edgar4j.model.SearchHistory;
 import org.jds.edgar4j.repository.FillingRepository;
 import org.jds.edgar4j.repository.SearchHistoryRepository;
 import org.jds.edgar4j.repository.SubmissionsRepository;
@@ -86,3 +86,4 @@ public class DashboardServiceImpl implements DashboardService {
                 .build();
     }
 }
+

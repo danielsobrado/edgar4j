@@ -2,9 +2,9 @@ package org.jds.edgar4j.repository;
 
 import java.util.List;
 
-import org.jds.edgar4j.entity.DownloadJob;
-import org.jds.edgar4j.entity.DownloadJob.JobStatus;
-import org.jds.edgar4j.entity.DownloadJob.JobType;
+import org.jds.edgar4j.model.DownloadJob;
+import org.jds.edgar4j.model.DownloadJob.JobStatus;
+import org.jds.edgar4j.model.DownloadJob.JobType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
@@ -27,3 +27,4 @@ public interface DownloadJobRepository extends MongoRepository<DownloadJob, Stri
 
     long countByStatus(JobStatus status);
 }
+

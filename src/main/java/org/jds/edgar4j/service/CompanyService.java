@@ -6,7 +6,7 @@ import org.jds.edgar4j.dto.request.CompanySearchRequest;
 import org.jds.edgar4j.dto.response.CompanyListResponse;
 import org.jds.edgar4j.dto.response.CompanyResponse;
 import org.jds.edgar4j.dto.response.PaginatedResponse;
-import org.jds.edgar4j.entity.Submissions;
+import org.jds.edgar4j.model.Submissions;
 
 public interface CompanyService {
 
@@ -22,3 +22,4 @@ public interface CompanyService {
 
     long countCompanies();
 }
+

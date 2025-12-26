@@ -7,7 +7,7 @@ import org.jds.edgar4j.dto.request.CompanySearchRequest;
 import org.jds.edgar4j.dto.response.CompanyListResponse;
 import org.jds.edgar4j.dto.response.CompanyResponse;
 import org.jds.edgar4j.dto.response.PaginatedResponse;
-import org.jds.edgar4j.entity.Submissions;
+import org.jds.edgar4j.model.Submissions;
 import org.jds.edgar4j.repository.SubmissionsRepository;
 import org.jds.edgar4j.service.CompanyService;
 import org.springframework.data.domain.Page;
@@ -115,3 +115,4 @@ public class CompanyServiceImpl implements CompanyService {
                 .build();
     }
 }
+

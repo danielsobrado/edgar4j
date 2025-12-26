@@ -3,7 +3,7 @@ package org.jds.edgar4j.repository;
 import java.time.LocalDateTime;
 import java.util.List;
 
-import org.jds.edgar4j.entity.SearchHistory;
+import org.jds.edgar4j.model.SearchHistory;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
@@ -18,3 +18,4 @@ public interface SearchHistoryRepository extends MongoRepository<SearchHistory, 
 
     void deleteByTimestampBefore(LocalDateTime timestamp);
 }
+

@@ -7,10 +7,11 @@ import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 import org.jds.edgar4j.dto.request.ExportRequest;
 import org.jds.edgar4j.dto.response.FilingResponse;
-import org.jds.edgar4j.entity.Filling;
+import org.jds.edgar4j.model.Filling;
 import org.jds.edgar4j.repository.FillingRepository;
 import org.jds.edgar4j.service.ExportService;
 import org.jds.edgar4j.service.FilingService;
@@ -87,7 +88,10 @@ public class ExportServiceImpl implements ExportService {
 
     private List<Filling> getFillings(ExportRequest request) {
         if (request.getFilingIds() != null && !request.getFilingIds().isEmpty()) {
-            return fillingRepository.findAllById(request.getFilingIds());
+            return StreamSupport.stream(
+                    fillingRepository.findAllById(request.getFilingIds()).spliterator(),
+                    false
+            ).collect(Collectors.toList());
         } else if (request.getSearchCriteria() != null) {
             var searchResult = filingService.searchFilings(request.getSearchCriteria());
             return searchResult.getContent().stream()
@@ -110,3 +114,4 @@ public class ExportServiceImpl implements ExportService {
         return value;
     }
 }
+

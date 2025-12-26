@@ -6,7 +6,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.concurrent.CompletableFuture;
 
-import org.jds.edgar4j.entity.Form4;
+import org.jds.edgar4j.model.Form4;
 import org.jds.edgar4j.service.Form4Service;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -59,3 +59,4 @@ public class Form4ServiceImpl implements Form4Service {
         }
     
 }
+

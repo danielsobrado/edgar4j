@@ -3,7 +3,7 @@ package org.jds.edgar4j.repository;
 import java.util.List;
 import java.util.Optional;
 
-import org.jds.edgar4j.entity.Exchange;
+import org.jds.edgar4j.model.Exchange;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
@@ -20,3 +20,4 @@ public interface ExchangeRepository extends MongoRepository<Exchange, String> {
 
     boolean existsByName(String name);
 }
+

@@ -2,7 +2,7 @@ package org.jds.edgar4j.service.impl;
 
 import java.util.List;
 
-import org.jds.edgar4j.entity.Ticker;
+import org.jds.edgar4j.model.Ticker;
 import org.jds.edgar4j.integration.SecApiClient;
 import org.jds.edgar4j.integration.SecResponseParser;
 import org.jds.edgar4j.repository.TickerRepository;
@@ -80,3 +80,4 @@ public class DownloadTickersServiceImpl implements DownloadTickersService {
         tickerRepository.saveAll(tickers);
     }
 }
+

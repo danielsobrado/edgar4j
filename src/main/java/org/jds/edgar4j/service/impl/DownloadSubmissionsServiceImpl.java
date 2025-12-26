@@ -2,8 +2,8 @@ package org.jds.edgar4j.service.impl;
 
 import java.util.List;
 
-import org.jds.edgar4j.entity.Filling;
-import org.jds.edgar4j.entity.Submissions;
+import org.jds.edgar4j.model.Filling;
+import org.jds.edgar4j.model.Submissions;
 import org.jds.edgar4j.integration.SecApiClient;
 import org.jds.edgar4j.integration.SecResponseParser;
 import org.jds.edgar4j.integration.model.SecSubmissionResponse;
@@ -77,3 +77,4 @@ public class DownloadSubmissionsServiceImpl implements DownloadSubmissionsServic
         log.info("Saved {} filings for CIK: {}", fillings.size(), cik);
     }
 }
+

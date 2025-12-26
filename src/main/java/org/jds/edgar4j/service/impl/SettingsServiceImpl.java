@@ -2,7 +2,7 @@ package org.jds.edgar4j.service.impl;
 
 import org.jds.edgar4j.dto.request.SettingsRequest;
 import org.jds.edgar4j.dto.response.SettingsResponse;
-import org.jds.edgar4j.entity.AppSettings;
+import org.jds.edgar4j.model.AppSettings;
 import org.jds.edgar4j.repository.AppSettingsRepository;
 import org.jds.edgar4j.service.SettingsService;
 import org.springframework.beans.factory.annotation.Value;
@@ -119,3 +119,4 @@ public class SettingsServiceImpl implements SettingsService {
                 .build();
     }
 }
+
