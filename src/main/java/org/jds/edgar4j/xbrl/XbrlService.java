@@ -89,7 +89,13 @@ public class XbrlService {
                 .retrieve()
                 .bodyToMono(byte[].class)
                 .timeout(Duration.ofMinutes(2))
-                .map(content -> parse(content, url));
+                .flatMap(content -> {
+                    XbrlInstance instance = parse(content, url);
+                    if (instance == null) {
+                        return Mono.error(new IllegalStateException("No XBRL instance parsed from " + url));
+                    }
+                    return Mono.just(instance);
+                });
     }
 
     /**
@@ -107,7 +113,13 @@ public class XbrlService {
                 .retrieve()
                 .bodyToMono(byte[].class)
                 .timeout(Duration.ofMinutes(5))
-                .map(content -> packageHandler.parsePackage(content, url));
+                .flatMap(content -> {
+                    XbrlPackageHandler.PackageResult result = packageHandler.parsePackage(content, url);
+                    if (result == null) {
+                        return Mono.error(new IllegalStateException("No XBRL package parsed from " + url));
+                    }
+                    return Mono.just(result);
+                });
     }
 
     /**
