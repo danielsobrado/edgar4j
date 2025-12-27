@@ -151,3 +151,19 @@ export function useDownloadActions() {
     cancelJob,
   };
 }
+
+// Combined hook for Downloads page
+export function useDownloads() {
+  const { jobs, loading, error, refresh } = useDownloadJobs(50);
+  const { jobs: activeJobs } = useActiveDownloadJobs(5000);
+  const actions = useDownloadActions();
+
+  return {
+    jobs,
+    activeJobs,
+    loading,
+    error,
+    refresh,
+    ...actions,
+  };
+}

@@ -121,3 +121,71 @@ export function useRecentFilings(limit: number = 10) {
 
   return { filings, loading, error };
 }
+
+// Hook used by FilingSearch page
+export function useFilings() {
+  const [filings, setFilings] = useState<Filing[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [totalElements, setTotalElements] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+
+  const search = useCallback(async (request: FilingSearchRequest) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await filingsApi.searchFilings(request);
+      setFilings(data.content);
+      setTotalElements(data.totalElements);
+      setTotalPages(data.totalPages);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to search filings');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const refresh = useCallback(() => {
+    // Refresh with current state - caller handles request
+  }, []);
+
+  return { filings, loading, error, totalElements, totalPages, search, refresh };
+}
+
+// Form types for dropdown
+interface FormType {
+  code: string;
+  name: string;
+  description?: string;
+}
+
+export function useFormTypes() {
+  const [formTypes, setFormTypes] = useState<FormType[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Common SEC form types - could be fetched from API
+    const commonFormTypes: FormType[] = [
+      { code: '10-K', name: 'Annual Report' },
+      { code: '10-Q', name: 'Quarterly Report' },
+      { code: '8-K', name: 'Current Report' },
+      { code: '20-F', name: 'Annual Report (Foreign)' },
+      { code: '6-K', name: 'Report of Foreign Issuer' },
+      { code: 'S-1', name: 'Registration Statement' },
+      { code: 'S-3', name: 'Registration Statement (Shelf)' },
+      { code: '4', name: 'Statement of Changes (Insider)' },
+      { code: 'DEF 14A', name: 'Proxy Statement' },
+      { code: '13F-HR', name: 'Institutional Holdings' },
+      { code: '13D', name: 'Beneficial Ownership (>5%)' },
+      { code: '13G', name: 'Beneficial Ownership (Passive)' },
+      { code: 'SC 13D', name: 'Schedule 13D' },
+      { code: 'SC 13G', name: 'Schedule 13G' },
+      { code: '424B', name: 'Prospectus' },
+    ];
+    setFormTypes(commonFormTypes);
+    setLoading(false);
+  }, []);
+
+  return { formTypes, loading, error };
+}
