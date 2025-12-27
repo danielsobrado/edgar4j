@@ -5,6 +5,7 @@ import { FormTypeBadge } from '../components/FormTypeBadge';
 import { useFiling } from '../hooks/useFilings';
 import { LoadingPage } from '../components/common/LoadingSpinner';
 import { ErrorPage } from '../components/common/ErrorMessage';
+import { XbrlAnalysisPanel } from '../components/xbrl';
 
 export function FilingDetail() {
   const { id } = useParams();
@@ -156,6 +157,17 @@ export function FilingDetail() {
             ))}
           </div>
         </div>
+
+        {/* XBRL Analysis Panel */}
+        {(filing.isXBRL || filing.isInlineXBRL) && (
+          <div className="p-6 border-b border-gray-200">
+            <XbrlAnalysisPanel
+              filingUrl={secDocumentUrl}
+              isXbrl={filing.isXBRL}
+              isInlineXbrl={filing.isInlineXBRL}
+            />
+          </div>
+        )}
 
         {/* Content Preview */}
         {filing.contentPreview && (

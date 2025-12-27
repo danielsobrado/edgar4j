@@ -9,3 +9,16 @@ export { filingsApi } from './endpoints/filings';
 export { downloadsApi } from './endpoints/downloads';
 export { settingsApi } from './endpoints/settings';
 export { exportApi } from './endpoints/export';
+export { xbrlApi } from './endpoints/xbrl';
+export type {
+  XbrlSummary,
+  SecFilingMetadata,
+  FinancialStatement,
+  FinancialStatements,
+  LineItem,
+  ReportingPeriod,
+  KeyFinancials,
+  ComprehensiveAnalysis,
+  XbrlFact,
+  CalculationValidation,
+} from './endpoints/xbrl';
