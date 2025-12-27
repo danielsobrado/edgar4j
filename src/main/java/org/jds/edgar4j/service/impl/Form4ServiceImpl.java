@@ -8,9 +8,11 @@ import java.util.concurrent.CompletableFuture;
 
 import org.jds.edgar4j.model.Form4;
 import org.jds.edgar4j.service.Form4Service;
+import org.jds.edgar4j.service.SettingsService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -20,10 +22,13 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class Form4ServiceImpl implements Form4Service {
 
         @Value("${edgar4j.urls.edgarDataArchivesUrl}")
         private String edgarDataArchivesUrl;
+
+        private final SettingsService settingsService;
 
         // if isDirector == 1:
         //     owner = 'Director'
@@ -46,6 +51,7 @@ public class Form4ServiceImpl implements Form4Service {
                 final HttpClient httpClient = HttpClient.newHttpClient();
                 HttpRequest httpRequest = HttpRequest.newBuilder()
                         .uri(URI.create(formURL))
+                        .header("User-Agent", settingsService.getUserAgent())
                         .build();
                 HttpResponse.BodyHandler<String> bodyHandler = HttpResponse.BodyHandlers.ofString();
                 return httpClient.sendAsync(httpRequest, bodyHandler);

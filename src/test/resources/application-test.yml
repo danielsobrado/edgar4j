@@ -1,6 +1,9 @@
 # Test profile configuration
 spring:
   data:
+    elasticsearch:
+      repositories:
+        enabled: false
     mongodb:
       database: edgar_test
   autoconfigure:

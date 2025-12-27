@@ -1,6 +1,9 @@
 package org.jds.edgar4j.service.impl;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 import org.jds.edgar4j.model.Ticker;
 import org.jds.edgar4j.integration.SecApiClient;
@@ -69,14 +72,26 @@ public class DownloadTickersServiceImpl implements DownloadTickersService {
     }
 
     private void saveTickers(List<Ticker> tickers) {
-        for (Ticker ticker : tickers) {
-            if (ticker.getCode() != null) {
-                Ticker existingTicker = tickerRepository.findByCode(ticker.getCode()).orElse(null);
-                if (existingTicker != null) {
-                    ticker.setId(existingTicker.getId());
+        List<String> codes = tickers.stream()
+                .map(Ticker::getCode)
+                .filter(Objects::nonNull)
+                .filter(code -> !code.isBlank())
+                .distinct()
+                .toList();
+
+        if (!codes.isEmpty()) {
+            Map<String, String> existingIdsByCode = tickerRepository.findByCodeIn(codes).stream()
+                    .filter(existing -> existing.getCode() != null)
+                    .collect(Collectors.toMap(Ticker::getCode, Ticker::getId, (left, right) -> left));
+
+            for (Ticker ticker : tickers) {
+                String existingId = existingIdsByCode.get(ticker.getCode());
+                if (existingId != null) {
+                    ticker.setId(existingId);
                 }
             }
         }
+
         tickerRepository.saveAll(tickers);
     }
 }

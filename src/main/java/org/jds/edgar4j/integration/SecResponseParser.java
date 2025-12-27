@@ -107,10 +107,33 @@ public class SecResponseParser {
             JsonNode root = objectMapper.readTree(json);
             root.fields().forEachRemaining(entry -> {
                 JsonNode node = entry.getValue();
+                JsonNode cikNode = node.get("cik_str");
+                JsonNode tickerNode = node.get("ticker");
+                JsonNode titleNode = node.get("title");
+
+                if (cikNode == null || cikNode.isNull()
+                        || tickerNode == null || tickerNode.isNull()
+                        || titleNode == null || titleNode.isNull()) {
+                    return;
+                }
+
+                String cikRaw = cikNode.asText();
+                if (cikRaw == null || cikRaw.isBlank()) {
+                    return;
+                }
+
+                int cikValue;
+                try {
+                    cikValue = Integer.parseInt(cikRaw);
+                } catch (NumberFormatException e) {
+                    log.debug("Skipping ticker with invalid CIK: {}", cikRaw);
+                    return;
+                }
+
                 Ticker ticker = Ticker.builder()
-                        .cik(String.format("%010d", node.get("cik_str").asInt()))
-                        .code(node.get("ticker").asText())
-                        .name(node.get("title").asText())
+                        .cik(String.format("%010d", cikValue))
+                        .code(tickerNode.asText())
+                        .name(titleNode.asText())
                         .build();
                 tickers.add(ticker);
             });
@@ -127,8 +150,14 @@ public class SecResponseParser {
             SecTickerExchangeResponse response = objectMapper.readValue(json, SecTickerExchangeResponse.class);
 
             for (List<Object> row : response.getData()) {
-                if (row.size() >= 4) {
-                    int cikInt = row.get(0) instanceof Integer ? (Integer) row.get(0) : Integer.parseInt(row.get(0).toString());
+                if (row.size() >= 4 && row.get(0) != null && row.get(1) != null && row.get(2) != null && row.get(3) != null) {
+                    int cikInt;
+                    try {
+                        cikInt = row.get(0) instanceof Integer ? (Integer) row.get(0) : Integer.parseInt(row.get(0).toString());
+                    } catch (NumberFormatException e) {
+                        log.debug("Skipping exchange ticker with invalid CIK: {}", row.get(0));
+                        continue;
+                    }
                     String cik = String.format("%010d", cikInt);
                     String name = row.get(1).toString();
                     String code = row.get(2).toString();

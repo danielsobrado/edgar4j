@@ -8,11 +8,6 @@ spring:
     mongodb:
       uri: ${MONGODB_URI:mongodb://localhost:27017/edgar}
       database: ${MONGODB_DATABASE:edgar}
-  jackson:
-    serialization:
-      write-dates-as-timestamps: false
-    deserialization:
-      fail-on-unknown-properties: false
 
 edgar4j:
   urls:
