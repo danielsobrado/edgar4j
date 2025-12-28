@@ -9,6 +9,7 @@ import org.jds.edgar4j.xbrl.model.XbrlInstance;
 import org.springframework.stereotype.Component;
 
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 /**
@@ -61,7 +62,7 @@ public class XbrlPackageHandler {
                 linkbaseFiles.add(filename);
             } else if (lower.endsWith(".xsd")) {
                 schemaFiles.add(filename);
-            } else if (isInstanceFile(filename)) {
+            } else if (isInstanceFile(filename, files.get(filename))) {
                 instanceFiles.add(filename);
             } else {
                 otherFiles.add(filename);
@@ -155,7 +156,7 @@ public class XbrlPackageHandler {
     /**
      * Check if a file is an XBRL instance document.
      */
-    private boolean isInstanceFile(String filename) {
+    private boolean isInstanceFile(String filename, byte[] content) {
         String lower = filename.toLowerCase();
 
         // Skip linkbases
@@ -164,15 +165,44 @@ public class XbrlPackageHandler {
             return false;
         }
 
+        if (isNonInstanceName(lower)) {
+            return false;
+        }
+
         // Check for common instance patterns
         if (lower.endsWith("_htm.xml")) return true;  // SEC inline XBRL
         if (lower.matches(".*-\\d{8}\\.xml")) return true;  // Traditional
+        if (lower.endsWith("_ins.xml") || lower.endsWith("_xbrl.xml")) return true;
         if (lower.endsWith(".xml") && !lower.endsWith(".xsd")) {
-            // Could be instance, check content later
-            return true;
+            return contentLooksLikeInstance(content);
         }
 
         return false;
+    }
+
+    private boolean isNonInstanceName(String lower) {
+        if (lower.endsWith("filingsummary.xml")) {
+            return true;
+        }
+        int lastSlash = Math.max(lower.lastIndexOf('/'), lower.lastIndexOf('\\'));
+        String baseName = lastSlash >= 0 ? lower.substring(lastSlash + 1) : lower;
+        return baseName.matches("r\\d+\\.xml");
+    }
+
+    private boolean contentLooksLikeInstance(byte[] content) {
+        if (content == null || content.length == 0) {
+            return false;
+        }
+        int length = Math.min(content.length, 4096);
+        String header = new String(content, 0, length, StandardCharsets.US_ASCII).toLowerCase();
+
+        if (header.contains("<xbrl") || header.contains("xbrli:xbrl")
+                || header.contains("xmlns:xbrli") || header.contains("xbrl.org/2003/instance")) {
+            return true;
+        }
+
+        return header.contains("xmlns:ix") || header.contains("ix:nonfraction")
+                || header.contains("ix:nonnumeric") || header.contains("inlinexbrl");
     }
 
     /**
@@ -221,8 +251,16 @@ public class XbrlPackageHandler {
         }
 
         public XbrlInstance getPrimaryInstance() {
-            // Return the first instance (usually the main document)
-            return instances.isEmpty() ? null : instances.values().iterator().next();
+            if (instances.isEmpty()) {
+                return null;
+            }
+
+            return instances.values().stream()
+                    .filter(Objects::nonNull)
+                    .max(Comparator.comparingInt((XbrlInstance instance) -> instance.getFacts().size())
+                            .thenComparingInt(instance -> instance.getContexts().size())
+                            .thenComparingInt(instance -> instance.getUnits().size()))
+                    .orElse(instances.values().iterator().next());
         }
 
         public int getTotalFacts() {

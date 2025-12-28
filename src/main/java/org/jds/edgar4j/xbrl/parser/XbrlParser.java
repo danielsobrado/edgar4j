@@ -168,6 +168,7 @@ public class XbrlParser {
                     namespaceResolver.registerNamespace(prefix, attr.getValue());
                 } else if (key.equals("xmlns")) {
                     namespaces.put("", attr.getValue());
+                    namespaceResolver.registerNamespace("", attr.getValue());
                 }
             }
         }
@@ -181,6 +182,9 @@ public class XbrlParser {
                     String prefix = key.substring(6);
                     namespaces.put(prefix, attr.getValue());
                     namespaceResolver.registerNamespace(prefix, attr.getValue());
+                } else if (key.equals("xmlns")) {
+                    namespaces.put("", attr.getValue());
+                    namespaceResolver.registerNamespace("", attr.getValue());
                 }
             }
         }
@@ -517,12 +521,37 @@ public class XbrlParser {
                 "schemaref", "link:schemaref", "linkbaseref", "link:linkbaseref"
         );
 
-        for (Element child : xbrlRoot.children()) {
-            String tagName = child.tagName().toLowerCase();
-            if (excludedTags.contains(tagName)) continue;
+        Set<Element> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+        extractFactCandidates(xbrlRoot.children(), excludedTags, facts, result, visited);
+
+        if (facts.isEmpty()) {
+            Elements candidates = xbrlRoot.getElementsByAttribute("contextRef");
+            if (candidates.isEmpty()) {
+                candidates = xbrlRoot.getElementsByAttribute("contextref");
+            }
+            extractFactCandidates(candidates, excludedTags, facts, result, visited);
+        }
+
+        result.setTotalFactsFound(facts.size() + result.getSkippedFacts());
+        return facts;
+    }
+
+    private void extractFactCandidates(Iterable<Element> elements,
+                                       Set<String> excludedTags,
+                                       List<XbrlFact> facts,
+                                       ParseResult result,
+                                       Set<Element> visited) {
+        for (Element element : elements) {
+            if (!visited.add(element)) {
+                continue;
+            }
+            String tagName = element.tagName().toLowerCase();
+            if (excludedTags.contains(tagName)) {
+                continue;
+            }
 
             try {
-                XbrlFact fact = parseXbrlFact(child);
+                XbrlFact fact = parseXbrlFact(element);
                 if (fact != null) {
                     facts.add(fact);
                     result.setSuccessfullyParsedFacts(
@@ -534,9 +563,6 @@ public class XbrlParser {
                 result.setSkippedFacts(result.getSkippedFacts() + 1);
             }
         }
-
-        result.setTotalFactsFound(facts.size() + result.getSkippedFacts());
-        return facts;
     }
 
     /**

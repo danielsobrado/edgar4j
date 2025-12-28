@@ -34,6 +34,9 @@ public class SettingsServiceImpl implements SettingsService {
     @Value("${edgar4j.urls.companyTickersUrl}")
     private String companyTickersUrl;
 
+    @Value("${edgar4j.sec.user-agent:}")
+    private String configuredUserAgent;
+
     @Override
     public SettingsResponse getSettings() {
         AppSettings settings = getOrCreateDefaultSettings();
@@ -94,9 +97,12 @@ public class SettingsServiceImpl implements SettingsService {
     private AppSettings getOrCreateDefaultSettings() {
         return appSettingsRepository.findById(DEFAULT_SETTINGS_ID)
                 .orElseGet(() -> {
-                    AppSettings newSettings = AppSettings.builder()
-                            .id(DEFAULT_SETTINGS_ID)
-                            .build();
+                    AppSettings.AppSettingsBuilder builder = AppSettings.builder()
+                            .id(DEFAULT_SETTINGS_ID);
+                    if (configuredUserAgent != null && !configuredUserAgent.isBlank()) {
+                        builder.userAgent(configuredUserAgent);
+                    }
+                    AppSettings newSettings = builder.build();
                     return appSettingsRepository.save(newSettings);
                 });
     }

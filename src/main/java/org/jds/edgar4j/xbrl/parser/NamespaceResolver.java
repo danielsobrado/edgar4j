@@ -148,9 +148,15 @@ public class NamespaceResolver {
      * Register a namespace discovered in the document.
      */
     public void registerNamespace(String prefix, String uri) {
-        if (prefix != null && uri != null && !prefix.isEmpty()) {
-            documentNamespaces.put(prefix, uri);
-            log.trace("Registered namespace: {}={}", prefix, uri);
+        if (uri == null) {
+            return;
+        }
+        String safePrefix = prefix == null ? "" : prefix;
+        documentNamespaces.put(safePrefix, uri);
+        if (!safePrefix.isEmpty()) {
+            log.trace("Registered namespace: {}={}", safePrefix, uri);
+        } else {
+            log.trace("Registered default namespace: {}", uri);
         }
     }
 
@@ -168,8 +174,11 @@ public class NamespaceResolver {
      * Uses document namespaces first, then falls back to known namespaces.
      */
     public String resolvePrefix(String prefix) {
-        if (prefix == null || prefix.isEmpty()) {
+        if (prefix == null) {
             return null;
+        }
+        if (prefix.isEmpty()) {
+            return documentNamespaces.get("");
         }
 
         // Try document-specific namespace first
@@ -234,7 +243,8 @@ public class NamespaceResolver {
 
         int colonIndex = qname.indexOf(':');
         if (colonIndex < 0) {
-            return new QNameParts(null, null, qname);
+            String defaultNamespace = resolvePrefix("");
+            return new QNameParts(null, defaultNamespace, qname);
         }
 
         String prefix = qname.substring(0, colonIndex);
