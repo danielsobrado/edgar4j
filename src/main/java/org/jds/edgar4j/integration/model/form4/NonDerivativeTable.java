@@ -5,6 +5,7 @@ import java.util.List;
 import jakarta.xml.bind.annotation.XmlAccessType;
 import jakarta.xml.bind.annotation.XmlAccessorType;
 import jakarta.xml.bind.annotation.XmlElement;
+import jakarta.xml.bind.annotation.XmlType;
 
 import lombok.Data;
 
@@ -66,6 +67,7 @@ public class NonDerivativeTable {
 
     @Data
     @XmlAccessorType(XmlAccessType.FIELD)
+    @XmlType(name = "nonDerivativeTransactionCoding")
     public static class TransactionCoding {
 
         @XmlElement(name = "transactionFormType")

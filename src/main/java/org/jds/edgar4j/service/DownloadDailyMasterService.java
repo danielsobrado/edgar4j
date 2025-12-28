@@ -1,18 +1,23 @@
 package org.jds.edgar4j.service;
 
-import io.vavr.control.Try;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jds.edgar4j.properties.Edgar4JProperties;
+import org.jds.edgar4j.integration.SecRateLimiter;
+import org.jds.edgar4j.properties.StorageProperties;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -20,7 +25,14 @@ import java.util.List;
 public class DownloadDailyMasterService {
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("MM/dd/yyyy");
     private static final DateTimeFormatter FILE_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd");
-    private final Edgar4JProperties edgarProperties;
+
+    private static final String SEC_BLOCK_MESSAGE =
+            "For security purposes, and to ensure that the public service remains available to users, this government computer system";
+
+    private final StorageProperties storageProperties;
+    private final SettingsService settingsService;
+    private final SecRateLimiter secRateLimiter;
+    private final WebClient.Builder webClientBuilder;
 
     public void downloadDailyMaster(String date) {
         LocalDate localDate = LocalDate.parse(date, DATE_FORMAT);
@@ -29,25 +41,53 @@ public class DownloadDailyMasterService {
             return;
         }
 
-        createDailyIndexesDirectory();
-
         String fileDate = localDate.format(FILE_DATE_FORMAT);
-        String filename = String.format("daily_idx_%s", fileDate);
-        String filepath = String.format("%s/%s", edgarProperties.getDailyIndexesPath(), filename);
+        String filename = String.format("daily_idx_%s.idx", fileDate);
+        Path outputPath = resolveOutputPath(filename);
 
         List<String> links = generateLinks(localDate);
 
-        boolean success = links.stream()
-                .map(link -> Try.of(() -> downloadFile(link, filepath, edgarProperties.getUserAgent())))
-                .anyMatch(Try::isSuccess);
+        String userAgent = settingsService.getUserAgent();
+        boolean downloaded = links.stream()
+                .map(url -> fetchDailyMasterIndex(url, userAgent))
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .findFirst()
+                .map(content -> writeFile(outputPath, content))
+                .orElse(false);
 
-        if (!success) {
+        if (!downloaded) {
             log.error("Daily master index is not available for this date.");
         }
     }
 
-    private void createDailyIndexesDirectory() {
-        new File(edgarProperties.getDailyIndexesPath()).mkdirs();
+    Optional<String> fetchDailyMasterIndex(String url, String userAgent) {
+        try {
+            secRateLimiter.acquire();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return Optional.empty();
+        }
+
+        WebClient client = webClientBuilder.build();
+        return client.get()
+                .uri(url)
+                .accept(MediaType.TEXT_PLAIN)
+                .header(HttpHeaders.USER_AGENT, userAgent)
+                .exchangeToMono(response -> response.statusCode().is2xxSuccessful()
+                        ? response.bodyToMono(String.class)
+                        : Mono.empty())
+                .timeout(java.time.Duration.ofSeconds(30))
+                .onErrorResume(e -> Mono.empty())
+                .map(String::trim)
+                .filter(body -> !body.isBlank())
+                .filter(body -> !body.contains(SEC_BLOCK_MESSAGE))
+                .blockOptional();
+    }
+
+    private Path resolveOutputPath(String filename) {
+        Path directory = Paths.get(storageProperties.getDailyIndexesPath());
+        return directory.resolve(filename).normalize();
     }
 
     private List<String> generateLinks(LocalDate date) {
@@ -62,28 +102,15 @@ public class DownloadDailyMasterService {
         );
     }
 
-    boolean downloadFile(String url, String filepath, String userAgent) throws IOException,
-            InterruptedException {
-        log.info("Downloading file from: {}", url);
-        ProcessBuilder processBuilder = new ProcessBuilder("curl", "-s", "-A", userAgent, "-o", filepath, url);
-        Process process = processBuilder.start();
-
-        int exitCode = process.waitFor();
-        if (exitCode != 0) {
-            log.error("Failed to download file from: {}", url);
+    private boolean writeFile(Path outputPath, String content) {
+        try {
+            Files.createDirectories(outputPath.getParent());
+            Files.writeString(outputPath, content);
+            log.info("Saved daily master index to {}", outputPath);
+            return true;
+        } catch (IOException e) {
+            log.error("Failed to write daily master index to {}", outputPath, e);
             return false;
         }
-
-        List<String> lines = Files.readAllLines(Paths.get(filepath));
-        boolean isFileValid = lines.stream()
-                .noneMatch(line -> line.contains("For security purposes, and to ensure that the public service remains available to users, this government computer system"));
-
-        if (!isFileValid) {
-            log.error("Invalid file content. Retrying...");
-            return false;
-        }
-
-        log.info("Successfully downloaded file from: {}", url);
-        return true;
     }
 }

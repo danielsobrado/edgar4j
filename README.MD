@@ -6,9 +6,65 @@ The scope will initially be confined to stock ownership and insider transactions
 
 Based on: https://www.sec.gov/edgar/sec-api-documentation
 
+## Configuration
+
+Most settings are configured via environment variables (with sane defaults for local development). Key options:
+
+### SEC access
+
+- `SEC_USER_AGENT`: User-Agent sent to `sec.gov` / `data.sec.gov` (recommended to set to your app + contact info).
+- `edgar4j.sec.rate-limit-per-second` (env: `EDGAR4J_SEC_RATE_LIMIT_PER_SECOND` if you map it yourself): Max requests/sec enforced by the internal rate limiter (default `10`).
+
+### Storage (daily index downloads)
+
+- `EDGAR4J_DAILY_INDEXES_PATH`: Directory for downloaded daily master index files (default `./data/daily-indexes`).
+
+### MongoDB
+
+- `MONGODB_URI`: Mongo connection string (default `mongodb://localhost:27017/edgar`).
+- `MONGODB_DATABASE`: Mongo database name (default `edgar`).
+- `MONGODB_AUTO_INDEX_CREATION`: Enables Spring Data Mongo index creation on startup (default `true`).
+
+### Spring Cloud Config (optional)
+
+- `SPRING_CLOUD_CONFIG_ENABLED`: Enables Spring Cloud Config client (default `false`).
+
+### Security (optional, recommended for production)
+
+By default, the app permits all requests (good for local dev). To protect `/api/**` and `/actuator/**` with HTTP Basic:
+
+- `EDGAR4J_SECURITY_ENABLED=true`
+- `EDGAR4J_SECURITY_USERNAME=...`
+- `EDGAR4J_SECURITY_PASSWORD=...`
+
+When enabled, `/actuator/health` and `/actuator/info` remain public, everything under `/api/**` and other actuator endpoints requires auth.
+
+### Actuator
+
+- `MANAGEMENT_HEALTH_SHOW_DETAILS`: Controls health endpoint details (default `never`).
+
+### Elasticsearch (optional)
+
+Elasticsearch repositories are disabled by default. To enable them, run with the `elasticsearch` Spring profile and provide endpoints/credentials:
+
+- Profile: `elasticsearch`
+- `ELASTICSEARCH_ENDPOINTS` (default `localhost:9200`)
+- `ELASTICSEARCH_USERNAME` (default `elastic`)
+- `ELASTICSEARCH_PASSWORD` (default `changeme`)
+
+### Jobs
+
+- `TICKER_SYNC_ENABLED` (default `true`)
+- `FILING_SYNC_ENABLED` (default `true`)
+- `DATA_INTEGRITY_ENABLED` (default `true`)
+
+## Build
+
+This repo uses the Maven Wrapper. On Windows, `mvnw.cmd` will fall back to the `java` found on `PATH` if `JAVA_HOME` is not set correctly.
+
 ## Submissions API
 
-Each entity’s current filing history is available at the following URL:
+Each entity's current filing history is available at the following URL:
 
 https://data.sec.gov/submissions/CIK##########.json
 Where the ########## is the entity’s 10-digit Central Index Key (CIK), including leading zeros.

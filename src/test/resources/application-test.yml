@@ -6,12 +6,15 @@ spring:
         enabled: false
     mongodb:
       database: edgar_test
+      auto-index-creation: true
   autoconfigure:
     exclude:
       - org.springframework.boot.autoconfigure.data.elasticsearch.ElasticsearchDataAutoConfiguration
       - org.springframework.boot.autoconfigure.elasticsearch.ElasticsearchRestClientAutoConfiguration
 
 edgar4j:
+  security:
+    enabled: false
   urls:
     baseSecUrl: https://www.sec.gov
     baseDataSecUrl: https://data.sec.gov

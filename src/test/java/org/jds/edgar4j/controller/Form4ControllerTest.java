@@ -1,42 +1,36 @@
 package org.jds.edgar4j.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.jds.edgar4j.model.Form4;
 import org.jds.edgar4j.model.Form4Transaction;
 import org.jds.edgar4j.repository.Form4Repository;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.reactive.server.WebTestClient;
 
 import java.util.*;
 
 import static org.hamcrest.Matchers.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
  * Integration tests for Form4Controller REST endpoints.
- * Uses MockMvc and embedded MongoDB.
+ * Uses WebTestClient and embedded MongoDB.
  */
-@SpringBootTest
-@AutoConfigureMockMvc
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class Form4ControllerTest {
 
-    @Autowired
-    private MockMvc mockMvc;
+    private WebTestClient webTestClient;
+
+    @LocalServerPort
+    private int port;
 
     @Autowired
     private Form4Repository form4Repository;
-
-    @Autowired
-    private ObjectMapper objectMapper;
 
     private static final String BASE_URL = "/api/form4";
     private static final String ACCESSION_1 = "0001234567-24-000001";
@@ -44,6 +38,7 @@ class Form4ControllerTest {
 
     @BeforeEach
     void setUp() {
+        webTestClient = WebTestClient.bindToServer().baseUrl("http://localhost:" + port).build();
         form4Repository.deleteAll();
     }
 
@@ -61,18 +56,23 @@ class Form4ControllerTest {
         void shouldReturnForm4WhenFound() throws Exception {
             Form4 saved = form4Repository.save(createForm4(ACCESSION_1, "MSFT", "John Doe"));
 
-            mockMvc.perform(get(BASE_URL + "/" + saved.getId()))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.accessionNumber").value(ACCESSION_1))
-                    .andExpect(jsonPath("$.tradingSymbol").value("MSFT"))
-                    .andExpect(jsonPath("$.rptOwnerName").value("John Doe"));
+            webTestClient.get()
+                    .uri(BASE_URL + "/" + saved.getId())
+                    .exchange()
+                    .expectStatus().isOk()
+                    .expectBody()
+                    .jsonPath("$.accessionNumber").isEqualTo(ACCESSION_1)
+                    .jsonPath("$.tradingSymbol").isEqualTo("MSFT")
+                    .jsonPath("$.rptOwnerName").isEqualTo("John Doe");
         }
 
         @Test
         @DisplayName("Should return 404 when Form4 not found")
         void shouldReturn404WhenNotFound() throws Exception {
-            mockMvc.perform(get(BASE_URL + "/nonexistent-id"))
-                    .andExpect(status().isNotFound());
+            webTestClient.get()
+                    .uri(BASE_URL + "/nonexistent-id")
+                    .exchange()
+                    .expectStatus().isNotFound();
         }
     }
 
@@ -85,17 +85,22 @@ class Form4ControllerTest {
         void shouldReturnByAccessionNumber() throws Exception {
             form4Repository.save(createForm4(ACCESSION_1, "MSFT", "John Doe"));
 
-            mockMvc.perform(get(BASE_URL + "/accession/" + ACCESSION_1))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.accessionNumber").value(ACCESSION_1))
-                    .andExpect(jsonPath("$.tradingSymbol").value("MSFT"));
+            webTestClient.get()
+                    .uri(BASE_URL + "/accession/" + ACCESSION_1)
+                    .exchange()
+                    .expectStatus().isOk()
+                    .expectBody()
+                    .jsonPath("$.accessionNumber").isEqualTo(ACCESSION_1)
+                    .jsonPath("$.tradingSymbol").isEqualTo("MSFT");
         }
 
         @Test
         @DisplayName("Should return 404 when accession number not found")
         void shouldReturn404WhenAccessionNotFound() throws Exception {
-            mockMvc.perform(get(BASE_URL + "/accession/nonexistent"))
-                    .andExpect(status().isNotFound());
+            webTestClient.get()
+                    .uri(BASE_URL + "/accession/nonexistent")
+                    .exchange()
+                    .expectStatus().isNotFound();
         }
     }
 
@@ -109,23 +114,31 @@ class Form4ControllerTest {
             form4Repository.save(createForm4(ACCESSION_1, "MSFT", "John Doe"));
             form4Repository.save(createForm4(ACCESSION_2, "MSFT", "Jane Smith"));
 
-            mockMvc.perform(get(BASE_URL + "/symbol/MSFT")
-                            .param("page", "0")
-                            .param("size", "10"))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.content", hasSize(2)))
-                    .andExpect(jsonPath("$.content[*].tradingSymbol", everyItem(is("MSFT"))))
-                    .andExpect(jsonPath("$.totalElements").value(2))
-                    .andExpect(jsonPath("$.totalPages").value(1));
+            webTestClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path(BASE_URL + "/symbol/MSFT")
+                            .queryParam("page", "0")
+                            .queryParam("size", "10")
+                            .build())
+                    .exchange()
+                    .expectStatus().isOk()
+                    .expectBody()
+                    .jsonPath("$.content").value(hasSize(2))
+                    .jsonPath("$.content[*].tradingSymbol").value(everyItem(is("MSFT")))
+                    .jsonPath("$.totalElements").isEqualTo(2)
+                    .jsonPath("$.totalPages").isEqualTo(1);
         }
 
         @Test
         @DisplayName("Should return empty page when symbol not found")
         void shouldReturnEmptyPageWhenSymbolNotFound() throws Exception {
-            mockMvc.perform(get(BASE_URL + "/symbol/UNKNOWN"))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.content", hasSize(0)))
-                    .andExpect(jsonPath("$.totalElements").value(0));
+            webTestClient.get()
+                    .uri(BASE_URL + "/symbol/UNKNOWN")
+                    .exchange()
+                    .expectStatus().isOk()
+                    .expectBody()
+                    .jsonPath("$.content").value(hasSize(0))
+                    .jsonPath("$.totalElements").isEqualTo(0);
         }
 
         @Test
@@ -133,9 +146,12 @@ class Form4ControllerTest {
         void shouldHandleCaseInsensitiveSymbol() throws Exception {
             form4Repository.save(createForm4(ACCESSION_1, "MSFT", "John Doe"));
 
-            mockMvc.perform(get(BASE_URL + "/symbol/msft"))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.content", hasSize(1)));
+            webTestClient.get()
+                    .uri(BASE_URL + "/symbol/msft")
+                    .exchange()
+                    .expectStatus().isOk()
+                    .expectBody()
+                    .jsonPath("$.content").value(hasSize(1));
         }
     }
 
@@ -148,10 +164,13 @@ class Form4ControllerTest {
         void shouldReturnPaginatedByCik() throws Exception {
             form4Repository.save(createForm4(ACCESSION_1, "MSFT", "John Doe"));
 
-            mockMvc.perform(get(BASE_URL + "/cik/789019"))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.content", hasSize(1)))
-                    .andExpect(jsonPath("$.content[0].cik").value("789019"));
+            webTestClient.get()
+                    .uri(BASE_URL + "/cik/789019")
+                    .exchange()
+                    .expectStatus().isOk()
+                    .expectBody()
+                    .jsonPath("$.content").value(hasSize(1))
+                    .jsonPath("$.content[0].cik").isEqualTo("789019");
         }
     }
 
@@ -165,11 +184,16 @@ class Form4ControllerTest {
             form4Repository.save(createForm4(ACCESSION_1, "MSFT", "John Doe"));
             form4Repository.save(createForm4(ACCESSION_2, "MSFT", "Jane Doe"));
 
-            mockMvc.perform(get(BASE_URL + "/owner")
-                            .param("name", "Doe"))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$", hasSize(2)))
-                    .andExpect(jsonPath("$[*].rptOwnerName", everyItem(containsString("Doe"))));
+            webTestClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path(BASE_URL + "/owner")
+                            .queryParam("name", "Doe")
+                            .build())
+                    .exchange()
+                    .expectStatus().isOk()
+                    .expectBody()
+                    .jsonPath("$").value(hasSize(2))
+                    .jsonPath("$[*].rptOwnerName").value(everyItem(containsString("Doe")));
         }
     }
 
@@ -187,20 +211,29 @@ class Form4ControllerTest {
             form4.setTransactionDate(cal.getTime());
             form4Repository.save(form4);
 
-            mockMvc.perform(get(BASE_URL + "/date-range")
-                            .param("startDate", "2024-01-10")
-                            .param("endDate", "2024-01-20"))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.content", hasSize(1)));
+            webTestClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path(BASE_URL + "/date-range")
+                            .queryParam("startDate", "2024-01-10")
+                            .queryParam("endDate", "2024-01-20")
+                            .build())
+                    .exchange()
+                    .expectStatus().isOk()
+                    .expectBody()
+                    .jsonPath("$.content").value(hasSize(1));
         }
 
         @Test
         @DisplayName("Should return 400 for invalid date format")
         void shouldReturn400ForInvalidDateFormat() throws Exception {
-            mockMvc.perform(get(BASE_URL + "/date-range")
-                            .param("startDate", "invalid-date")
-                            .param("endDate", "2024-01-20"))
-                    .andExpect(status().isBadRequest());
+            webTestClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path(BASE_URL + "/date-range")
+                            .queryParam("startDate", "invalid-date")
+                            .queryParam("endDate", "2024-01-20")
+                            .build())
+                    .exchange()
+                    .expectStatus().isBadRequest();
         }
     }
 
@@ -222,12 +255,17 @@ class Form4ControllerTest {
             aapl.setTransactionDate(cal.getTime());
             form4Repository.save(aapl);
 
-            mockMvc.perform(get(BASE_URL + "/symbol/MSFT/date-range")
-                            .param("startDate", "2024-01-10")
-                            .param("endDate", "2024-01-20"))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.content", hasSize(1)))
-                    .andExpect(jsonPath("$.content[0].tradingSymbol").value("MSFT"));
+            webTestClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path(BASE_URL + "/symbol/MSFT/date-range")
+                            .queryParam("startDate", "2024-01-10")
+                            .queryParam("endDate", "2024-01-20")
+                            .build())
+                    .exchange()
+                    .expectStatus().isOk()
+                    .expectBody()
+                    .jsonPath("$.content").value(hasSize(1))
+                    .jsonPath("$.content[0].tradingSymbol").isEqualTo("MSFT");
         }
     }
 
@@ -250,9 +288,12 @@ class Form4ControllerTest {
                 form4Repository.save(form4);
             }
 
-            mockMvc.perform(get(BASE_URL + "/recent"))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$", hasSize(10)));
+            webTestClient.get()
+                    .uri(BASE_URL + "/recent")
+                    .exchange()
+                    .expectStatus().isOk()
+                    .expectBody()
+                    .jsonPath("$").value(hasSize(10));
         }
 
         @Test
@@ -266,18 +307,27 @@ class Form4ControllerTest {
                 ));
             }
 
-            mockMvc.perform(get(BASE_URL + "/recent")
-                            .param("limit", "5"))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$", hasSize(5)));
+            webTestClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path(BASE_URL + "/recent")
+                            .queryParam("limit", "5")
+                            .build())
+                    .exchange()
+                    .expectStatus().isOk()
+                    .expectBody()
+                    .jsonPath("$").value(hasSize(5));
         }
 
         @Test
         @DisplayName("Should cap limit at 100")
         void shouldCapLimitAt100() throws Exception {
-            mockMvc.perform(get(BASE_URL + "/recent")
-                            .param("limit", "500"))
-                    .andExpect(status().isOk());
+            webTestClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path(BASE_URL + "/recent")
+                            .queryParam("limit", "500")
+                            .build())
+                    .exchange()
+                    .expectStatus().isOk();
             // Just verify it doesn't error; actual cap is applied in controller
         }
     }
@@ -297,6 +347,7 @@ class Form4ControllerTest {
             buy.setAcquiredDisposedCode("A");
             buy.setTransactionValue(100000f);
             buy.setDirector(true);
+            buy.setOfficer(false);  // Override default
             form4Repository.save(buy);
 
             Form4 sell = createForm4(ACCESSION_2, "MSFT", "Seller");
@@ -306,14 +357,19 @@ class Form4ControllerTest {
             sell.setOfficer(true);
             form4Repository.save(sell);
 
-            mockMvc.perform(get(BASE_URL + "/symbol/MSFT/stats")
-                            .param("startDate", "2024-01-01")
-                            .param("endDate", "2024-01-31"))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.totalBuys").value(1))
-                    .andExpect(jsonPath("$.totalSells").value(1))
-                    .andExpect(jsonPath("$.directorTransactions").value(1))
-                    .andExpect(jsonPath("$.officerTransactions").value(1));
+            webTestClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path(BASE_URL + "/symbol/MSFT/stats")
+                            .queryParam("startDate", "2024-01-01")
+                            .queryParam("endDate", "2024-01-31")
+                            .build())
+                    .exchange()
+                    .expectStatus().isOk()
+                    .expectBody()
+                    .jsonPath("$.totalBuys").isEqualTo(1)
+                    .jsonPath("$.totalSells").isEqualTo(1)
+                    .jsonPath("$.directorTransactions").isEqualTo(1)
+                    .jsonPath("$.officerTransactions").isEqualTo(1);
         }
     }
 
@@ -327,12 +383,15 @@ class Form4ControllerTest {
             Form4 form4 = createForm4(ACCESSION_1, "MSFT", "John Doe");
             form4.setId(null); // Ensure no ID for new record
 
-            mockMvc.perform(post(BASE_URL)
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(form4)))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.accessionNumber").value(ACCESSION_1))
-                    .andExpect(jsonPath("$.id").exists());
+            webTestClient.post()
+                    .uri(BASE_URL)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(form4)
+                    .exchange()
+                    .expectStatus().isOk()
+                    .expectBody()
+                    .jsonPath("$.accessionNumber").isEqualTo(ACCESSION_1)
+                    .jsonPath("$.id").exists();
         }
 
         @Test
@@ -342,11 +401,14 @@ class Form4ControllerTest {
 
             saved.setRptOwnerName("Updated Name");
 
-            mockMvc.perform(post(BASE_URL)
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(saved)))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.rptOwnerName").value("Updated Name"));
+            webTestClient.post()
+                    .uri(BASE_URL)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(saved)
+                    .exchange()
+                    .expectStatus().isOk()
+                    .expectBody()
+                    .jsonPath("$.rptOwnerName").isEqualTo("Updated Name");
         }
     }
 
@@ -359,19 +421,25 @@ class Form4ControllerTest {
         void shouldDeleteForm4() throws Exception {
             Form4 saved = form4Repository.save(createForm4(ACCESSION_1, "MSFT", "John Doe"));
 
-            mockMvc.perform(delete(BASE_URL + "/" + saved.getId()))
-                    .andExpect(status().isNoContent());
+            webTestClient.delete()
+                    .uri(BASE_URL + "/" + saved.getId())
+                    .exchange()
+                    .expectStatus().isNoContent();
 
             // Verify deleted
-            mockMvc.perform(get(BASE_URL + "/" + saved.getId()))
-                    .andExpect(status().isNotFound());
+            webTestClient.get()
+                    .uri(BASE_URL + "/" + saved.getId())
+                    .exchange()
+                    .expectStatus().isNotFound();
         }
 
         @Test
         @DisplayName("Should return 404 when deleting non-existent Form4")
         void shouldReturn404WhenDeletingNonExistent() throws Exception {
-            mockMvc.perform(delete(BASE_URL + "/nonexistent-id"))
-                    .andExpect(status().isNotFound());
+            webTestClient.delete()
+                    .uri(BASE_URL + "/nonexistent-id")
+                    .exchange()
+                    .expectStatus().isNotFound();
         }
     }
 

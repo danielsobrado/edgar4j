@@ -4,10 +4,17 @@ server:
 spring:
   application:
     name: edgar4j
+  cloud:
+    config:
+      enabled: ${SPRING_CLOUD_CONFIG_ENABLED:false}
   data:
     mongodb:
       uri: ${MONGODB_URI:mongodb://localhost:27017/edgar}
       database: ${MONGODB_DATABASE:edgar}
+      auto-index-creation: ${MONGODB_AUTO_INDEX_CREATION:true}
+    elasticsearch:
+      repositories:
+        enabled: ${ELASTICSEARCH_REPOSITORIES_ENABLED:false}
 
 edgar4j:
   urls:
@@ -26,6 +33,12 @@ edgar4j:
   sec:
     user-agent: ${SEC_USER_AGENT:Edgar4j/1.0 (contact@example.com)}
     rate-limit-per-second: 10
+  security:
+    enabled: ${EDGAR4J_SECURITY_ENABLED:false}
+    username: ${EDGAR4J_SECURITY_USERNAME:}
+    password: ${EDGAR4J_SECURITY_PASSWORD:}
+  storage:
+    daily-indexes-path: ${EDGAR4J_DAILY_INDEXES_PATH:./data/daily-indexes}
   jobs:
     ticker-sync:
       enabled: ${TICKER_SYNC_ENABLED:true}
@@ -46,10 +59,25 @@ management:
         include: health,info,metrics
   endpoint:
     health:
-      show-details: always
+      show-details: ${MANAGEMENT_HEALTH_SHOW_DETAILS:never}
 
 logging:
   level:
     org.jds.edgar4j: DEBUG
     org.springframework.data.mongodb: INFO
     org.springframework.web: INFO
+
+---
+spring:
+  config:
+    activate:
+      on-profile: elasticsearch
+  data:
+    elasticsearch:
+      repositories:
+        enabled: true
+      client:
+        reactive:
+          endpoints: ${ELASTICSEARCH_ENDPOINTS:localhost:9200}
+          username: ${ELASTICSEARCH_USERNAME:elastic}
+          password: ${ELASTICSEARCH_PASSWORD:changeme}

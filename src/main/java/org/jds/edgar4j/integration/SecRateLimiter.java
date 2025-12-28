@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import lombok.extern.slf4j.Slf4j;
@@ -13,14 +14,15 @@ import lombok.extern.slf4j.Slf4j;
 @Component
 public class SecRateLimiter {
 
-    private static final int MAX_REQUESTS_PER_SECOND = 10;
     private static final long WINDOW_SIZE_MS = 1000;
 
+    private final int maxRequestsPerSecond;
     private final Semaphore semaphore;
     private volatile Instant windowStart;
     private volatile int requestsInWindow;
 
-    public SecRateLimiter() {
+    public SecRateLimiter(@Value("${edgar4j.sec.rate-limit-per-second:10}") int maxRequestsPerSecond) {
+        this.maxRequestsPerSecond = Math.max(1, maxRequestsPerSecond);
         this.semaphore = new Semaphore(1);
         this.windowStart = Instant.now();
         this.requestsInWindow = 0;
@@ -56,7 +58,7 @@ public class SecRateLimiter {
             requestsInWindow = 0;
         }
 
-        if (requestsInWindow >= MAX_REQUESTS_PER_SECOND) {
+        if (requestsInWindow >= maxRequestsPerSecond) {
             long sleepTime = WINDOW_SIZE_MS - elapsed.toMillis();
             if (sleepTime > 0) {
                 log.debug("Rate limit reached, sleeping for {} ms", sleepTime);
@@ -74,9 +76,9 @@ public class SecRateLimiter {
         Duration elapsed = Duration.between(windowStart, now);
 
         if (elapsed.toMillis() >= WINDOW_SIZE_MS) {
-            return MAX_REQUESTS_PER_SECOND;
+            return maxRequestsPerSecond;
         }
 
-        return Math.max(0, MAX_REQUESTS_PER_SECOND - requestsInWindow);
+        return Math.max(0, maxRequestsPerSecond - requestsInWindow);
     }
 }

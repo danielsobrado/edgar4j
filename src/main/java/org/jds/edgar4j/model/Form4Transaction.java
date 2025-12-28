@@ -47,7 +47,7 @@ public class Form4Transaction {
 
     private String transactionFormType;
 
-    private boolean equitySwapInvolved;
+    private Boolean equitySwapInvolved;
 
     private Float transactionShares;
 

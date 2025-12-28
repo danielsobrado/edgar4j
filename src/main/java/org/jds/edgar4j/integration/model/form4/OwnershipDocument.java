@@ -46,12 +46,17 @@ public class OwnershipDocument {
     @XmlElement(name = "issuer")
     private Issuer issuer;
 
-    @XmlElementWrapper(name = "reportingOwner")
-    @XmlElement(name = "reportingOwnerId")
+    @XmlElement(name = "reportingOwner")
     private List<ReportingOwner> reportingOwners;
 
-    @XmlElement(name = "reportingOwner")
-    private ReportingOwner reportingOwner;
+    /**
+     * Convenience method to get first reporting owner.
+     */
+    public ReportingOwner getReportingOwner() {
+        return (reportingOwners != null && !reportingOwners.isEmpty())
+            ? reportingOwners.get(0)
+            : null;
+    }
 
     @XmlElement(name = "nonDerivativeTable")
     private NonDerivativeTable nonDerivativeTable;
@@ -66,10 +71,15 @@ public class OwnershipDocument {
     @XmlElement(name = "remarks")
     private String remarks;
 
-    @XmlElementWrapper(name = "ownerSignature")
-    @XmlElement(name = "signatureName")
+    @XmlElement(name = "ownerSignature")
     private List<OwnerSignature> ownerSignatures;
 
-    @XmlElement(name = "ownerSignature")
-    private OwnerSignature ownerSignature;
+    /**
+     * Convenience method to get first owner signature.
+     */
+    public OwnerSignature getOwnerSignature() {
+        return (ownerSignatures != null && !ownerSignatures.isEmpty())
+            ? ownerSignatures.get(0)
+            : null;
+    }
 }

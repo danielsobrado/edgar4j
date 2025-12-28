@@ -9,6 +9,7 @@ spring:
     mongodb:
       uri: ${MONGODB_URI:mongodb://admin:admin123@mongodb:27017/edgar?authSource=admin}
       database: ${MONGODB_DATABASE:edgar}
+      auto-index-creation: ${MONGODB_AUTO_INDEX_CREATION:true}
 
 edgar4j:
   sec:

@@ -60,6 +60,9 @@ set ERROR_CODE=0
 @REM ==== START VALIDATION ====
 if not "%JAVA_HOME%" == "" goto OkJHome
 
+call :FindJavaHomeFromPath
+if not "%JAVA_HOME%" == "" goto OkJHome
+
 echo.
 echo Error: JAVA_HOME not found in your environment. >&2
 echo Please set the JAVA_HOME variable in your environment to match the >&2
@@ -68,6 +71,9 @@ echo.
 goto error
 
 :OkJHome
+if exist "%JAVA_HOME%\bin\java.exe" goto init
+
+call :FindJavaHomeFromPath
 if exist "%JAVA_HOME%\bin\java.exe" goto init
 
 echo.
@@ -186,3 +192,16 @@ if "%MAVEN_BATCH_PAUSE%"=="on" pause
 if "%MAVEN_TERMINATE_CMD%"=="on" exit %ERROR_CODE%
 
 cmd /C exit /B %ERROR_CODE%
+
+@REM Attempts to derive JAVA_HOME from the first java.exe on PATH.
+:FindJavaHomeFromPath
+set "JAVA_EXE="
+for /F "usebackq delims=" %%i in (`where java 2^>NUL`) do (
+  set "JAVA_EXE=%%i"
+  goto foundJavaFromPath
+)
+goto :eof
+
+:foundJavaFromPath
+for %%j in ("%JAVA_EXE%") do set "JAVA_HOME=%%~dpj.."
+goto :eof
