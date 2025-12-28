@@ -37,6 +37,10 @@ edgar4j:
     enabled: ${EDGAR4J_SECURITY_ENABLED:false}
     username: ${EDGAR4J_SECURITY_USERNAME:}
     password: ${EDGAR4J_SECURITY_PASSWORD:}
+  cors:
+    allowed-origins: ${EDGAR4J_CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173,http://localhost:5174,http://127.0.0.1:3000,http://127.0.0.1:5173,http://127.0.0.1:5174}
+    allow-credentials: ${EDGAR4J_CORS_ALLOW_CREDENTIALS:true}
+    max-age-seconds: ${EDGAR4J_CORS_MAX_AGE_SECONDS:3600}
   storage:
     daily-indexes-path: ${EDGAR4J_DAILY_INDEXES_PATH:./data/daily-indexes}
   jobs:
@@ -56,14 +60,14 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info
   endpoint:
     health:
       show-details: ${MANAGEMENT_HEALTH_SHOW_DETAILS:never}
 
 logging:
   level:
-    org.jds.edgar4j: DEBUG
+    org.jds.edgar4j: INFO
     org.springframework.data.mongodb: INFO
     org.springframework.web: INFO
 

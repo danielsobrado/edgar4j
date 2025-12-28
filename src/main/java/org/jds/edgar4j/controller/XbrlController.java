@@ -7,6 +7,7 @@ import org.jds.edgar4j.xbrl.model.XbrlFact;
 import org.jds.edgar4j.xbrl.model.XbrlInstance;
 import org.jds.edgar4j.xbrl.parser.XbrlPackageHandler;
 import org.jds.edgar4j.xbrl.validation.CalculationValidator;
+import org.jds.edgar4j.validation.UrlAllowlistValidator;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -28,6 +29,7 @@ import java.util.Map;
 public class XbrlController {
 
     private final XbrlService xbrlService;
+    private final UrlAllowlistValidator urlAllowlistValidator;
 
     /**
      * Parse XBRL from uploaded file.
@@ -54,6 +56,12 @@ public class XbrlController {
     public Mono<ResponseEntity<Map<String, Object>>> parseUrl(@RequestParam String url) {
         log.info("Parsing XBRL from URL: {}", url);
 
+        try {
+            urlAllowlistValidator.validateXbrlUrl(url);
+        } catch (IllegalArgumentException e) {
+            return Mono.just(ResponseEntity.badRequest().body(Map.of("error", e.getMessage())));
+        }
+
         return xbrlService.parseFromUrl(url)
                 .map(instance -> ResponseEntity.ok(xbrlService.getSummary(instance)))
                 .onErrorResume(e -> {
@@ -69,6 +77,12 @@ public class XbrlController {
     @GetMapping("/parse-package")
     public Mono<ResponseEntity<Map<String, Object>>> parsePackage(@RequestParam String url) {
         log.info("Parsing XBRL package from URL: {}", url);
+
+        try {
+            urlAllowlistValidator.validateXbrlUrl(url);
+        } catch (IllegalArgumentException e) {
+            return Mono.just(ResponseEntity.badRequest().body(Map.of("error", e.getMessage())));
+        }
 
         return xbrlService.parsePackageFromUrl(url)
                 .map(result -> {
@@ -112,9 +126,19 @@ public class XbrlController {
     public Mono<ResponseEntity<Map<String, BigDecimal>>> getFinancialsFromUrl(
             @RequestParam String url) {
 
+        try {
+            urlAllowlistValidator.validateXbrlUrl(url);
+        } catch (IllegalArgumentException e) {
+            log.warn("URL validation failed: {}", e.getMessage());
+            return Mono.just(ResponseEntity.badRequest().build());
+        }
+
         return xbrlService.parseFromUrl(url)
                 .map(instance -> ResponseEntity.ok(xbrlService.getKeyFinancials(instance)))
-                .onErrorResume(e -> Mono.just(ResponseEntity.badRequest().build()));
+                .onErrorResume(e -> {
+                    log.error("Failed to get financials from URL: {}", url, e);
+                    return Mono.just(ResponseEntity.badRequest().build());
+                });
     }
 
     /**
@@ -173,6 +197,12 @@ public class XbrlController {
     public Mono<ResponseEntity<CalculationValidator.ValidationResult>> validateFromUrl(
             @RequestParam String url) {
 
+        try {
+            urlAllowlistValidator.validateXbrlUrl(url);
+        } catch (IllegalArgumentException e) {
+            return Mono.just(ResponseEntity.badRequest().build());
+        }
+
         return xbrlService.parseFromUrl(url)
                 .map(instance -> ResponseEntity.ok(xbrlService.validateCalculations(instance)))
                 .onErrorResume(e -> Mono.just(ResponseEntity.badRequest().build()));
@@ -206,6 +236,12 @@ public class XbrlController {
     public Mono<ResponseEntity<Map<String, Object>>> getAnalysisFromUrl(@RequestParam String url) {
         log.info("Getting comprehensive analysis from URL: {}", url);
 
+        try {
+            urlAllowlistValidator.validateXbrlUrl(url);
+        } catch (IllegalArgumentException e) {
+            return Mono.just(ResponseEntity.badRequest().body(Map.of("error", e.getMessage())));
+        }
+
         return xbrlService.parseFromUrl(url)
                 .map(instance -> ResponseEntity.ok(xbrlService.getComprehensiveAnalysis(instance)))
                 .onErrorResume(e -> {
@@ -221,6 +257,12 @@ public class XbrlController {
     @GetMapping("/statements")
     public Mono<ResponseEntity<Object>> getStatementsFromUrl(@RequestParam String url) {
         log.info("Getting financial statements from URL: {}", url);
+
+        try {
+            urlAllowlistValidator.validateXbrlUrl(url);
+        } catch (IllegalArgumentException e) {
+            return Mono.just(ResponseEntity.badRequest().body(Map.of("error", e.getMessage())));
+        }
 
         return xbrlService.parseFromUrl(url)
                 .map(instance -> ResponseEntity.ok((Object) xbrlService.reconstructStatements(instance)))
@@ -238,6 +280,12 @@ public class XbrlController {
     public Mono<ResponseEntity<Object>> getSecMetadataFromUrl(@RequestParam String url) {
         log.info("Getting SEC metadata from URL: {}", url);
 
+        try {
+            urlAllowlistValidator.validateXbrlUrl(url);
+        } catch (IllegalArgumentException e) {
+            return Mono.just(ResponseEntity.badRequest().body(Map.of("error", e.getMessage())));
+        }
+
         return xbrlService.parseFromUrl(url)
                 .map(instance -> ResponseEntity.ok((Object) xbrlService.extractSecMetadata(instance)))
                 .onErrorResume(e -> {
@@ -254,11 +302,17 @@ public class XbrlController {
     public Mono<ResponseEntity<List<Map<String, Object>>>> getFactsFromUrl(@RequestParam String url) {
         log.info("Exporting facts from URL: {}", url);
 
+        try {
+            urlAllowlistValidator.validateXbrlUrl(url);
+        } catch (IllegalArgumentException e) {
+            return Mono.just(ResponseEntity.badRequest().body(List.of(Map.of("error", e.getMessage()))));
+        }
+
         return xbrlService.parseFromUrl(url)
                 .map(instance -> ResponseEntity.ok(xbrlService.exportFacts(instance)))
                 .onErrorResume(e -> {
                     log.error("Failed to export facts: {}", url, e);
-                    return Mono.just(ResponseEntity.badRequest().build());
+                    return Mono.just(ResponseEntity.badRequest().body(List.of(Map.of("error", e.getMessage()))));
                 });
     }
 
@@ -270,6 +324,12 @@ public class XbrlController {
             @RequestParam String url,
             @RequestParam String query) {
         log.info("Searching facts from URL: {} with query: {}", url, query);
+
+        try {
+            urlAllowlistValidator.validateXbrlUrl(url);
+        } catch (IllegalArgumentException e) {
+            return Mono.just(ResponseEntity.badRequest().build());
+        }
 
         return xbrlService.parseFromUrl(url)
                 .map(instance -> ResponseEntity.ok(xbrlService.searchFacts(instance, query)))

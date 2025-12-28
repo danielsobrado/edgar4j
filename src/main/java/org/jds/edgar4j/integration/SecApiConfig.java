@@ -56,4 +56,12 @@ public class SecApiConfig {
         String cleanedAccession = accessionNumber.replace("-", "");
         return String.format("%s/%s/%s/%s", edgarDataArchivesUrl, cik, cleanedAccession, primaryDocument);
     }
+
+    /**
+     * Gets the URL for any EDGAR filing document.
+     */
+    public String getFilingUrl(String cik, String accessionNumber, String document) {
+        String cleanedAccession = accessionNumber.replace("-", "");
+        return String.format("%s/%s/%s/%s", edgarDataArchivesUrl, formatCik(cik), cleanedAccession, document);
+    }
 }

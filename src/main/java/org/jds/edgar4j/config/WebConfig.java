@@ -1,49 +1,36 @@
 package org.jds.edgar4j.config;
 
+import org.jds.edgar4j.properties.CorsProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 import org.springframework.web.cors.reactive.CorsWebFilter;
-import org.springframework.web.reactive.config.CorsRegistry;
-import org.springframework.web.reactive.config.WebFluxConfigurer;
+
+import lombok.RequiredArgsConstructor;
 
 @Configuration
-public class WebConfig implements WebFluxConfigurer {
+@RequiredArgsConstructor
+public class WebConfig {
 
-    @Override
-    public void addCorsMappings(CorsRegistry registry) {
-        registry.addMapping("/api/**")
-                .allowedOrigins(
-                        "http://localhost:3000",
-                        "http://localhost:5173",
-                        "http://localhost:5174",
-                        "http://127.0.0.1:3000",
-                        "http://127.0.0.1:5173",
-                        "http://127.0.0.1:5174"
-                )
-                .allowedMethods("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS")
-                .allowedHeaders("*")
-                .exposedHeaders("Content-Disposition")
-                .allowCredentials(true)
-                .maxAge(3600);
-    }
+    private final CorsProperties corsProperties;
 
     @Bean
     public CorsWebFilter corsFilter() {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         CorsConfiguration config = new CorsConfiguration();
 
-        config.setAllowCredentials(true);
-        config.addAllowedOrigin("http://localhost:3000");
-        config.addAllowedOrigin("http://localhost:5173");
-        config.addAllowedOrigin("http://localhost:5174");
-        config.addAllowedOrigin("http://127.0.0.1:3000");
-        config.addAllowedOrigin("http://127.0.0.1:5173");
-        config.addAllowedOrigin("http://127.0.0.1:5174");
+        config.setAllowCredentials(corsProperties.isAllowCredentials());
+        corsProperties.getAllowedOrigins().forEach(config::addAllowedOrigin);
         config.addAllowedHeader("*");
-        config.addAllowedMethod("*");
+        config.addAllowedMethod("GET");
+        config.addAllowedMethod("POST");
+        config.addAllowedMethod("PUT");
+        config.addAllowedMethod("DELETE");
+        config.addAllowedMethod("PATCH");
+        config.addAllowedMethod("OPTIONS");
         config.addExposedHeader("Content-Disposition");
+        config.setMaxAge(corsProperties.getMaxAgeSeconds());
 
         source.registerCorsConfiguration("/api/**", config);
         return new CorsWebFilter(source);

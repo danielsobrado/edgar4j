@@ -27,8 +27,7 @@ import lombok.extern.slf4j.Slf4j;
 public class DownloadJobServiceImpl implements DownloadJobService {
 
     private final DownloadJobRepository downloadJobRepository;
-    private final DownloadTickersService downloadTickersService;
-    private final DownloadSubmissionsService downloadSubmissionsService;
+    private final DownloadJobExecutor downloadJobExecutor;
 
     @Override
     public DownloadJobResponse startDownload(DownloadRequest request) {
@@ -48,51 +47,9 @@ public class DownloadJobServiceImpl implements DownloadJobService {
 
         job = downloadJobRepository.save(job);
 
-        executeDownloadAsync(job.getId(), request);
+        downloadJobExecutor.executeDownloadAsync(job.getId(), request);
 
         return toDownloadJobResponse(job);
-    }
-
-    @Async
-    protected void executeDownloadAsync(String jobId, DownloadRequest request) {
-        log.info("Executing download job asynchronously: {}", jobId);
-
-        Optional<DownloadJob> jobOpt = downloadJobRepository.findById(jobId);
-        if (jobOpt.isEmpty()) {
-            log.error("Job not found: {}", jobId);
-            return;
-        }
-
-        DownloadJob job = jobOpt.get();
-        job.setStatus(JobStatus.IN_PROGRESS);
-        downloadJobRepository.save(job);
-
-        try {
-            switch (request.getType()) {
-                case TICKERS_ALL:
-                    downloadTickersService.downloadTickers();
-                    break;
-                case TICKERS_NYSE:
-                case TICKERS_NASDAQ:
-                    downloadTickersService.downloadTickersExchanges();
-                    break;
-                case TICKERS_MF:
-                    downloadTickersService.downloadTickersMFs();
-                    break;
-                case SUBMISSIONS:
-                    if (request.getCik() != null) {
-                        downloadSubmissionsService.downloadSubmissions(request.getCik());
-                    }
-                    break;
-                default:
-                    log.warn("Unsupported download type: {}", request.getType());
-            }
-
-            completeJob(jobId);
-        } catch (Exception e) {
-            log.error("Download job failed: {}", jobId, e);
-            failJob(jobId, e.getMessage());
-        }
     }
 
     @Override

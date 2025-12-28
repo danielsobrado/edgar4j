@@ -67,6 +67,22 @@ public class SecApiClient {
         return executeRequestAsync(url);
     }
 
+    /**
+     * Fetches any EDGAR filing document by CIK, accession number, and document name.
+     */
+    public String fetchFiling(String cik, String accessionNumber, String document) {
+        String url = config.getFilingUrl(cik, accessionNumber, document);
+        return executeRequest(url);
+    }
+
+    /**
+     * Asynchronously fetches any EDGAR filing document.
+     */
+    public CompletableFuture<String> fetchFilingAsync(String cik, String accessionNumber, String document) {
+        String url = config.getFilingUrl(cik, accessionNumber, document);
+        return executeRequestAsync(url);
+    }
+
     private String executeRequest(String url) {
         try {
             rateLimiter.acquire();
