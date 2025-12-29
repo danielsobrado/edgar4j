@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import type { Form13F, Form13DG, Form8K, PaginatedResponse } from '../../app/api/types';
+import type { Form13F, Form13DG, Form8K, Form3, Form5, Form6K, Form4Transaction, PaginatedResponse } from '../../app/api/types';
 
 // Mock Form13F data
 export const mockForm13F: Form13F = {
@@ -133,6 +133,125 @@ export const mockForm8KPaginated: PaginatedResponse<Form8K> = {
   hasPrevious: false,
 };
 
+// Mock Form4Transaction data (used by Form3 and Form5)
+export const mockForm4Transaction: Form4Transaction = {
+  transactionType: 'NON_DERIVATIVE',
+  securityTitle: 'Common Stock',
+  transactionDate: '2024-12-15',
+  transactionCode: 'P',
+  transactionShares: 1000,
+  transactionPricePerShare: 150.00,
+  acquiredDisposedCode: 'A',
+  sharesOwnedFollowingTransaction: 10000,
+  directOrIndirectOwnership: 'D',
+};
+
+// Mock Form3 data
+export const mockForm3: Form3 = {
+  id: '1',
+  accessionNumber: '0001234567-24-000001',
+  documentType: '3',
+  periodOfReport: '2024-12-15',
+  filedDate: '2024-12-15',
+  cik: '0001234567',
+  issuerName: 'ACME CORPORATION',
+  tradingSymbol: 'ACME',
+  rptOwnerCik: '0009876543',
+  rptOwnerName: 'John Doe',
+  officerTitle: 'Chief Executive Officer',
+  isDirector: true,
+  isOfficer: true,
+  isTenPercentOwner: false,
+  isOther: false,
+  ownerType: 'Officer',
+  holdings: [mockForm4Transaction],
+};
+
+export const mockForm3List: Form3[] = [mockForm3];
+
+export const mockForm3Paginated: PaginatedResponse<Form3> = {
+  content: mockForm3List,
+  page: 0,
+  size: 20,
+  totalElements: 1,
+  totalPages: 1,
+  first: true,
+  last: true,
+  hasNext: false,
+  hasPrevious: false,
+};
+
+// Mock Form5 data
+export const mockForm5: Form5 = {
+  id: '1',
+  accessionNumber: '0001234567-24-000001',
+  documentType: '5',
+  periodOfReport: '2024-12-31',
+  filedDate: '2025-02-15',
+  cik: '0001234567',
+  issuerName: 'ACME CORPORATION',
+  tradingSymbol: 'ACME',
+  rptOwnerCik: '0009876543',
+  rptOwnerName: 'Jane Smith',
+  officerTitle: 'Chief Financial Officer',
+  isDirector: false,
+  isOfficer: true,
+  isTenPercentOwner: false,
+  isOther: false,
+  ownerType: 'Officer',
+  transactions: [mockForm4Transaction],
+  holdings: [mockForm4Transaction],
+};
+
+export const mockForm5List: Form5[] = [mockForm5];
+
+export const mockForm5Paginated: PaginatedResponse<Form5> = {
+  content: mockForm5List,
+  page: 0,
+  size: 20,
+  totalElements: 1,
+  totalPages: 1,
+  first: true,
+  last: true,
+  hasNext: false,
+  hasPrevious: false,
+};
+
+// Mock Form6K data
+export const mockForm6K: Form6K = {
+  id: '1',
+  accessionNumber: '0001234567-24-000001',
+  cik: '0001234567',
+  companyName: 'Foreign Corp Ltd',
+  tradingSymbol: 'FCRP',
+  formType: '6-K',
+  filedDate: '2024-12-15',
+  reportDate: '2024-12-14',
+  primaryDocument: 'd123456d6k.htm',
+  reportText: 'This is a report from a foreign private issuer...',
+  exhibits: [
+    {
+      exhibitNumber: '99.1',
+      description: 'Press Release',
+      document: 'ex99-1.htm',
+    },
+  ],
+};
+
+export const mockForm6KList: Form6K[] = [mockForm6K];
+
+export const mockForm6KPaginated: PaginatedResponse<Form6K> = {
+  content: mockForm6KList,
+  page: 0,
+  size: 20,
+  totalElements: 1,
+  totalPages: 1,
+  first: true,
+  last: true,
+  hasNext: false,
+  hasPrevious: false,
+};
+
 // API mock functions
 export const createApiMock = () => ({
   form13fApi: {
@@ -178,5 +297,32 @@ export const createApiMock = () => ({
     getByDateRange: vi.fn().mockResolvedValue(mockForm8KPaginated),
     getRecentFilings: vi.fn().mockResolvedValue(mockForm8KList),
     downloadAndParse: vi.fn().mockResolvedValue(mockForm8K),
+  },
+  form3Api: {
+    getById: vi.fn().mockResolvedValue(mockForm3),
+    getByAccessionNumber: vi.fn().mockResolvedValue(mockForm3),
+    getByCik: vi.fn().mockResolvedValue(mockForm3Paginated),
+    getBySymbol: vi.fn().mockResolvedValue(mockForm3Paginated),
+    getByDateRange: vi.fn().mockResolvedValue(mockForm3Paginated),
+    getRecentFilings: vi.fn().mockResolvedValue(mockForm3List),
+    downloadAndParse: vi.fn().mockResolvedValue(mockForm3),
+  },
+  form5Api: {
+    getById: vi.fn().mockResolvedValue(mockForm5),
+    getByAccessionNumber: vi.fn().mockResolvedValue(mockForm5),
+    getByCik: vi.fn().mockResolvedValue(mockForm5Paginated),
+    getBySymbol: vi.fn().mockResolvedValue(mockForm5Paginated),
+    getByDateRange: vi.fn().mockResolvedValue(mockForm5Paginated),
+    getRecentFilings: vi.fn().mockResolvedValue(mockForm5List),
+    downloadAndParse: vi.fn().mockResolvedValue(mockForm5),
+  },
+  form6kApi: {
+    getById: vi.fn().mockResolvedValue(mockForm6K),
+    getByAccessionNumber: vi.fn().mockResolvedValue(mockForm6K),
+    getByCik: vi.fn().mockResolvedValue(mockForm6KPaginated),
+    getBySymbol: vi.fn().mockResolvedValue(mockForm6KPaginated),
+    getByDateRange: vi.fn().mockResolvedValue(mockForm6KPaginated),
+    getRecentFilings: vi.fn().mockResolvedValue(mockForm6KList),
+    downloadAndParse: vi.fn().mockResolvedValue(mockForm6K),
   },
 });

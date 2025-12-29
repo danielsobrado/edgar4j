@@ -10,6 +10,9 @@ import { Settings } from './pages/Settings';
 import { Form13FPage } from './pages/Form13F';
 import { Form13DGPage } from './pages/Form13DG';
 import { Form8KPage } from './pages/Form8K';
+import { Form3Page } from './pages/Form3';
+import { Form5Page } from './pages/Form5';
+import { Form6KPage } from './pages/Form6K';
 
 export default function App() {
   return (
@@ -23,6 +26,9 @@ export default function App() {
           <Route path="/form13f" element={<Form13FPage />} />
           <Route path="/form13dg" element={<Form13DGPage />} />
           <Route path="/form8k" element={<Form8KPage />} />
+          <Route path="/form3" element={<Form3Page />} />
+          <Route path="/form5" element={<Form5Page />} />
+          <Route path="/form6k" element={<Form6KPage />} />
           <Route path="/downloads" element={<Downloads />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>

@@ -13,6 +13,9 @@ export { xbrlApi } from './endpoints/xbrl';
 export { form13fApi } from './endpoints/form13f';
 export { form13dgApi } from './endpoints/form13dg';
 export { form8kApi } from './endpoints/form8k';
+export { form3Api } from './endpoints/form3';
+export { form5Api } from './endpoints/form5';
+export { form6kApi } from './endpoints/form6k';
 export type {
   XbrlSummary,
   SecFilingMetadata,

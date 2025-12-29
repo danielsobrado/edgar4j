@@ -36,3 +36,27 @@ export {
   useRecentForm8K,
   useForm8KSearch,
 } from './useForm8K';
+export {
+  useForm3,
+  useForm3ByAccession,
+  useForm3ByCik,
+  useForm3BySymbol,
+  useRecentForm3,
+  useForm3Search,
+} from './useForm3';
+export {
+  useForm5,
+  useForm5ByAccession,
+  useForm5ByCik,
+  useForm5BySymbol,
+  useRecentForm5,
+  useForm5Search,
+} from './useForm5';
+export {
+  useForm6K,
+  useForm6KByAccession,
+  useForm6KByCik,
+  useForm6KBySymbol,
+  useRecentForm6K,
+  useForm6KSearch,
+} from './useForm6K';

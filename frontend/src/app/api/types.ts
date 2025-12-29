@@ -462,6 +462,99 @@ export interface Form8K {
   exhibits?: Form8KExhibit[];
 }
 
+// ========== Form 3 & 5 Types (Initial & Annual Ownership) ==========
+
+export interface Form4Transaction {
+  accessionNumber?: string;
+  transactionType: string; // NON_DERIVATIVE or DERIVATIVE
+  securityTitle: string;
+  transactionDate?: string;
+  transactionCode?: string;
+  transactionFormType?: string;
+  equitySwapInvolved?: boolean;
+  transactionShares?: number;
+  transactionPricePerShare?: number;
+  transactionValue?: number;
+  acquiredDisposedCode?: string; // A = Acquired, D = Disposed
+  sharesOwnedFollowingTransaction?: number;
+  directOrIndirectOwnership?: string; // D = Direct, I = Indirect
+  natureOfOwnership?: string;
+  // Derivative-specific fields
+  exercisePrice?: number;
+  expirationDate?: string;
+  underlyingSecurityTitle?: string;
+  underlyingSecurityShares?: number;
+}
+
+export interface Form3 {
+  id: string;
+  accessionNumber: string;
+  documentType?: string;
+  periodOfReport?: string;
+  filedDate: string;
+  // Issuer information
+  cik: string;
+  issuerName?: string;
+  tradingSymbol?: string;
+  // Reporting owner information
+  rptOwnerCik?: string;
+  rptOwnerName?: string;
+  officerTitle?: string;
+  isDirector?: boolean;
+  isOfficer?: boolean;
+  isTenPercentOwner?: boolean;
+  isOther?: boolean;
+  ownerType?: string;
+  // Holdings
+  holdings?: Form4Transaction[];
+}
+
+export interface Form5 {
+  id: string;
+  accessionNumber: string;
+  documentType?: string;
+  periodOfReport?: string;
+  filedDate: string;
+  // Issuer information
+  cik: string;
+  issuerName?: string;
+  tradingSymbol?: string;
+  // Reporting owner information
+  rptOwnerCik?: string;
+  rptOwnerName?: string;
+  officerTitle?: string;
+  isDirector?: boolean;
+  isOfficer?: boolean;
+  isTenPercentOwner?: boolean;
+  isOther?: boolean;
+  ownerType?: string;
+  // Transactions and Holdings
+  transactions?: Form4Transaction[];
+  holdings?: Form4Transaction[];
+}
+
+// ========== Form 6-K Types (Foreign Private Issuer) ==========
+
+export interface Form6KExhibit {
+  exhibitNumber: string;
+  description?: string;
+  document?: string;
+}
+
+export interface Form6K {
+  id: string;
+  accessionNumber: string;
+  cik: string;
+  companyName?: string;
+  tradingSymbol?: string;
+  formType: string;
+  filedDate: string;
+  reportDate?: string;
+  primaryDocument?: string;
+  reportText?: string;
+  exhibits?: Form6KExhibit[];
+}
+
 // Common 8-K item descriptions
 export const FORM_8K_ITEMS: Record<string, string> = {
   '1.01': 'Entry into Material Definitive Agreement',
