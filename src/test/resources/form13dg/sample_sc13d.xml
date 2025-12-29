@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<edgarSubmission>
+    <schemaVersion>1.0</schemaVersion>
+    <headerData>
+        <submissionType>SCHEDULE 13D</submissionType>
+        <filerInfo>
+            <filer>
+                <credentials>
+                    <cik>0001234567</cik>
+                    <ccc>XXXXXXXX</ccc>
+                </credentials>
+            </filer>
+        </filerInfo>
+    </headerData>
+    <formData>
+        <coverPage>
+            <issuerName>ACME CORPORATION</issuerName>
+            <issuerCik>0009876543</issuerCik>
+            <cusipNumber>001234567</cusipNumber>
+            <securityTitle>Common Stock</securityTitle>
+            <dateOfEvent>2024-12-15</dateOfEvent>
+            <filedDate>2024-12-20</filedDate>
+            <isAmendment>false</isAmendment>
+        </coverPage>
+        <reportingPersonInfo>
+            <nameOfReportingPerson>ACTIVIST CAPITAL PARTNERS LP</nameOfReportingPerson>
+            <reportingPersonCik>0001234567</reportingPersonCik>
+            <identificationOrResidence>
+                <citizenshipOrPlaceOfOrganization>Delaware</citizenshipOrPlaceOfOrganization>
+            </identificationOrResidence>
+            <address>
+                <street1>100 Park Avenue</street1>
+                <street2>Suite 2000</street2>
+                <city>New York</city>
+                <stateOrCountry>NY</stateOrCountry>
+                <zipCode>10001</zipCode>
+            </address>
+            <typeOfReportingPerson>PN, IA</typeOfReportingPerson>
+            <ownershipInfo>
+                <soleVotingPower>5000000</soleVotingPower>
+                <sharedVotingPower>1000000</sharedVotingPower>
+                <soleDispositivePower>5000000</soleDispositivePower>
+                <sharedDispositivePower>1000000</sharedDispositivePower>
+                <aggregateAmountBeneficiallyOwned>6000000</aggregateAmountBeneficiallyOwned>
+                <checkIfExcludesCertainShares>false</checkIfExcludesCertainShares>
+                <percentOfClass>7.5</percentOfClass>
+            </ownershipInfo>
+        </reportingPersonInfo>
+        <reportingPersonInfo>
+            <nameOfReportingPerson>ACTIVIST CAPITAL GP LLC</nameOfReportingPerson>
+            <reportingPersonCik>0001234568</reportingPersonCik>
+            <identificationOrResidence>
+                <citizenshipOrPlaceOfOrganization>Delaware</citizenshipOrPlaceOfOrganization>
+            </identificationOrResidence>
+            <address>
+                <street1>100 Park Avenue</street1>
+                <street2>Suite 2000</street2>
+                <city>New York</city>
+                <stateOrCountry>NY</stateOrCountry>
+                <zipCode>10001</zipCode>
+            </address>
+            <typeOfReportingPerson>OO</typeOfReportingPerson>
+            <ownershipInfo>
+                <soleVotingPower>0</soleVotingPower>
+                <sharedVotingPower>6000000</sharedVotingPower>
+                <soleDispositivePower>0</soleDispositivePower>
+                <sharedDispositivePower>6000000</sharedDispositivePower>
+                <aggregateAmountBeneficiallyOwned>6000000</aggregateAmountBeneficiallyOwned>
+                <checkIfExcludesCertainShares>false</checkIfExcludesCertainShares>
+                <percentOfClass>7.5</percentOfClass>
+            </ownershipInfo>
+        </reportingPersonInfo>
+        <signatureBlock>
+            <signatureName>John Smith</signatureName>
+            <signatureTitle>Managing Partner</signatureTitle>
+            <signatureDate>2024-12-20</signatureDate>
+        </signatureBlock>
+    </formData>
+</edgarSubmission>

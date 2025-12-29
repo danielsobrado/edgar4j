@@ -10,6 +10,9 @@ export { downloadsApi } from './endpoints/downloads';
 export { settingsApi } from './endpoints/settings';
 export { exportApi } from './endpoints/export';
 export { xbrlApi } from './endpoints/xbrl';
+export { form13fApi } from './endpoints/form13f';
+export { form13dgApi } from './endpoints/form13dg';
+export { form8kApi } from './endpoints/form8k';
 export type {
   XbrlSummary,
   SecFilingMetadata,
