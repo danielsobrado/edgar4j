@@ -60,3 +60,11 @@ export {
   useRecentForm6K,
   useForm6KSearch,
 } from './useForm6K';
+export {
+  useForm20F,
+  useForm20FByAccession,
+  useForm20FByCik,
+  useForm20FBySymbol,
+  useRecentForm20F,
+  useForm20FSearch,
+} from './useForm20F';

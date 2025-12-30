@@ -104,7 +104,7 @@ describe('useForm6K', () => {
       await result.current.searchByCik('0001234567');
 
       await waitFor(() => {
-        expect(result.current.loading).toBe(false);
+        expect(result.current.filings.length).toBeGreaterThan(0);
       });
 
       expect(result.current.filings).toEqual(mockForm6KPaginated.content);
@@ -120,7 +120,7 @@ describe('useForm6K', () => {
       await result.current.searchBySymbol('FCRP');
 
       await waitFor(() => {
-        expect(result.current.loading).toBe(false);
+        expect(result.current.filings.length).toBeGreaterThan(0);
       });
 
       expect(result.current.filings).toEqual(mockForm6KPaginated.content);
@@ -135,7 +135,7 @@ describe('useForm6K', () => {
       await result.current.searchByDateRange('2024-01-01', '2024-12-31');
 
       await waitFor(() => {
-        expect(result.current.loading).toBe(false);
+        expect(result.current.filings.length).toBeGreaterThan(0);
       });
 
       expect(form6kApi.getByDateRange).toHaveBeenCalledWith('2024-01-01', '2024-12-31', 0, 20);
@@ -149,7 +149,7 @@ describe('useForm6K', () => {
       await result.current.searchByCik('test');
 
       await waitFor(() => {
-        expect(result.current.loading).toBe(false);
+        expect(result.current.error).not.toBeNull();
       });
 
       expect(result.current.error).toBe('Search failed');

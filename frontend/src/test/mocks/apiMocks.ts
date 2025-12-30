@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import type { Form13F, Form13DG, Form8K, Form3, Form5, Form6K, Form4Transaction, PaginatedResponse } from '../../app/api/types';
+import type { Form13F, Form13DG, Form8K, Form3, Form5, Form6K, Form20F, Form4Transaction, PaginatedResponse } from '../../app/api/types';
 
 // Mock Form13F data
 export const mockForm13F: Form13F = {
@@ -252,6 +252,50 @@ export const mockForm6KPaginated: PaginatedResponse<Form6K> = {
   hasPrevious: false,
 };
 
+// Mock Form20F data
+export const mockForm20F: Form20F = {
+  id: '1',
+  accessionNumber: '0001234567-24-000001',
+  cik: '0001234567',
+  companyName: 'Foreign Corp Ltd',
+  tradingSymbol: 'FCRP',
+  securityExchange: 'NYSE',
+  formType: '20-F',
+  filedDate: '2024-12-15',
+  reportDate: '2024-12-31',
+  documentPeriodEndDate: '2024-12-31',
+  fiscalYear: 2024,
+  fiscalPeriod: 'FY',
+  fiscalYearEndDate: '12-31',
+  sharesOutstanding: 100000000,
+  isAmendment: false,
+  primaryDocument: 'd123456d20f.htm',
+  keyFinancials: {
+    'Revenue': 5000000000,
+    'NetIncome': 500000000,
+    'TotalAssets': 10000000000,
+  },
+  deiData: {
+    'EntityRegistrantName': 'Foreign Corp Ltd',
+    'TradingSymbol': 'FCRP',
+    'SecurityExchangeName': 'NYSE',
+  },
+};
+
+export const mockForm20FList: Form20F[] = [mockForm20F];
+
+export const mockForm20FPaginated: PaginatedResponse<Form20F> = {
+  content: mockForm20FList,
+  page: 0,
+  size: 20,
+  totalElements: 1,
+  totalPages: 1,
+  first: true,
+  last: true,
+  hasNext: false,
+  hasPrevious: false,
+};
+
 // API mock functions
 export const createApiMock = () => ({
   form13fApi: {
@@ -324,5 +368,14 @@ export const createApiMock = () => ({
     getByDateRange: vi.fn().mockResolvedValue(mockForm6KPaginated),
     getRecentFilings: vi.fn().mockResolvedValue(mockForm6KList),
     downloadAndParse: vi.fn().mockResolvedValue(mockForm6K),
+  },
+  form20fApi: {
+    getById: vi.fn().mockResolvedValue(mockForm20F),
+    getByAccessionNumber: vi.fn().mockResolvedValue(mockForm20F),
+    getByCik: vi.fn().mockResolvedValue(mockForm20FPaginated),
+    getBySymbol: vi.fn().mockResolvedValue(mockForm20FPaginated),
+    getByDateRange: vi.fn().mockResolvedValue(mockForm20FPaginated),
+    getRecentFilings: vi.fn().mockResolvedValue(mockForm20FList),
+    downloadAndParse: vi.fn().mockResolvedValue(mockForm20F),
   },
 });

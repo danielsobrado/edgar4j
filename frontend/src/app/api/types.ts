@@ -555,6 +555,29 @@ export interface Form6K {
   exhibits?: Form6KExhibit[];
 }
 
+// ========== Form 20-F Types (Foreign Private Issuer Annual Report) ==========
+
+export interface Form20F {
+  id: string;
+  accessionNumber: string;
+  cik: string;
+  companyName?: string;
+  tradingSymbol?: string;
+  securityExchange?: string;
+  formType: string;
+  filedDate: string;
+  reportDate?: string;
+  documentPeriodEndDate?: string;
+  fiscalYear?: number;
+  fiscalPeriod?: string;
+  fiscalYearEndDate?: string;
+  sharesOutstanding?: number;
+  isAmendment?: boolean;
+  primaryDocument?: string;
+  keyFinancials?: Record<string, number>;
+  deiData?: Record<string, string>;
+}
+
 // Common 8-K item descriptions
 export const FORM_8K_ITEMS: Record<string, string> = {
   '1.01': 'Entry into Material Definitive Agreement',

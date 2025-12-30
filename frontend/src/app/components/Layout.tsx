@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Database, Search, Building2, Download, Settings, LayoutDashboard, Briefcase, Users, FileText, UserPlus, FileCheck, Globe } from 'lucide-react';
+import { Database, Search, Building2, Download, Settings, LayoutDashboard, Briefcase, Users, FileText, UserPlus, FileCheck, Globe, FileBarChart } from 'lucide-react';
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -12,6 +12,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { path: '/form3', label: 'Form 3', icon: UserPlus },
     { path: '/form5', label: 'Form 5', icon: FileCheck },
     { path: '/form6k', label: '6-K', icon: Globe },
+    { path: '/form20f', label: '20-F', icon: FileBarChart },
     { path: '/form8k', label: '8-K', icon: FileText },
     { path: '/form13f', label: '13F', icon: Briefcase },
     { path: '/form13dg', label: '13D/G', icon: Users },
@@ -63,7 +64,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       {/* Mobile Navigation */}
       <div className="md:hidden bg-[#1a1f36] border-t border-white/10 overflow-x-auto">
         <div className="max-w-7xl mx-auto px-4">
-          <div className="grid grid-cols-11 gap-1 min-w-max">
+          <div className="grid grid-cols-12 gap-1 min-w-max">
             {navItems.map(item => {
               const Icon = item.icon;
               const isActive = location.pathname === item.path;
