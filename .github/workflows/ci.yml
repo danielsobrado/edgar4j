@@ -92,6 +92,9 @@ jobs:
       - name: Run type check
         run: npm run type-check --if-present
 
+      - name: Run tests
+        run: npm run test:run
+
       - name: Build
         run: npm run build
         env:
@@ -170,10 +173,10 @@ jobs:
           cache: maven
 
       - name: Run SpotBugs
-        run: mvn spotbugs:check -B || true
+        run: mvn spotbugs:check -B
 
       - name: Run Checkstyle
-        run: mvn checkstyle:check -B || true
+        run: mvn checkstyle:check -B
 
   # Security Scan
   security:

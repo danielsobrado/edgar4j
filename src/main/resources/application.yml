@@ -56,6 +56,19 @@ edgar4j:
       enabled: ${DATA_INTEGRITY_ENABLED:true}
       cron: "0 0 0 * * *"
 
+springdoc:
+  api-docs:
+    enabled: ${SPRINGDOC_API_DOCS_ENABLED:true}
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: ${SPRINGDOC_SWAGGER_UI_ENABLED:true}
+    path: /swagger-ui.html
+    operationsSorter: method
+    tagsSorter: alpha
+    tryItOutEnabled: true
+  show-actuator: false
+  paths-to-match: /api/**
+
 management:
   endpoints:
     web:
