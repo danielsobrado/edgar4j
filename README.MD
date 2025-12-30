@@ -87,11 +87,12 @@ Example from Microsoft: https://www.sec.gov/Archives/edgar/data/789019/000162643
 
 ## Forms
 
-### Ownership: 13G and 13F
+### Ownership: 13D/13G and 13F
 
 https://www.sec.gov/dera/data/form-13f
 
-13G form is used to report a party's ownership of stock which exceeds 5% of a company's total stock issue.
+Schedule 13D and 13G are used to report a party's ownership of stock which exceeds 5% of a company's total stock issue.
+Schedule 13D is for active/intent-to-influence ownership, while Schedule 13G is for passive ownership.
 
 Form 13F is a quarterly report that is required to be filed by all institutional investment managers with at least $100 million in assets under management.
 
@@ -102,6 +103,16 @@ Form 13F is a quarterly report that is required to be filed by all institutional
 **SEC Form 3**: Is a document that a company insider or major shareholder must file with the SEC. The information provided on the form is meant to disclose the holdings of directors, officers, and beneficial owners of registered companies and becomes public record.
 
 **SEC Form 5**: Annual Statement of Changes in Beneficial Ownership of Securities is a document that company insiders must file with the Securities and Exchange Commission (SEC) if they have conducted transactions in the company's securities during the year.
+
+### Current Reports: 6-K and 8-K
+
+**SEC Form 6-K**: Report of foreign private issuers on major events or updates between annual reports.
+
+**SEC Form 8-K**: Current report used to announce major events that shareholders should know about.
+
+### Annual Reports: 20-F
+
+**SEC Form 20-F**: Annual report for foreign private issuers with comprehensive company and financial information.
 
 ## Terms
 
