@@ -6,6 +6,8 @@ import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { ErrorMessage } from '../components/common/ErrorMessage';
 import { EmptyState } from '../components/common/EmptyState';
 import { DownloadJobResponse } from '../api';
+import { showError, showSuccess } from '../store/notificationStore';
+import { POLLING } from '../config/constants';
 
 export function Downloads() {
   const [cikInput, setCikInput] = React.useState('');
@@ -20,11 +22,11 @@ export function Downloads() {
     refresh
   } = useDownloads();
 
-  // Auto-refresh jobs every 5 seconds if there are in-progress jobs
+  // Auto-refresh jobs if there are in-progress jobs
   useEffect(() => {
     const hasInProgress = jobs.some(j => j.status === 'IN_PROGRESS' || j.status === 'PENDING');
     if (hasInProgress) {
-      const interval = setInterval(refresh, 5000);
+      const interval = setInterval(refresh, POLLING.ACTIVE_JOBS_MS);
       return () => clearInterval(interval);
     }
   }, [jobs, refresh]);
@@ -37,8 +39,10 @@ export function Downloads() {
   const handleDownloadTickers = async (exchange?: string) => {
     try {
       await downloadTickers(exchange);
+      showSuccess('Download Started', `Ticker download ${exchange ? `for ${exchange}` : ''} has been queued`);
     } catch (err) {
-      console.error('Failed to start ticker download:', err);
+      const message = err instanceof Error ? err.message : 'Failed to start ticker download';
+      showError('Download Failed', message);
     }
   };
 
@@ -46,17 +50,21 @@ export function Downloads() {
     if (!cikInput.trim()) return;
     try {
       await downloadSubmissions(cikInput.trim());
+      showSuccess('Download Started', `Submissions download for CIK ${cikInput.trim()} has been queued`);
       setCikInput('');
     } catch (err) {
-      console.error('Failed to start submissions download:', err);
+      const message = err instanceof Error ? err.message : 'Failed to start submissions download';
+      showError('Download Failed', message);
     }
   };
 
   const handleCancelJob = async (jobId: string) => {
     try {
       await cancelJob(jobId);
+      showSuccess('Job Cancelled', 'The download job has been cancelled');
     } catch (err) {
-      console.error('Failed to cancel job:', err);
+      const message = err instanceof Error ? err.message : 'Failed to cancel job';
+      showError('Cancel Failed', message);
     }
   };
 

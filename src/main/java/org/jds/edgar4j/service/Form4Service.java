@@ -1,7 +1,7 @@
 package org.jds.edgar4j.service;
 
 import java.net.http.HttpResponse;
-import java.util.Date;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -68,12 +68,12 @@ public interface Form4Service {
     /**
      * Finds Form 4 filings within a date range.
      */
-    Page<Form4> findByDateRange(Date startDate, Date endDate, Pageable pageable);
+    Page<Form4> findByDateRange(LocalDate startDate, LocalDate endDate, Pageable pageable);
 
     /**
      * Finds Form 4 filings by symbol and date range.
      */
-    Page<Form4> findBySymbolAndDateRange(String symbol, Date startDate, Date endDate, Pageable pageable);
+    Page<Form4> findBySymbolAndDateRange(String symbol, LocalDate startDate, LocalDate endDate, Pageable pageable);
 
     /**
      * Finds recent Form 4 filings.
@@ -93,7 +93,7 @@ public interface Form4Service {
     /**
      * Gets insider transaction statistics for a symbol.
      */
-    InsiderStats getInsiderStats(String tradingSymbol, Date startDate, Date endDate);
+    InsiderStats getInsiderStats(String tradingSymbol, LocalDate startDate, LocalDate endDate);
 
     /**
      * Insider trading statistics.

@@ -1,6 +1,7 @@
 package org.jds.edgar4j.service.impl;
 
-import java.util.Date;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -58,8 +59,9 @@ public class Form5ServiceImpl implements Form5Service {
                     }
 
                     form5.setCik(cik);
-                    form5.setCreatedAt(new Date());
-                    form5.setUpdatedAt(new Date());
+                    Instant now = Instant.now();
+                    form5.setCreatedAt(now);
+                    form5.setUpdatedAt(now);
                     if (form5.getDocumentType() == null || form5.getDocumentType().isBlank()) {
                         form5.setDocumentType("5");
                     }
@@ -79,9 +81,9 @@ public class Form5ServiceImpl implements Form5Service {
                 form5.setCreatedAt(current.getCreatedAt());
             }
         } else if (form5.getCreatedAt() == null) {
-            form5.setCreatedAt(new Date());
+            form5.setCreatedAt(Instant.now());
         }
-        form5.setUpdatedAt(new Date());
+        form5.setUpdatedAt(Instant.now());
         return form5Repository.save(form5);
     }
 
@@ -90,7 +92,7 @@ public class Form5ServiceImpl implements Form5Service {
         if (form5List == null || form5List.isEmpty()) {
             return List.of();
         }
-        Date now = new Date();
+        Instant now = Instant.now();
         for (Form5 f : form5List) {
             if (f.getCreatedAt() == null) f.setCreatedAt(now);
             f.setUpdatedAt(now);
@@ -119,7 +121,7 @@ public class Form5ServiceImpl implements Form5Service {
     }
 
     @Override
-    public Page<Form5> findByFiledDateRange(Date startDate, Date endDate, Pageable pageable) {
+    public Page<Form5> findByFiledDateRange(LocalDate startDate, LocalDate endDate, Pageable pageable) {
         return form5Repository.findByFiledDateBetween(startDate, endDate, pageable);
     }
 
@@ -139,4 +141,3 @@ public class Form5ServiceImpl implements Form5Service {
         form5Repository.deleteById(id);
     }
 }
-

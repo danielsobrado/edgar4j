@@ -5,7 +5,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
-import java.util.Date;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -76,8 +77,9 @@ public class Form4ServiceImpl implements Form4Service {
         try {
             Form4 form4 = form4Parser.parse(xml, accessionNumber);
             if (form4 != null) {
-                form4.setCreatedAt(new Date());
-                form4.setUpdatedAt(new Date());
+                Instant now = Instant.now();
+                form4.setCreatedAt(now);
+                form4.setUpdatedAt(now);
             }
             return form4;
         } catch (Exception e) {
@@ -117,7 +119,7 @@ public class Form4ServiceImpl implements Form4Service {
             log.debug("Updating existing Form 4: {}", form4.getAccessionNumber());
         }
 
-        form4.setUpdatedAt(new Date());
+        form4.setUpdatedAt(Instant.now());
 
         try {
             Form4 saved = form4Repository.save(form4);
@@ -138,7 +140,7 @@ public class Form4ServiceImpl implements Form4Service {
             return List.of();
         }
 
-        Date now = new Date();
+        Instant now = Instant.now();
         form4List.forEach(f -> {
             if (f.getCreatedAt() == null) {
                 f.setCreatedAt(now);
@@ -182,12 +184,12 @@ public class Form4ServiceImpl implements Form4Service {
     }
 
     @Override
-    public Page<Form4> findByDateRange(Date startDate, Date endDate, Pageable pageable) {
+    public Page<Form4> findByDateRange(LocalDate startDate, LocalDate endDate, Pageable pageable) {
         return form4Repository.findByTransactionDateBetween(startDate, endDate, pageable);
     }
 
     @Override
-    public Page<Form4> findBySymbolAndDateRange(String symbol, Date startDate, Date endDate, Pageable pageable) {
+    public Page<Form4> findBySymbolAndDateRange(String symbol, LocalDate startDate, LocalDate endDate, Pageable pageable) {
         return form4Repository.findBySymbolAndDateRange(symbol, startDate, endDate, pageable);
     }
 
@@ -209,7 +211,7 @@ public class Form4ServiceImpl implements Form4Service {
     }
 
     @Override
-    public InsiderStats getInsiderStats(String tradingSymbol, Date startDate, Date endDate) {
+    public InsiderStats getInsiderStats(String tradingSymbol, LocalDate startDate, LocalDate endDate) {
         List<Form4> filings = form4Repository.findByTradingSymbolAndTransactionDateBetween(
                 tradingSymbol, startDate, endDate);
 

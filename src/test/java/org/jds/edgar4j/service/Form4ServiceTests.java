@@ -13,7 +13,10 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.net.http.HttpResponse;
-import java.util.*;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
@@ -73,13 +76,15 @@ class Form4ServiceTests {
             Form4 original = createForm4(ACCESSION_1, "MSFT", "John Doe");
             Form4 saved = form4Service.save(original);
             String originalId = saved.getId();
-            Date originalCreatedAt = saved.getCreatedAt();
+            Instant originalCreatedAt = saved.getCreatedAt();
 
             Form4 updated = createForm4(ACCESSION_1, "MSFT", "Updated Name");
             Form4 result = form4Service.save(updated);
 
             assertEquals(originalId, result.getId());
-            assertEquals(originalCreatedAt, result.getCreatedAt());
+            // Compare with millisecond precision (MongoDB truncates nanoseconds)
+            assertEquals(originalCreatedAt.truncatedTo(java.time.temporal.ChronoUnit.MILLIS),
+                    result.getCreatedAt().truncatedTo(java.time.temporal.ChronoUnit.MILLIS));
             assertEquals("Updated Name", result.getRptOwnerName());
         }
 
@@ -196,17 +201,14 @@ class Form4ServiceTests {
         @Order(16)
         @DisplayName("Should find by date range with pagination")
         void shouldFindByDateRange() {
-            Calendar cal = Calendar.getInstance();
-            cal.set(2024, Calendar.JANUARY, 15);
+            LocalDate txDate = LocalDate.of(2024, 1, 15);
 
             Form4 form4 = createForm4(ACCESSION_1, "MSFT", "John Doe");
-            form4.setTransactionDate(cal.getTime());
+            form4.setTransactionDate(txDate);
             form4Service.save(form4);
 
-            cal.set(2024, Calendar.JANUARY, 10);
-            Date startDate = cal.getTime();
-            cal.set(2024, Calendar.JANUARY, 20);
-            Date endDate = cal.getTime();
+            LocalDate startDate = LocalDate.of(2024, 1, 10);
+            LocalDate endDate = LocalDate.of(2024, 1, 20);
 
             Page<Form4> page = form4Service.findByDateRange(startDate, endDate, PageRequest.of(0, 10));
 
@@ -217,21 +219,18 @@ class Form4ServiceTests {
         @Order(17)
         @DisplayName("Should find by symbol and date range")
         void shouldFindBySymbolAndDateRange() {
-            Calendar cal = Calendar.getInstance();
-            cal.set(2024, Calendar.JANUARY, 15);
+            LocalDate txDate = LocalDate.of(2024, 1, 15);
 
             Form4 msft = createForm4(ACCESSION_1, "MSFT", "John Doe");
-            msft.setTransactionDate(cal.getTime());
+            msft.setTransactionDate(txDate);
             form4Service.save(msft);
 
             Form4 aapl = createForm4(ACCESSION_2, "AAPL", "Tim Cook");
-            aapl.setTransactionDate(cal.getTime());
+            aapl.setTransactionDate(txDate);
             form4Service.save(aapl);
 
-            cal.set(2024, Calendar.JANUARY, 10);
-            Date startDate = cal.getTime();
-            cal.set(2024, Calendar.JANUARY, 20);
-            Date endDate = cal.getTime();
+            LocalDate startDate = LocalDate.of(2024, 1, 10);
+            LocalDate endDate = LocalDate.of(2024, 1, 20);
 
             Page<Form4> page = form4Service.findBySymbolAndDateRange("MSFT", startDate, endDate, PageRequest.of(0, 10));
 
@@ -249,9 +248,7 @@ class Form4ServiceTests {
                         "MSFT",
                         "Owner " + i
                 );
-                Calendar cal = Calendar.getInstance();
-                cal.add(Calendar.DAY_OF_MONTH, -i);
-                form4.setTransactionDate(cal.getTime());
+                form4.setTransactionDate(LocalDate.now().minusDays(i));
                 form4Service.save(form4);
             }
 
@@ -299,9 +296,7 @@ class Form4ServiceTests {
         @Order(30)
         @DisplayName("Should calculate insider stats correctly")
         void shouldCalculateInsiderStats() {
-            Calendar cal = Calendar.getInstance();
-            cal.set(2024, Calendar.JANUARY, 15);
-            Date txDate = cal.getTime();
+            LocalDate txDate = LocalDate.of(2024, 1, 15);
 
             // Create buys
             Form4 buy1 = createForm4(ACCESSION_1, "MSFT", "Director Buyer");
@@ -348,10 +343,8 @@ class Form4ServiceTests {
             ));
             form4Service.save(sell);
 
-            cal.set(2024, Calendar.JANUARY, 1);
-            Date startDate = cal.getTime();
-            cal.set(2024, Calendar.JANUARY, 31);
-            Date endDate = cal.getTime();
+            LocalDate startDate = LocalDate.of(2024, 1, 1);
+            LocalDate endDate = LocalDate.of(2024, 1, 31);
 
             InsiderStats stats = form4Service.getInsiderStats("MSFT", startDate, endDate);
 
@@ -367,11 +360,8 @@ class Form4ServiceTests {
         @Order(31)
         @DisplayName("Should return zero stats for empty results")
         void shouldReturnZeroStatsForEmptyResults() {
-            Calendar cal = Calendar.getInstance();
-            cal.set(2024, Calendar.JANUARY, 1);
-            Date startDate = cal.getTime();
-            cal.set(2024, Calendar.JANUARY, 31);
-            Date endDate = cal.getTime();
+            LocalDate startDate = LocalDate.of(2024, 1, 1);
+            LocalDate endDate = LocalDate.of(2024, 1, 31);
 
             InsiderStats stats = form4Service.getInsiderStats("NONEXISTENT", startDate, endDate);
 
@@ -529,13 +519,13 @@ class Form4ServiceTests {
                 .ownerType("Officer")
                 .officerTitle("CFO")
                 .securityTitle("Common Stock")
-                .transactionDate(new Date())
+                .transactionDate(LocalDate.now())
                 .transactionShares(1000f)
                 .transactionPricePerShare(100f)
                 .transactionValue(100000f)
                 .acquiredDisposedCode("A")
-                .createdAt(new Date())
-                .updatedAt(new Date())
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
                 .build();
     }
 }

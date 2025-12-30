@@ -4,20 +4,30 @@ import { useForm13DG, useRecentForm13DG, useForm13DGSearch } from './useForm13DG
 import { mockForm13DG, mockForm13DGList, mockForm13DGPaginated } from '../../test/mocks/apiMocks';
 
 // Mock the API module
-vi.mock('../api/endpoints/form13dg', () => ({
-  form13dgApi: {
-    getById: vi.fn(),
-    getRecentFilings: vi.fn(),
-    searchByFilerName: vi.fn(),
-    searchByIssuerName: vi.fn(),
-    getByCusip: vi.fn(),
-    getByScheduleType: vi.fn(),
-    getActivistFilings: vi.fn(),
-    getAboveThreshold: vi.fn(),
-  },
-}));
+vi.mock('../api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../api')>();
+  return {
+    ...actual,
+    form13dgApi: {
+      getById: vi.fn(),
+      getByAccessionNumber: vi.fn(),
+      getRecentFilings: vi.fn(),
+      searchByFilerName: vi.fn(),
+      searchByIssuerName: vi.fn(),
+      getByCusip: vi.fn(),
+      getByScheduleType: vi.fn(),
+      getActivistFilings: vi.fn(),
+      getAboveThreshold: vi.fn(),
+      getBeneficialOwners: vi.fn(),
+      getOwnershipHistory: vi.fn(),
+      getFilerPortfolio: vi.fn(),
+      getOwnershipSnapshot: vi.fn(),
+      getTopActivistInvestors: vi.fn(),
+    },
+  };
+});
 
-import { form13dgApi } from '../api/endpoints/form13dg';
+import { form13dgApi } from '../api';
 
 describe('useForm13DG', () => {
   beforeEach(() => {
@@ -123,9 +133,8 @@ describe('useForm13DG', () => {
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
+        expect(result.current.filings).toEqual(mockForm13DGPaginated.content);
       });
-
-      expect(result.current.filings).toEqual(mockForm13DGPaginated.content);
     });
 
     it('should search by schedule type', async () => {

@@ -2,8 +2,7 @@ package org.jds.edgar4j.controller;
 
 import static org.hamcrest.Matchers.hasSize;
 
-import java.util.Calendar;
-import java.util.Date;
+import java.time.LocalDate;
 
 import org.jds.edgar4j.model.Form3;
 import org.jds.edgar4j.repository.Form3Repository;
@@ -47,7 +46,7 @@ class Form3ControllerTest {
         repository.deleteAll();
     }
 
-    private Form3 createForm3(String accessionNumber, String cik, String symbol, Date filedDate) {
+    private Form3 createForm3(String accessionNumber, String cik, String symbol, LocalDate filedDate) {
         return Form3.builder()
                 .accessionNumber(accessionNumber)
                 .cik(cik)
@@ -65,7 +64,7 @@ class Form3ControllerTest {
         @Test
         @DisplayName("should return Form3 when found by ID")
         void shouldReturnForm3WhenFound() {
-            Form3 saved = repository.save(createForm3("0000555555-25-000001", "0000555555", "ACME", new Date()));
+            Form3 saved = repository.save(createForm3("0000555555-25-000001", "0000555555", "ACME", LocalDate.now()));
 
             webTestClient.get()
                     .uri(BASE_URL + "/" + saved.getId())
@@ -93,7 +92,7 @@ class Form3ControllerTest {
         @Test
         @DisplayName("should return Form3 by accession number")
         void shouldReturnByAccessionNumber() {
-            repository.save(createForm3("0000555555-25-000002", "0000555555", "ACME", new Date()));
+            repository.save(createForm3("0000555555-25-000002", "0000555555", "ACME", LocalDate.now()));
 
             webTestClient.get()
                     .uri(BASE_URL + "/accession/0000555555-25-000002")
@@ -111,8 +110,8 @@ class Form3ControllerTest {
         @Test
         @DisplayName("should return paginated Form3 by CIK")
         void shouldReturnPaginatedByCik() {
-            repository.save(createForm3("0000555555-25-000003", "0000555555", "ACME", new Date()));
-            repository.save(createForm3("0000555555-25-000004", "0000555555", "ACME", new Date()));
+            repository.save(createForm3("0000555555-25-000003", "0000555555", "ACME", LocalDate.now()));
+            repository.save(createForm3("0000555555-25-000004", "0000555555", "ACME", LocalDate.now()));
 
             webTestClient.get()
                     .uri(uriBuilder -> uriBuilder
@@ -134,7 +133,7 @@ class Form3ControllerTest {
         @Test
         @DisplayName("should handle case insensitive symbol")
         void shouldHandleCaseInsensitiveSymbol() {
-            repository.save(createForm3("0000555555-25-000005", "0000555555", "ACME", new Date()));
+            repository.save(createForm3("0000555555-25-000005", "0000555555", "ACME", LocalDate.now()));
 
             webTestClient.get()
                     .uri(BASE_URL + "/symbol/acme")
@@ -165,9 +164,7 @@ class Form3ControllerTest {
         @Test
         @DisplayName("should return filings within date range")
         void shouldReturnByDateRange() {
-            Calendar cal = Calendar.getInstance();
-            cal.set(2025, Calendar.NOVEMBER, 5);
-            Date nov5 = cal.getTime();
+            LocalDate nov5 = LocalDate.of(2025, 11, 5);
 
             repository.save(createForm3("0000555555-25-000006", "0000555555", "ACME", nov5));
 
@@ -191,8 +188,8 @@ class Form3ControllerTest {
         @Test
         @DisplayName("should return recent filings")
         void shouldReturnRecentFilings() {
-            repository.save(createForm3("0000555555-25-000007", "0000555555", "ACME", new Date()));
-            repository.save(createForm3("0000555555-25-000008", "0000555555", "ACME", new Date()));
+            repository.save(createForm3("0000555555-25-000007", "0000555555", "ACME", LocalDate.now()));
+            repository.save(createForm3("0000555555-25-000008", "0000555555", "ACME", LocalDate.now()));
 
             webTestClient.get()
                     .uri(BASE_URL + "/recent?limit=10")
@@ -203,4 +200,3 @@ class Form3ControllerTest {
         }
     }
 }
-

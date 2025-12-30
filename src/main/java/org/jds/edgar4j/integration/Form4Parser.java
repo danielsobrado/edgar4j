@@ -1,10 +1,10 @@
 package org.jds.edgar4j.integration;
 
 import java.io.StringReader;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 
 import jakarta.xml.bind.JAXBContext;
@@ -37,7 +37,7 @@ import lombok.extern.slf4j.Slf4j;
 @Component
 public class Form4Parser {
 
-    private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd");
+    private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ISO_LOCAL_DATE;
     private static final String TRANSACTION_TYPE_NON_DERIVATIVE = "NON_DERIVATIVE";
     private static final String TRANSACTION_TYPE_DERIVATIVE = "DERIVATIVE";
 
@@ -484,15 +484,13 @@ public class Form4Parser {
         return vwf.getValue();
     }
 
-    private Date parseDate(String dateStr) {
+    private LocalDate parseDate(String dateStr) {
         if (dateStr == null || dateStr.trim().isEmpty()) {
             return null;
         }
         try {
-            synchronized (DATE_FORMAT) {
-                return DATE_FORMAT.parse(dateStr.trim());
-            }
-        } catch (ParseException e) {
+            return LocalDate.parse(dateStr.trim(), DATE_FORMAT);
+        } catch (DateTimeParseException e) {
             log.warn("Failed to parse date: {}", dateStr);
             return null;
         }

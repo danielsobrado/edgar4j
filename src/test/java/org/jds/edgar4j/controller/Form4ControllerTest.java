@@ -11,7 +11,10 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
-import java.util.*;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.hamcrest.Matchers.*;
 
@@ -204,11 +207,10 @@ class Form4ControllerTest {
         @Test
         @DisplayName("Should return Form4 within date range")
         void shouldReturnByDateRange() throws Exception {
-            Calendar cal = Calendar.getInstance();
-            cal.set(2024, Calendar.JANUARY, 15);
+            LocalDate txDate = LocalDate.of(2024, 1, 15);
 
             Form4 form4 = createForm4(ACCESSION_1, "MSFT", "John Doe");
-            form4.setTransactionDate(cal.getTime());
+            form4.setTransactionDate(txDate);
             form4Repository.save(form4);
 
             webTestClient.get()
@@ -244,15 +246,14 @@ class Form4ControllerTest {
         @Test
         @DisplayName("Should return Form4 by symbol and date range")
         void shouldReturnBySymbolAndDateRange() throws Exception {
-            Calendar cal = Calendar.getInstance();
-            cal.set(2024, Calendar.JANUARY, 15);
+            LocalDate txDate = LocalDate.of(2024, 1, 15);
 
             Form4 msft = createForm4(ACCESSION_1, "MSFT", "John Doe");
-            msft.setTransactionDate(cal.getTime());
+            msft.setTransactionDate(txDate);
             form4Repository.save(msft);
 
             Form4 aapl = createForm4(ACCESSION_2, "AAPL", "Tim Cook");
-            aapl.setTransactionDate(cal.getTime());
+            aapl.setTransactionDate(txDate);
             form4Repository.save(aapl);
 
             webTestClient.get()
@@ -282,9 +283,8 @@ class Form4ControllerTest {
                         "MSFT",
                         "Owner " + i
                 );
-                Calendar cal = Calendar.getInstance();
-                cal.add(Calendar.DAY_OF_MONTH, -i);
-                form4.setTransactionDate(cal.getTime());
+                LocalDate txDate = LocalDate.now().minusDays(i);
+                form4.setTransactionDate(txDate);
                 form4Repository.save(form4);
             }
 
@@ -339,11 +339,10 @@ class Form4ControllerTest {
         @Test
         @DisplayName("Should return insider statistics for symbol")
         void shouldReturnInsiderStats() throws Exception {
-            Calendar cal = Calendar.getInstance();
-            cal.set(2024, Calendar.JANUARY, 15);
+            LocalDate txDate = LocalDate.of(2024, 1, 15);
 
             Form4 buy = createForm4(ACCESSION_1, "MSFT", "Buyer");
-            buy.setTransactionDate(cal.getTime());
+            buy.setTransactionDate(txDate);
             buy.setAcquiredDisposedCode("A");
             buy.setTransactionValue(100000f);
             buy.setDirector(true);
@@ -351,7 +350,7 @@ class Form4ControllerTest {
             form4Repository.save(buy);
 
             Form4 sell = createForm4(ACCESSION_2, "MSFT", "Seller");
-            sell.setTransactionDate(cal.getTime());
+            sell.setTransactionDate(txDate);
             sell.setAcquiredDisposedCode("D");
             sell.setTransactionValue(50000f);
             sell.setOfficer(true);
@@ -471,14 +470,14 @@ class Form4ControllerTest {
                 .ownerType("Officer")
                 .officerTitle("CFO")
                 .securityTitle("Common Stock")
-                .transactionDate(new Date())
+                .transactionDate(LocalDate.now())
                 .transactionShares(1000f)
                 .transactionPricePerShare(100f)
                 .transactionValue(100000f)
                 .acquiredDisposedCode("A")
                 .transactions(transactions)
-                .createdAt(new Date())
-                .updatedAt(new Date())
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
                 .build();
     }
 }

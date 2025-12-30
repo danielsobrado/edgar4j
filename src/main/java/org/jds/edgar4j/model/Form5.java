@@ -1,6 +1,7 @@
 package org.jds.edgar4j.model;
 
-import java.util.Date;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 
 import org.springframework.data.annotation.Id;
@@ -41,9 +42,9 @@ public class Form5 {
 
     private String documentType;
 
-    private Date periodOfReport;
+    private LocalDate periodOfReport;
 
-    private Date filedDate;
+    private LocalDate filedDate;
 
     // Issuer information
     @Indexed
@@ -82,8 +83,7 @@ public class Form5 {
     // Holdings (non-derivative + derivative)
     private List<Form4Transaction> holdings;
 
-    private Date createdAt;
+    private Instant createdAt;
 
-    private Date updatedAt;
+    private Instant updatedAt;
 }
-

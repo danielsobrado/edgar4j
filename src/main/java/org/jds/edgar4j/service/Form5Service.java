@@ -1,6 +1,6 @@
 package org.jds.edgar4j.service;
 
-import java.util.Date;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -32,7 +32,7 @@ public interface Form5Service {
 
     Page<Form5> findByTradingSymbol(String tradingSymbol, Pageable pageable);
 
-    Page<Form5> findByFiledDateRange(Date startDate, Date endDate, Pageable pageable);
+    Page<Form5> findByFiledDateRange(LocalDate startDate, LocalDate endDate, Pageable pageable);
 
     List<Form5> findRecentFilings(int limit);
 
@@ -40,4 +40,3 @@ public interface Form5Service {
 
     void deleteById(String id);
 }
-

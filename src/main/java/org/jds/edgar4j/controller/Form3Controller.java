@@ -1,8 +1,8 @@
 package org.jds.edgar4j.controller;
 
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 
 import org.jds.edgar4j.model.Form3;
@@ -34,7 +34,7 @@ public class Form3Controller {
 
     private final Form3Service form3Service;
 
-    private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd");
+    private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     @GetMapping("/{id}")
     public ResponseEntity<Form3> getById(@PathVariable String id) {
@@ -78,11 +78,11 @@ public class Form3Controller {
             @RequestParam(defaultValue = "20") int size) {
 
         try {
-            Date start = parseDate(startDate);
-            Date end = parseDate(endDate);
+            LocalDate start = parseDate(startDate);
+            LocalDate end = parseDate(endDate);
             PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "filedDate"));
             return ResponseEntity.ok(form3Service.findByFiledDateRange(start, end, pageRequest));
-        } catch (ParseException e) {
+        } catch (DateTimeParseException e) {
             log.warn("Invalid date format: {} or {}", startDate, endDate);
             return ResponseEntity.badRequest().build();
         }
@@ -123,7 +123,7 @@ public class Form3Controller {
             Form3 saved = form3Service.save(form3);
             return ResponseEntity.ok(saved);
 
-        } catch (ParseException e) {
+        } catch (DateTimeParseException e) {
             log.warn("Invalid date format in request: filedDate={}", filedDate);
             return ResponseEntity.badRequest().build();
         } catch (Exception e) {
@@ -147,10 +147,7 @@ public class Form3Controller {
         return ResponseEntity.noContent().build();
     }
 
-    private Date parseDate(String dateStr) throws ParseException {
-        synchronized (DATE_FORMAT) {
-            return DATE_FORMAT.parse(dateStr);
-        }
+    private LocalDate parseDate(String dateStr) {
+        return LocalDate.parse(dateStr, DATE_FORMAT);
     }
 }
-

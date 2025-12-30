@@ -1,5 +1,12 @@
 # Docker profile configuration
 # This profile is used when running in Docker containers
+#
+# REQUIRED Environment Variables:
+#   MONGODB_URI - MongoDB connection string (no default for security)
+#
+# Optional Environment Variables:
+#   MONGODB_DATABASE - Database name (default: edgar)
+#   SEC_USER_AGENT - User agent for SEC API calls
 
 server:
   port: 8080
@@ -7,13 +14,15 @@ server:
 spring:
   data:
     mongodb:
-      uri: ${MONGODB_URI:mongodb://admin:admin123@mongodb:27017/edgar?authSource=admin}
+      uri: ${MONGODB_URI}
       database: ${MONGODB_DATABASE:edgar}
       auto-index-creation: ${MONGODB_AUTO_INDEX_CREATION:true}
 
 edgar4j:
   sec:
     user-agent: ${SEC_USER_AGENT:Edgar4j/1.0 (contact@example.com)}
+  security:
+    enabled: ${EDGAR4J_SECURITY_ENABLED:true}
   jobs:
     ticker-sync:
       enabled: true

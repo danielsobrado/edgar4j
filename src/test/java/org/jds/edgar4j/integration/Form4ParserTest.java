@@ -10,7 +10,6 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.text.SimpleDateFormat;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -23,8 +22,6 @@ class Form4ParserTest {
 
     private Form4Parser parser;
     private static final String ACCESSION_NUMBER = "0001234567-24-000001";
-    private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd");
-
     @BeforeEach
     void setUp() {
         parser = new Form4Parser();

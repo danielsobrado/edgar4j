@@ -1,6 +1,6 @@
 package org.jds.edgar4j.repository;
 
-import java.util.Date;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -42,16 +42,16 @@ public interface Form4Repository extends MongoRepository<Form4, String> {
     List<Form4> findByRptOwnerCik(String rptOwnerCik);
 
     // Find by date range
-    List<Form4> findByTransactionDateBetween(Date startDate, Date endDate);
+    List<Form4> findByTransactionDateBetween(LocalDate startDate, LocalDate endDate);
 
-    Page<Form4> findByTransactionDateBetween(Date startDate, Date endDate, Pageable pageable);
+    Page<Form4> findByTransactionDateBetween(LocalDate startDate, LocalDate endDate, Pageable pageable);
 
     // Find by symbol and date range
     @Query("{ 'tradingSymbol': ?0, 'transactionDate': { $gte: ?1, $lte: ?2 } }")
-    Page<Form4> findBySymbolAndDateRange(String tradingSymbol, Date startDate, Date endDate, Pageable pageable);
+    Page<Form4> findBySymbolAndDateRange(String tradingSymbol, LocalDate startDate, LocalDate endDate, Pageable pageable);
 
     @Query("{ 'tradingSymbol': ?0, 'transactionDate': { $gte: ?1, $lte: ?2 } }")
-    List<Form4> findByTradingSymbolAndTransactionDateBetween(String tradingSymbol, Date startDate, Date endDate);
+    List<Form4> findByTradingSymbolAndTransactionDateBetween(String tradingSymbol, LocalDate startDate, LocalDate endDate);
 
     // Find by owner type
     List<Form4> findByIsDirectorTrue();
@@ -109,7 +109,7 @@ public interface Form4Repository extends MongoRepository<Form4, String> {
         "{ $match: { 'tradingSymbol': ?0, 'transactionDate': { $gte: ?1, $lte: ?2 } } }",
         "{ $group: { _id: '$acquiredDisposedCode', totalValue: { $sum: '$transactionValue' }, count: { $sum: 1 } } }"
     })
-    List<TransactionSummary> getTransactionSummaryBySymbol(String tradingSymbol, Date startDate, Date endDate);
+    List<TransactionSummary> getTransactionSummaryBySymbol(String tradingSymbol, LocalDate startDate, LocalDate endDate);
 
     /**
      * Projection for transaction summary aggregation.

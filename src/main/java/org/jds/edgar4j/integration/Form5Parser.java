@@ -2,8 +2,8 @@ package org.jds.edgar4j.integration;
 
 import java.io.StringReader;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
+import java.time.Instant;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -76,7 +76,7 @@ public class Form5Parser {
                 form5.setHoldings(holdings);
             }
 
-            Date now = new Date();
+            Instant now = Instant.now();
             form5.setCreatedAt(now);
             form5.setUpdatedAt(now);
 
@@ -123,4 +123,3 @@ public class Form5Parser {
         return "Unknown";
     }
 }
-

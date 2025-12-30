@@ -84,4 +84,4 @@ spring:
         reactive:
           endpoints: ${ELASTICSEARCH_ENDPOINTS:localhost:9200}
           username: ${ELASTICSEARCH_USERNAME:elastic}
-          password: ${ELASTICSEARCH_PASSWORD:changeme}
+          password: ${ELASTICSEARCH_PASSWORD}

@@ -80,8 +80,13 @@ public class Form13DGServiceImpl implements Form13DGService {
 
     @Override
     public Form13DG save(Form13DG form13DG) {
+        if (form13DG == null) {
+            return null;
+        }
         log.info("Saving Schedule 13D/G: accession={}, issuer={}, filer={}",
                 form13DG.getAccessionNumber(), form13DG.getIssuerName(), form13DG.getFilingPersonName());
+        form13DGRepository.findByAccessionNumber(form13DG.getAccessionNumber())
+                .ifPresent(existing -> form13DG.setId(existing.getId()));
         return form13DGRepository.save(form13DG);
     }
 
@@ -197,12 +202,16 @@ public class Form13DGServiceImpl implements Form13DGService {
 
     @Override
     public List<Form13DG> findRecent13DFilings(int limit) {
-        return form13DGRepository.findTop10ByScheduleTypeOrderByFiledDateDesc("13D");
+        int safeLimit = limit > 0 ? limit : 10;
+        Pageable pageable = PageRequest.of(0, safeLimit, Sort.by(Sort.Direction.DESC, "filedDate"));
+        return form13DGRepository.findByScheduleType("13D", pageable).getContent();
     }
 
     @Override
     public List<Form13DG> findRecent13GFilings(int limit) {
-        return form13DGRepository.findTop10ByScheduleTypeOrderByFiledDateDesc("13G");
+        int safeLimit = limit > 0 ? limit : 10;
+        Pageable pageable = PageRequest.of(0, safeLimit, Sort.by(Sort.Direction.DESC, "filedDate"));
+        return form13DGRepository.findByScheduleType("13G", pageable).getContent();
     }
 
     // ========== AMENDMENTS ==========

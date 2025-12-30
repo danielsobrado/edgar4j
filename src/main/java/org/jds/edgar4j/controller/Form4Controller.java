@@ -1,8 +1,8 @@
 package org.jds.edgar4j.controller;
 
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 
 import org.jds.edgar4j.model.Form4;
@@ -35,7 +35,7 @@ public class Form4Controller {
 
     private final Form4Service form4Service;
 
-    private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd");
+    private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     /**
      * Get Form 4 by ID.
@@ -105,12 +105,12 @@ public class Form4Controller {
             @RequestParam(defaultValue = "20") int size) {
 
         try {
-            Date start = parseDate(startDate);
-            Date end = parseDate(endDate);
+            LocalDate start = parseDate(startDate);
+            LocalDate end = parseDate(endDate);
             PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "transactionDate"));
             Page<Form4> results = form4Service.findByDateRange(start, end, pageRequest);
             return ResponseEntity.ok(results);
-        } catch (ParseException e) {
+        } catch (DateTimeParseException e) {
             log.warn("Invalid date format: {} or {}", startDate, endDate);
             return ResponseEntity.badRequest().build();
         }
@@ -128,12 +128,12 @@ public class Form4Controller {
             @RequestParam(defaultValue = "20") int size) {
 
         try {
-            Date start = parseDate(startDate);
-            Date end = parseDate(endDate);
+            LocalDate start = parseDate(startDate);
+            LocalDate end = parseDate(endDate);
             PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "transactionDate"));
             Page<Form4> results = form4Service.findBySymbolAndDateRange(symbol.toUpperCase(), start, end, pageRequest);
             return ResponseEntity.ok(results);
-        } catch (ParseException e) {
+        } catch (DateTimeParseException e) {
             log.warn("Invalid date format: {} or {}", startDate, endDate);
             return ResponseEntity.badRequest().build();
         }
@@ -159,11 +159,11 @@ public class Form4Controller {
             @RequestParam String endDate) {
 
         try {
-            Date start = parseDate(startDate);
-            Date end = parseDate(endDate);
+            LocalDate start = parseDate(startDate);
+            LocalDate end = parseDate(endDate);
             InsiderStats stats = form4Service.getInsiderStats(symbol.toUpperCase(), start, end);
             return ResponseEntity.ok(stats);
-        } catch (ParseException e) {
+        } catch (DateTimeParseException e) {
             log.warn("Invalid date format: {} or {}", startDate, endDate);
             return ResponseEntity.badRequest().build();
         }
@@ -223,9 +223,7 @@ public class Form4Controller {
         return ResponseEntity.noContent().build();
     }
 
-    private Date parseDate(String dateStr) throws ParseException {
-        synchronized (DATE_FORMAT) {
-            return DATE_FORMAT.parse(dateStr);
-        }
+    private LocalDate parseDate(String dateStr) {
+        return LocalDate.parse(dateStr, DATE_FORMAT);
     }
 }

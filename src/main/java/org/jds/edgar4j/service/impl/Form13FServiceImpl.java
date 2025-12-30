@@ -97,8 +97,13 @@ public class Form13FServiceImpl implements Form13FService {
 
     @Override
     public Form13F save(Form13F form13F) {
+        if (form13F == null) {
+            return null;
+        }
         log.info("Saving Form 13F: accession={}, filer={}",
                 form13F.getAccessionNumber(), form13F.getFilerName());
+        form13FRepository.findByAccessionNumber(form13F.getAccessionNumber())
+                .ifPresent(existing -> form13F.setId(existing.getId()));
         return form13FRepository.save(form13F);
     }
 
@@ -161,7 +166,9 @@ public class Form13FServiceImpl implements Form13FService {
 
     @Override
     public List<Form13F> findRecentFilingsByCik(String cik, int limit) {
-        return form13FRepository.findTop10ByCikOrderByReportPeriodDesc(cik);
+        int safeLimit = limit > 0 ? limit : 10;
+        Pageable pageable = PageRequest.of(0, safeLimit, Sort.by(Sort.Direction.DESC, "reportPeriod"));
+        return form13FRepository.findByCik(cik, pageable).getContent();
     }
 
     @Override

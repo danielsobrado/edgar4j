@@ -2,8 +2,7 @@ package org.jds.edgar4j.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.util.Calendar;
-import java.util.Date;
+import java.time.LocalDate;
 
 import org.jds.edgar4j.model.Form3;
 import org.junit.jupiter.api.AfterEach;
@@ -39,7 +38,7 @@ class Form3RepositoryTest {
         repository.deleteAll();
     }
 
-    private Form3 createForm3(String accession, String cik, String symbol, Date filedDate) {
+    private Form3 createForm3(String accession, String cik, String symbol, LocalDate filedDate) {
         return Form3.builder()
                 .accessionNumber(accession)
                 .cik(cik)
@@ -58,7 +57,7 @@ class Form3RepositoryTest {
         @Test
         @DisplayName("should find by accession number")
         void shouldFindByAccessionNumber() {
-            repository.save(createForm3("0000555555-25-000001", "0000555555", "ACME", new Date()));
+            repository.save(createForm3("0000555555-25-000001", "0000555555", "ACME", LocalDate.now()));
 
             assertThat(repository.findByAccessionNumber("0000555555-25-000001")).isPresent();
         }
@@ -66,9 +65,9 @@ class Form3RepositoryTest {
         @Test
         @DisplayName("should find by CIK")
         void shouldFindByCik() {
-            repository.save(createForm3("0000555555-25-000002", "0000555555", "ACME", new Date()));
-            repository.save(createForm3("0000555555-25-000003", "0000555555", "ACME", new Date()));
-            repository.save(createForm3("0000999999-25-000001", "0000999999", "ZZZ", new Date()));
+            repository.save(createForm3("0000555555-25-000002", "0000555555", "ACME", LocalDate.now()));
+            repository.save(createForm3("0000555555-25-000003", "0000555555", "ACME", LocalDate.now()));
+            repository.save(createForm3("0000999999-25-000001", "0000999999", "ZZZ", LocalDate.now()));
 
             Page<Form3> results = repository.findByCik("0000555555",
                     PageRequest.of(0, 10, Sort.by(Sort.Direction.DESC, "filedDate")));
@@ -80,8 +79,8 @@ class Form3RepositoryTest {
         @Test
         @DisplayName("should find by trading symbol")
         void shouldFindByTradingSymbol() {
-            repository.save(createForm3("0000555555-25-000004", "0000555555", "ACME", new Date()));
-            repository.save(createForm3("0000999999-25-000002", "0000999999", "ZZZ", new Date()));
+            repository.save(createForm3("0000555555-25-000004", "0000555555", "ACME", LocalDate.now()));
+            repository.save(createForm3("0000999999-25-000002", "0000999999", "ZZZ", LocalDate.now()));
 
             Page<Form3> results = repository.findByTradingSymbol("ACME", PageRequest.of(0, 10));
 
@@ -92,15 +91,10 @@ class Form3RepositoryTest {
         @Test
         @DisplayName("should find by filed date range")
         void shouldFindByFiledDateRange() {
-            Calendar cal = Calendar.getInstance();
-            cal.set(2025, Calendar.NOVEMBER, 1);
-            Date nov1 = cal.getTime();
-            cal.set(2025, Calendar.NOVEMBER, 10);
-            Date nov10 = cal.getTime();
-            cal.set(2025, Calendar.NOVEMBER, 2);
-            Date nov2 = cal.getTime();
-            cal.set(2025, Calendar.NOVEMBER, 20);
-            Date nov20 = cal.getTime();
+            LocalDate nov1 = LocalDate.of(2025, 11, 1);
+            LocalDate nov10 = LocalDate.of(2025, 11, 10);
+            LocalDate nov2 = LocalDate.of(2025, 11, 2);
+            LocalDate nov20 = LocalDate.of(2025, 11, 20);
 
             repository.save(createForm3("0000555555-25-000005", "0000555555", "ACME", nov1));
             repository.save(createForm3("0000555555-25-000006", "0000555555", "ACME", nov10));
@@ -115,4 +109,3 @@ class Form3RepositoryTest {
         }
     }
 }
-

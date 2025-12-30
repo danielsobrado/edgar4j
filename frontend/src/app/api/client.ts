@@ -1,7 +1,9 @@
 import axios, { AxiosError, AxiosInstance, AxiosRequestConfig } from 'axios';
 import { ApiResponse } from './types';
+import { getApiBaseUrl, devLog } from '../config/env';
+import { API_CONFIG, ERROR_MESSAGES } from '../config/constants';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const API_BASE_URL = getApiBaseUrl();
 
 class ApiClient {
   private client: AxiosInstance;
@@ -9,19 +11,17 @@ class ApiClient {
   constructor() {
     this.client = axios.create({
       baseURL: `${API_BASE_URL}/api`,
-      timeout: 30000,
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      timeout: API_CONFIG.TIMEOUT_MS,
+      headers: API_CONFIG.DEFAULT_HEADERS,
     });
 
     this.client.interceptors.request.use(
       (config) => {
-        console.log(`[API] ${config.method?.toUpperCase()} ${config.url}`);
+        devLog.log(`[API] ${config.method?.toUpperCase()} ${config.url}`);
         return config;
       },
       (error) => {
-        console.error('[API] Request error:', error);
+        devLog.error('[API] Request error:', error);
         return Promise.reject(error);
       }
     );
@@ -31,8 +31,8 @@ class ApiClient {
         return response;
       },
       (error: AxiosError<ApiResponse<unknown>>) => {
-        const message = error.response?.data?.message || error.message || 'An error occurred';
-        console.error('[API] Response error:', message);
+        const message = error.response?.data?.message || error.message || ERROR_MESSAGES.GENERIC;
+        devLog.error('[API] Response error:', message);
         return Promise.reject(new Error(message));
       }
     );

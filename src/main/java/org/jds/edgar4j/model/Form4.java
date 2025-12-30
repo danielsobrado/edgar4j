@@ -1,6 +1,7 @@
 package org.jds.edgar4j.model;
 
-import java.util.Date;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 
 import org.springframework.data.mongodb.core.index.CompoundIndex;
@@ -42,7 +43,7 @@ public class Form4 {
 
     private String documentType;
 
-    private Date periodOfReport;
+    private LocalDate periodOfReport;
 
     // Issuer information
     @Indexed
@@ -79,7 +80,7 @@ public class Form4 {
     private String securityTitle;
 
     @Indexed
-    private Date transactionDate;
+    private LocalDate transactionDate;
 
     private Float transactionShares;
 
@@ -93,9 +94,9 @@ public class Form4 {
     private List<Form4Transaction> transactions;
 
     // Metadata
-    private Date createdAt;
+    private Instant createdAt;
 
-    private Date updatedAt;
+    private Instant updatedAt;
 
     /**
      * Determines if transaction was a purchase (A) or sale (D).

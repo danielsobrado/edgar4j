@@ -1,6 +1,7 @@
 package org.jds.edgar4j.service.impl;
 
-import java.util.Date;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -58,8 +59,9 @@ public class Form3ServiceImpl implements Form3Service {
                     }
 
                     form3.setCik(cik);
-                    form3.setCreatedAt(new Date());
-                    form3.setUpdatedAt(new Date());
+                    Instant now = Instant.now();
+                    form3.setCreatedAt(now);
+                    form3.setUpdatedAt(now);
                     if (form3.getDocumentType() == null || form3.getDocumentType().isBlank()) {
                         form3.setDocumentType("3");
                     }
@@ -79,9 +81,9 @@ public class Form3ServiceImpl implements Form3Service {
                 form3.setCreatedAt(current.getCreatedAt());
             }
         } else if (form3.getCreatedAt() == null) {
-            form3.setCreatedAt(new Date());
+            form3.setCreatedAt(Instant.now());
         }
-        form3.setUpdatedAt(new Date());
+        form3.setUpdatedAt(Instant.now());
         return form3Repository.save(form3);
     }
 
@@ -90,7 +92,7 @@ public class Form3ServiceImpl implements Form3Service {
         if (form3List == null || form3List.isEmpty()) {
             return List.of();
         }
-        Date now = new Date();
+        Instant now = Instant.now();
         for (Form3 f : form3List) {
             if (f.getCreatedAt() == null) f.setCreatedAt(now);
             f.setUpdatedAt(now);
@@ -119,7 +121,7 @@ public class Form3ServiceImpl implements Form3Service {
     }
 
     @Override
-    public Page<Form3> findByFiledDateRange(Date startDate, Date endDate, Pageable pageable) {
+    public Page<Form3> findByFiledDateRange(LocalDate startDate, LocalDate endDate, Pageable pageable) {
         return form3Repository.findByFiledDateBetween(startDate, endDate, pageable);
     }
 
@@ -139,4 +141,3 @@ public class Form3ServiceImpl implements Form3Service {
         form3Repository.deleteById(id);
     }
 }
-

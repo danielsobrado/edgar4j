@@ -1,6 +1,6 @@
 package org.jds.edgar4j.repository;
 
-import java.util.Date;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -24,7 +24,7 @@ public interface Form3Repository extends MongoRepository<Form3, String> {
     Page<Form3> findByTradingSymbol(String tradingSymbol, Pageable pageable);
 
     @Query("{ 'filedDate': { $gte: ?0, $lte: ?1 } }")
-    Page<Form3> findByFiledDateBetween(Date startDate, Date endDate, Pageable pageable);
+    Page<Form3> findByFiledDateBetween(LocalDate startDate, LocalDate endDate, Pageable pageable);
 
     List<Form3> findTop20ByOrderByFiledDateDesc();
 
@@ -32,4 +32,3 @@ public interface Form3Repository extends MongoRepository<Form3, String> {
 
     void deleteByAccessionNumber(String accessionNumber);
 }
-

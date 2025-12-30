@@ -1,6 +1,6 @@
 package org.jds.edgar4j.model;
 
-import java.util.Date;
+import java.time.LocalDate;
 
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
@@ -30,7 +30,7 @@ public class Form4Transaction {
 
     private String securityTitle;
 
-    private Date transactionDate;
+    private LocalDate transactionDate;
 
     /**
      * Transaction code per SEC spec.
@@ -72,7 +72,7 @@ public class Form4Transaction {
     // Derivative-specific fields
     private Float exercisePrice;
 
-    private Date expirationDate;
+    private LocalDate expirationDate;
 
     private String underlyingSecurityTitle;
 

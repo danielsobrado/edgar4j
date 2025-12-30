@@ -10,7 +10,11 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.test.context.ActiveProfiles;
 
-import java.util.*;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -121,15 +125,9 @@ class Form4RepositoryTest {
     @Order(6)
     @DisplayName("Should find Form4 by transaction date range")
     void shouldFindByTransactionDateBetween() {
-        Calendar cal = Calendar.getInstance();
-        cal.set(2024, Calendar.JANUARY, 15);
-        Date midDate = cal.getTime();
-
-        cal.set(2024, Calendar.JANUARY, 10);
-        Date startDate = cal.getTime();
-
-        cal.set(2024, Calendar.JANUARY, 20);
-        Date endDate = cal.getTime();
+        LocalDate midDate = LocalDate.of(2024, 1, 15);
+        LocalDate startDate = LocalDate.of(2024, 1, 10);
+        LocalDate endDate = LocalDate.of(2024, 1, 20);
 
         Form4 form4 = createForm4(ACCESSION_1, "MSFT", "789019", "John Doe");
         form4.setTransactionDate(midDate);
@@ -211,9 +209,7 @@ class Form4RepositoryTest {
                     "789019",
                     "Owner " + i
             );
-            Calendar cal = Calendar.getInstance();
-            cal.add(Calendar.DAY_OF_MONTH, -i);
-            form4.setTransactionDate(cal.getTime());
+            form4.setTransactionDate(LocalDate.now().minusDays(i));
             form4Repository.save(form4);
         }
 
@@ -375,13 +371,13 @@ class Form4RepositoryTest {
                 .isOther(false)
                 .ownerType("Officer")
                 .officerTitle("CFO")
-                .transactionDate(new Date())
+                .transactionDate(LocalDate.now())
                 .transactionShares(1000f)
                 .transactionPricePerShare(100f)
                 .transactionValue(100000f)
                 .acquiredDisposedCode("A")
-                .createdAt(new Date())
-                .updatedAt(new Date())
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
                 .build();
     }
 }
