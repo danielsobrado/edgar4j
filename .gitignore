@@ -55,3 +55,6 @@ frontend/.env.local
 
 ### Claude Code ###
 .claude/
+
+### Serena ###
+.serena/
