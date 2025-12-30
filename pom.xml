@@ -15,6 +15,7 @@
 	<properties>
 		<java.version>21</java.version>
 		<spring-cloud.version>2025.1.0</spring-cloud.version>
+		<maven.compiler.useModulePath>false</maven.compiler.useModulePath>
 	</properties>
 	<dependencies>
 		<dependency>
