@@ -118,9 +118,9 @@ export function useForm6KSearch() {
     setError(null);
     try {
       const data = await form6kApi.getByCik(cik, page, size);
-      setFilings(data.content);
-      setTotalElements(data.totalElements);
-      setTotalPages(data.totalPages);
+      setFilings(data?.content ?? []);
+      setTotalElements(data?.totalElements ?? 0);
+      setTotalPages(data?.totalPages ?? 0);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to search filings');
     } finally {
@@ -133,9 +133,9 @@ export function useForm6KSearch() {
     setError(null);
     try {
       const data = await form6kApi.getBySymbol(symbol, page, size);
-      setFilings(data.content);
-      setTotalElements(data.totalElements);
-      setTotalPages(data.totalPages);
+      setFilings(data?.content ?? []);
+      setTotalElements(data?.totalElements ?? 0);
+      setTotalPages(data?.totalPages ?? 0);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to search filings');
     } finally {
@@ -148,9 +148,9 @@ export function useForm6KSearch() {
     setError(null);
     try {
       const data = await form6kApi.getByDateRange(startDate, endDate, page, size);
-      setFilings(data.content);
-      setTotalElements(data.totalElements);
-      setTotalPages(data.totalPages);
+      setFilings(data?.content ?? []);
+      setTotalElements(data?.totalElements ?? 0);
+      setTotalPages(data?.totalPages ?? 0);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to search filings');
     } finally {

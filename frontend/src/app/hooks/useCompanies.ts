@@ -1,20 +1,33 @@
 import { useState, useEffect, useCallback } from 'react';
-import { companiesApi, Company, CompanyListItem, CompanySearchRequest, Filing, PaginatedResponse } from '../api';
+import { companiesApi, Company, CompanyListItem, CompanySearchRequest, Filing } from '../api';
 
 export function useCompanies(initialParams: CompanySearchRequest = {}) {
-  const [companies, setCompanies] = useState<PaginatedResponse<CompanyListItem> | null>(null);
+  const [companies, setCompanies] = useState<CompanyListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [params, setParams] = useState<CompanySearchRequest>(initialParams);
+  const [totalElements, setTotalElements] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [params, setParams] = useState<CompanySearchRequest>({
+    page: 0,
+    size: 20,
+    sortBy: 'name',
+    sortDir: 'asc',
+    ...initialParams,
+  });
 
   const fetchCompanies = useCallback(async (searchParams: CompanySearchRequest) => {
     setLoading(true);
     setError(null);
     try {
       const data = await companiesApi.getCompanies(searchParams);
-      setCompanies(data);
+      setCompanies(data?.content ?? []);
+      setTotalElements(data?.totalElements ?? 0);
+      setTotalPages(data?.totalPages ?? 0);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load companies');
+      setCompanies([]);
+      setTotalElements(0);
+      setTotalPages(0);
     } finally {
       setLoading(false);
     }
@@ -24,8 +37,13 @@ export function useCompanies(initialParams: CompanySearchRequest = {}) {
     fetchCompanies(params);
   }, [params, fetchCompanies]);
 
-  const search = useCallback((searchTerm: string) => {
-    setParams(prev => ({ ...prev, searchTerm, page: 0 }));
+  const search = useCallback((searchInput: CompanySearchRequest & { name?: string }) => {
+    setParams(prev => ({
+      ...prev,
+      ...searchInput,
+      searchTerm: searchInput.searchTerm ?? searchInput.name ?? prev.searchTerm,
+      page: searchInput.page ?? 0,
+    }));
   }, []);
 
   const setPage = useCallback((page: number) => {
@@ -44,6 +62,8 @@ export function useCompanies(initialParams: CompanySearchRequest = {}) {
     companies,
     loading,
     error,
+    totalElements,
+    totalPages,
     params,
     search,
     setPage,
@@ -95,23 +115,29 @@ export function useCompanyByCik(cik: string | undefined) {
   return { company, loading, error };
 }
 
-export function useCompanyFilings(companyId: string | undefined, page: number = 0, size: number = 10) {
-  const [filings, setFilings] = useState<PaginatedResponse<Filing> | null>(null);
-  const [loading, setLoading] = useState(true);
+export function useCompanyFilings() {
+  const [filings, setFilings] = useState<Filing[]>([]);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!companyId) {
-      setLoading(false);
+  const fetchByCompany = useCallback(async (cik: string, page: number = 0, size: number = 10) => {
+    if (!cik) {
+      setFilings([]);
       return;
     }
 
     setLoading(true);
-    companiesApi.getCompanyFilings(companyId, page, size)
-      .then(setFilings)
-      .catch(err => setError(err.message))
-      .finally(() => setLoading(false));
-  }, [companyId, page, size]);
+    setError(null);
+    try {
+      const data = await companiesApi.getCompanyFilingsByCik(cik, page, size);
+      setFilings(data?.content ?? []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load company filings');
+      setFilings([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  return { filings, loading, error };
+  return { filings, loading, error, fetchByCompany };
 }

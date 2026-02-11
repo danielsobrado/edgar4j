@@ -39,23 +39,23 @@ class ApiClient {
   }
 
   async get<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
-    const response = await this.client.get<ApiResponse<T>>(url, config);
-    return response.data.data;
+    const response = await this.client.get<ApiResponse<T> | T>(url, config);
+    return this.unwrapResponse<T>(response.data);
   }
 
   async post<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> {
-    const response = await this.client.post<ApiResponse<T>>(url, data, config);
-    return response.data.data;
+    const response = await this.client.post<ApiResponse<T> | T>(url, data, config);
+    return this.unwrapResponse<T>(response.data);
   }
 
   async put<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> {
-    const response = await this.client.put<ApiResponse<T>>(url, data, config);
-    return response.data.data;
+    const response = await this.client.put<ApiResponse<T> | T>(url, data, config);
+    return this.unwrapResponse<T>(response.data);
   }
 
   async delete<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
-    const response = await this.client.delete<ApiResponse<T>>(url, config);
-    return response.data.data;
+    const response = await this.client.delete<ApiResponse<T> | T>(url, config);
+    return this.unwrapResponse<T>(response.data);
   }
 
   async downloadFile(url: string, data?: unknown): Promise<Blob> {
@@ -67,6 +67,18 @@ class ApiClient {
 
   getBaseUrl(): string {
     return API_BASE_URL;
+  }
+
+  private unwrapResponse<T>(payload: ApiResponse<T> | T): T {
+    if (
+      payload !== null &&
+      typeof payload === 'object' &&
+      'success' in payload &&
+      'data' in payload
+    ) {
+      return (payload as ApiResponse<T>).data;
+    }
+    return payload as T;
   }
 }
 

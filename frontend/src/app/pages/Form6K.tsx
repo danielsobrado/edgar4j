@@ -226,7 +226,9 @@ export function Form6KPage() {
 
   const loading = recentLoading || searchLoading;
   const error = recentError || searchError;
-  const displayFilings = hasSearched ? searchResults : recentFilings;
+  const displayFilings = hasSearched
+    ? (Array.isArray(searchResults) ? searchResults : [])
+    : (Array.isArray(recentFilings) ? recentFilings : []);
 
   return (
     <div className="space-y-6">
