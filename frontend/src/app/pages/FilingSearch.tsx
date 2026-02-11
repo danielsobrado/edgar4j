@@ -29,19 +29,23 @@ export function FilingSearch() {
   const [hasSearched, setHasSearched] = React.useState(false);
 
   // Build search request
-  const buildSearchRequest = useCallback((): FilingSearchRequest => ({
-    companyName: searchTerm || undefined,
-    ticker: searchTerm || undefined,
-    cik: searchTerm || undefined,
-    formType: selectedFormType || undefined,
-    dateFrom: dateFrom || undefined,
-    dateTo: dateTo || undefined,
-    keywords: keywords.length > 0 ? keywords : undefined,
-    page: currentPage,
-    size: pageSize,
-    sortBy: sortField,
-    sortDirection: sortDirection,
-  }), [searchTerm, selectedFormType, dateFrom, dateTo, keywords, currentPage, pageSize, sortField, sortDirection]);
+  const buildSearchRequest = useCallback((): FilingSearchRequest => {
+    const trimmedSearchTerm = searchTerm.trim();
+    const isCikQuery = /^\d+$/.test(trimmedSearchTerm);
+
+    return {
+      companyName: trimmedSearchTerm && !isCikQuery ? trimmedSearchTerm : undefined,
+      cik: trimmedSearchTerm && isCikQuery ? trimmedSearchTerm : undefined,
+      formTypes: selectedFormType ? [selectedFormType] : undefined,
+      dateFrom: dateFrom || undefined,
+      dateTo: dateTo || undefined,
+      keywords: keywords.length > 0 ? keywords : undefined,
+      page: currentPage,
+      size: pageSize,
+      sortBy: sortField,
+      sortDir: sortDirection,
+    };
+  }, [searchTerm, selectedFormType, dateFrom, dateTo, keywords, currentPage, pageSize, sortField, sortDirection]);
 
   // API hooks
   const { filings, loading, error, totalElements, totalPages, search, refresh } = useFilings();

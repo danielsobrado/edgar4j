@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Database, Search, Building2, Download, Settings, LayoutDashboard, Briefcase, Users, FileText, UserPlus, FileCheck, Globe, FileBarChart } from 'lucide-react';
+import { Database, Search, Building2, Download, Settings, LayoutDashboard, Briefcase, Users, FileText, UserPlus, FileCheck, Globe, FileBarChart, Radio } from 'lucide-react';
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -16,6 +16,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { path: '/form8k', label: '8-K', icon: FileText },
     { path: '/form13f', label: '13F', icon: Briefcase },
     { path: '/form13dg', label: '13D/G', icon: Users },
+    { path: '/remote-edgar', label: 'Remote', icon: Radio },
     { path: '/downloads', label: 'Downloads', icon: Download },
     { path: '/settings', label: 'Settings', icon: Settings }
   ];
@@ -31,7 +32,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <span className="text-xl font-mono">edgar4j</span>
             </div>
             
-            <nav className="hidden md:flex items-center gap-6">
+            <nav className="hidden md:flex items-center gap-2 overflow-x-auto">
               {navItems.map(item => {
                 const Icon = item.icon;
                 const isActive = location.pathname === item.path;
@@ -39,7 +40,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   <Link
                     key={item.path}
                     to={item.path}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-md transition-colors ${
+                    className={`flex items-center gap-2 px-3 py-2 rounded-md transition-colors shrink-0 whitespace-nowrap ${
                       isActive 
                         ? 'bg-white/10 text-white' 
                         : 'text-gray-300 hover:bg-white/5 hover:text-white'

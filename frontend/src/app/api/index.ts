@@ -16,6 +16,7 @@ export { form8kApi } from './endpoints/form8k';
 export { form3Api } from './endpoints/form3';
 export { form5Api } from './endpoints/form5';
 export { form6kApi } from './endpoints/form6k';
+export { remoteEdgarApi } from './endpoints/remoteEdgar';
 export type {
   XbrlSummary,
   SecFilingMetadata,

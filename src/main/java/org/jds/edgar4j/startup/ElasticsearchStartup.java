@@ -19,9 +19,8 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 
 @Component
-@ConditionalOnProperty(name = "edgar4j.elasticsearch.startup.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(name = "spring.data.elasticsearch.repositories.enabled", havingValue = "true")
 public class ElasticsearchStartup implements ApplicationRunner {
-
 
     private final ElasticsearchOperations elasticsearchOperations;
 
@@ -32,8 +31,10 @@ public class ElasticsearchStartup implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        createIndexAndMappingIfNeeded(MasterIndexEntry.class, "master_index_entry", "mappings/master_index_entry_mapping.json");
-        createIndexAndMappingIfNeeded(DailyMasterIndex.class, "daily_master_index", "mappings/daily_master_index_mapping.json");
+        createIndexAndMappingIfNeeded(MasterIndexEntry.class, "master_index_entry",
+                "mappings/master_index_entry_mapping.json");
+        createIndexAndMappingIfNeeded(DailyMasterIndex.class, "daily_master_index",
+                "mappings/daily_master_index_mapping.json");
     }
 
     private void createIndexAndMappingIfNeeded(Class<?> entityClass, String indexName, String mappingResourcePath) {

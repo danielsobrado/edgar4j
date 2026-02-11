@@ -110,6 +110,33 @@ export interface FilingDetail extends Filing {
   documentTags?: string[];
 }
 
+export interface RemoteTicker {
+  cik: string;
+  ticker: string;
+  name: string;
+  exchange?: string;
+}
+
+export interface RemoteSubmissionFiling {
+  accessionNumber?: string;
+  formType?: string;
+  filingDate?: string;
+  reportDate?: string;
+  primaryDocument?: string;
+  primaryDocDescription?: string;
+}
+
+export interface RemoteSubmission {
+  cik: string;
+  companyName: string;
+  sic?: string;
+  sicDescription?: string;
+  tickers?: string[];
+  exchanges?: string[];
+  recentFilingsCount: number;
+  recentFilings: RemoteSubmissionFiling[];
+}
+
 // Search Request Types
 export interface FilingSearchRequest {
   companyName?: string;

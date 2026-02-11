@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import org.jds.edgar4j.config.AppConstants;
 import org.jds.edgar4j.dto.request.FilingSearchRequest;
 import org.jds.edgar4j.dto.response.FilingDetailResponse;
 import org.jds.edgar4j.dto.response.FilingResponse;
@@ -30,9 +31,19 @@ public class FilingServiceImpl implements FilingService {
     public PaginatedResponse<FilingResponse> searchFilings(FilingSearchRequest request) {
         log.info("Searching filings with request: {}", request);
 
+        String sortDirection = request.getSortDir();
+        if (sortDirection == null || sortDirection.isBlank()) {
+            sortDirection = AppConstants.DEFAULT_SORT_DIRECTION;
+        }
+
+        String sortField = request.getSortBy();
+        if (sortField == null || sortField.isBlank()) {
+            sortField = "fillingDate";
+        }
+
         Sort sort = Sort.by(
-                request.getSortDir().equalsIgnoreCase("desc") ? Sort.Direction.DESC : Sort.Direction.ASC,
-                request.getSortBy()
+                sortDirection.equalsIgnoreCase("desc") ? Sort.Direction.DESC : Sort.Direction.ASC,
+                sortField
         );
         PageRequest pageRequest = PageRequest.of(request.getPage(), request.getSize(), sort);
 
@@ -162,4 +173,3 @@ public class FilingServiceImpl implements FilingService {
                 .build();
     }
 }
-

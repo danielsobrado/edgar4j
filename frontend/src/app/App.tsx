@@ -14,6 +14,7 @@ import { Form3Page } from './pages/Form3';
 import { Form5Page } from './pages/Form5';
 import { Form6KPage } from './pages/Form6K';
 import { Form20FPage } from './pages/Form20F';
+import { RemoteEdgar } from './pages/RemoteEdgar';
 
 export default function App() {
   return (
@@ -31,6 +32,7 @@ export default function App() {
           <Route path="/form5" element={<Form5Page />} />
           <Route path="/form6k" element={<Form6KPage />} />
           <Route path="/form20f" element={<Form20FPage />} />
+          <Route path="/remote-edgar" element={<RemoteEdgar />} />
           <Route path="/downloads" element={<Downloads />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>

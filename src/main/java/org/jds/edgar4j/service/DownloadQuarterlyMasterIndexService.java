@@ -4,6 +4,7 @@ import io.vavr.collection.List;
 import lombok.extern.slf4j.Slf4j;
 import org.jds.edgar4j.model.MasterIndexEntry;
 import org.jds.edgar4j.repository.MasterIndexEntryRepository;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -20,12 +21,14 @@ import java.util.zip.GZIPInputStream;
 
 @Service
 @Slf4j
+@ConditionalOnProperty(name = "spring.data.elasticsearch.repositories.enabled", havingValue = "true")
 public class DownloadQuarterlyMasterIndexService {
 
     private final WebClient webClient;
     private final MasterIndexEntryRepository masterIndexEntryRepository;
 
-    public DownloadQuarterlyMasterIndexService(WebClient webClient, MasterIndexEntryRepository masterIndexEntryRepository) {
+    public DownloadQuarterlyMasterIndexService(WebClient webClient,
+            MasterIndexEntryRepository masterIndexEntryRepository) {
         this.webClient = webClient;
         this.masterIndexEntryRepository = masterIndexEntryRepository;
     }
@@ -50,7 +53,8 @@ public class DownloadQuarterlyMasterIndexService {
     private void downloadMasterIndex(WebClient webClient, int year, int quarter) {
         log.info("Downloading Master Index for year {} and quarter {}", year, quarter);
 
-        String masterUrl = String.format("https://www.sec.gov/Archives/edgar/full-index/%d/QTR%d/master.gz", year, quarter);
+        String masterUrl = String.format("https://www.sec.gov/Archives/edgar/full-index/%d/QTR%d/master.gz", year,
+                quarter);
         String masterGzPath = String.format("Master Indexes/%dQTR%dmaster.gz", year, quarter);
         String masterPath = String.format("Master Indexes/%dQTR%dmaster", year, quarter);
 
@@ -98,16 +102,18 @@ public class DownloadQuarterlyMasterIndexService {
                 })
                 .subscribe(success -> {
                     if (success) {
-                        log.info("Master Index for year {} and quarter {} downloaded and processed successfully", year, quarter);
+                        log.info("Master Index for year {} and quarter {} downloaded and processed successfully", year,
+                                quarter);
                     } else {
-                        log.error("Failed to download and process Master Index for year {} and quarter {}", year, quarter);
+                        log.error("Failed to download and process Master Index for year {} and quarter {}", year,
+                                quarter);
                     }
                 });
     }
 
     private void unzip(String gzFilePath, String outputPath) throws IOException {
         try (GZIPInputStream gis = new GZIPInputStream(new FileInputStream(gzFilePath));
-             FileOutputStream fos = new FileOutputStream(outputPath)) {
+                FileOutputStream fos = new FileOutputStream(outputPath)) {
             byte[] buffer = new byte[1024];
             int len;
 
@@ -123,7 +129,8 @@ public class DownloadQuarterlyMasterIndexService {
 
         return lines.drop(headerEnd)
                 .map(line -> line.split("\\|"))
-                .map(parts -> new MasterIndexEntry(parts[0], parts[1], parts[2], LocalDate.parse(parts[3], DateTimeFormatter.BASIC_ISO_DATE), parts[4]))
+                .map(parts -> new MasterIndexEntry(parts[0], parts[1], parts[2],
+                        LocalDate.parse(parts[3], DateTimeFormatter.BASIC_ISO_DATE), parts[4]))
                 .toList();
     }
 
