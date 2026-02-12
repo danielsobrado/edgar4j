@@ -62,6 +62,57 @@ Elasticsearch repositories are disabled by default. To enable them, run with the
 
 This repo uses the Maven Wrapper. On Windows, `mvnw.cmd` will fall back to the `java` found on `PATH` if `JAVA_HOME` is not set correctly.
 
+### Compile and Start with Docker
+
+Prerequisites:
+
+- Docker Desktop (or Docker Engine) with Docker Compose v2
+
+From the repository root:
+
+1. Build the backend image (this compiles the Java project inside Docker):
+
+```bash
+docker build -t edgar4j-app-clean .
+```
+
+2. Start the full stack:
+
+```bash
+docker compose up -d
+```
+
+3. Verify containers are up:
+
+```bash
+docker compose ps
+```
+
+4. Open the application:
+
+- Frontend: `http://localhost:5173`
+- Backend API: `http://localhost:8080`
+- Health check: `http://localhost:8080/actuator/health`
+
+Useful Docker commands:
+
+```bash
+# Follow backend logs
+docker compose logs -f edgar4j-app
+
+# Follow frontend logs
+docker compose logs -f frontend
+
+# Rebuild backend after backend code changes
+docker build -t edgar4j-app-clean . && docker compose up -d --force-recreate edgar4j-app
+
+# Stop everything
+docker compose down
+
+# Stop and remove volumes (destructive)
+docker compose down -v
+```
+
 ## Submissions API
 
 Each entity's current filing history is available at the following URL:
