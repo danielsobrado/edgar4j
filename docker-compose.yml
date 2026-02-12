@@ -1,99 +1,136 @@
 version: '3.8'
 
 services:
-  # MongoDB Database
-  mongodb:
-    image: mongo:7.0
-    container_name: edgar4j-mongodb
-    restart: unless-stopped
+  edgar4j-app:
+    image: edgar4j-app-clean
+    container_name: edgar4j-app
     environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:-admin}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-admin123}
-      MONGO_INITDB_DATABASE: edgar
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_CLOUD_CONFIG_ENABLED=false
+      - SPRING_MONGODB_URI=mongodb://mongo:27017/edgar
+      - SPRING_MONGODB_DATABASE=edgar
+      - SPRING_DATA_MONGODB_AUTO_INDEX_CREATION=false
+      - MONGODB_AUTO_INDEX_CREATION=false
+      - EDGAR4J_SECURITY_ENABLED=false
+      - SPRING_ELASTICSEARCH_URIS=http://elasticsearch:9200
+      - SPRING_DATA_ELASTICSEARCH_CLIENT_REACTIVE_ENDPOINTS=elasticsearch:9200
+      - MANAGEMENT_HEALTH_ELASTICSEARCH_ENABLED=false
+    depends_on:
+      mongo:
+        condition: service_started
+      elasticsearch:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  frontend:
+    image: node:20-alpine
+    container_name: edgar4j-frontend
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:8080
+    command: sh -c "npm ci && npm run dev -- --host 0.0.0.0 --port 5173"
+    ports:
+      - "5173:5173"
+    depends_on:
+      edgar4j-app:
+        condition: service_started
+    restart: unless-stopped
+
+  mongo:
+    image: mongo:7
+    container_name: edgar4j-mongo
     ports:
       - "27017:27017"
     volumes:
-      - mongodb_data:/data/db
-      - mongodb_config:/data/configdb
-      - ./docker/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
-    networks:
-      - edgar4j-network
-    healthcheck:
-      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-
-  # Backend Spring Boot Application
-  backend:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.backend
-    container_name: edgar4j-backend
+      - mongo_data:/data/db
     restart: unless-stopped
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: edgar4j-postgres
     environment:
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-docker}
-      MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME:-admin}:${MONGO_ROOT_PASSWORD:-admin123}@mongodb:27017/edgar?authSource=admin
-      MONGODB_DATABASE: edgar
-      SEC_USER_AGENT: ${SEC_USER_AGENT:-Edgar4j/1.0 (contact@example.com)}
+      - POSTGRES_DB=edgar4j
+      - POSTGRES_USER=edgar4j
+      - POSTGRES_PASSWORD=edgar4j
     ports:
-      - "8080:8080"
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./src/main/resources/db/migration:/docker-entrypoint-initdb.d
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.16.3
+    container_name: edgar4j-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    ports:
+      - "9200:9200"
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.16.3
+    container_name: edgar4j-kibana
     depends_on:
-      mongodb:
-        condition: service_healthy
-    networks:
-      - edgar4j-network
+      - elasticsearch
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+
+  # Phase 3: Redis Cache for Market Data
+  redis:
+    image: redis:7-alpine
+    container_name: edgar4j-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
     healthcheck:
-      test: curl -f http://localhost:8080/actuator/health || exit 1
+      test: ["CMD", "redis-cli", "ping"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 60s
+      retries: 5
 
-  # Frontend React Application
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: ../docker/Dockerfile.frontend
-      args:
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080}
-    container_name: edgar4j-frontend
-    restart: unless-stopped
-    ports:
-      - "3000:80"
-    depends_on:
-      - backend
-    networks:
-      - edgar4j-network
-
-  # Mongo Express - MongoDB Admin UI (optional, for development)
-  mongo-express:
-    image: mongo-express:1.0.2
-    container_name: edgar4j-mongo-express
-    restart: unless-stopped
+  # Redis Commander - Web UI for Redis
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: edgar4j-redis-commander
+    environment:
+      - REDIS_HOSTS=local:redis:6379
     ports:
       - "8081:8081"
-    environment:
-      ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_ROOT_USERNAME:-admin}
-      ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_ROOT_PASSWORD:-admin123}
-      ME_CONFIG_MONGODB_URL: mongodb://${MONGO_ROOT_USERNAME:-admin}:${MONGO_ROOT_PASSWORD:-admin123}@mongodb:27017/
-      ME_CONFIG_BASICAUTH_USERNAME: ${MONGO_EXPRESS_USER:-admin}
-      ME_CONFIG_BASICAUTH_PASSWORD: ${MONGO_EXPRESS_PASSWORD:-admin123}
     depends_on:
-      mongodb:
-        condition: service_healthy
-    networks:
-      - edgar4j-network
-    profiles:
-      - dev
+      - redis
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: edgar4j-pgadmin
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@edgar4j.com
+      - PGADMIN_DEFAULT_PASSWORD=admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
 
 volumes:
-  mongodb_data:
-    driver: local
-  mongodb_config:
-    driver: local
-
-networks:
-  edgar4j-network:
-    driver: bridge
+  postgres_data:
+  esdata:
+  redis_data:
+  mongo_data:
+  frontend_node_modules:

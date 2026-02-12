@@ -1,100 +1,137 @@
-server:
-  port: 8080
-
-spring:
-  application:
-    name: edgar4j
-  cloud:
-    config:
-      enabled: ${SPRING_CLOUD_CONFIG_ENABLED:false}
-  data:
-    mongodb:
-      uri: ${MONGODB_URI:mongodb://localhost:27017/edgar}
-      database: ${MONGODB_DATABASE:edgar}
-      auto-index-creation: ${MONGODB_AUTO_INDEX_CREATION:true}
-    elasticsearch:
-      repositories:
-        enabled: ${ELASTICSEARCH_REPOSITORIES_ENABLED:false}
-
 edgar4j:
-  urls:
-    baseSecUrl: https://www.sec.gov
-    baseDataSecUrl: https://data.sec.gov
-    edgarDataArchivesUrl: https://www.sec.gov/Archives/edgar/data
-    submissionsUrl: https://data.sec.gov/submissions
-    submissionsCIKUrl: https://data.sec.gov/submissions/CIK
-    bulkSubmissionsFileUrl: https://www.sec.gov/Archives/edgar/daily-index/bulkdata/submissions.zip
-    bulkCompanyFactsFileUrl: https://www.sec.gov/Archives/edgar/daily-index/xbrl/companyfacts.zip
-    companyTickersUrl: https://www.sec.gov/files/company_tickers.json
-    companyTickersExchangesUrl: https://www.sec.gov/files/company_tickers_exchange.json
-    companyTickersMFsUrl: https://www.sec.gov/files/company_tickers_mf.json
-  persistence:
-    database: mongodb
-  sec:
-    user-agent: ${SEC_USER_AGENT:Edgar4j/1.0 (contact@example.com)}
-    rate-limit-per-second: 10
-  security:
-    enabled: ${EDGAR4J_SECURITY_ENABLED:false}
-    username: ${EDGAR4J_SECURITY_USERNAME:}
-    password: ${EDGAR4J_SECURITY_PASSWORD:}
-  cors:
-    allowed-origins: ${EDGAR4J_CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173,http://localhost:5174,http://127.0.0.1:3000,http://127.0.0.1:5173,http://127.0.0.1:5174}
-    allow-credentials: ${EDGAR4J_CORS_ALLOW_CREDENTIALS:true}
-    max-age-seconds: ${EDGAR4J_CORS_MAX_AGE_SECONDS:3600}
-  storage:
-    daily-indexes-path: ${EDGAR4J_DAILY_INDEXES_PATH:./data/daily-indexes}
-  jobs:
-    ticker-sync:
-      enabled: ${TICKER_SYNC_ENABLED:true}
-      cron: "0 0 6 * * *"
-    filing-sync:
-      enabled: ${FILING_SYNC_ENABLED:true}
-      cron: "0 0 */4 * * *"
-      batch-size: 100
-      delay-between-companies-ms: 1000
-    data-integrity:
-      enabled: ${DATA_INTEGRITY_ENABLED:true}
-      cron: "0 0 0 * * *"
+    urls:
+        baseSecUrl: https://www.sec.gov
+        baseDataSecUrl: https://data.sec.gov
+        edgarDataArchivesUrl: https://www.sec.gov/Archives/edgar/data
+        submissionsUrl: https://data.sec.gov/submissions
+        submissionsCIKUrl: https://data.sec.gov/submissions/CIK
+        bulkSubmissionsFileUrl: https://www.sec.gov/Archives/edgar/daily-index/bulkdata/submissions.zip
+        bulkCompanyFactsFileUrl: https://www.sec.gov/Archives/edgar/daily-index/xbrl/companyfacts.zip
+        companyTickersUrl: https://www.sec.gov/files/company_tickers.json
+        companyTickersExchangesUrl: https://www.sec.gov/files/company_tickers_exchange.json
+        companyTickersMFsUrl: https://www.sec.gov/files/company_tickers_mf.json
+    persistence:
+        database: postgresql
+    # Phase 3: Market Data Provider Configuration
+    providers:
+        alpha-vantage:
+            api-key: ${ALPHA_VANTAGE_API_KEY:demo}
+            base-url: https://www.alphavantage.co/query
+            enabled: ${ALPHA_VANTAGE_ENABLED:false}
+            priority: 2
+            rate-limit:
+                requests: 5
+                period: PT1M
+            timeout: PT30S
+            retry-attempts: 3
+            retry-delay: PT1S
+        finnhub:
+            api-key: ${FINNHUB_API_KEY:demo}
+            base-url: https://finnhub.io/api/v1
+            enabled: ${FINNHUB_ENABLED:false}
+            priority: 3
+            rate-limit:
+                requests: 60
+                period: PT1M
+            timeout: PT30S
+            retry-attempts: 3
+            retry-delay: PT1S
+        yahoo-finance:
+            base-url: https://query1.finance.yahoo.com/v8/finance/chart
+            enabled: ${YAHOO_FINANCE_ENABLED:true}
+            priority: 1
+            rate-limit:
+                requests: 2000
+                period: PT1H
+            timeout: PT30S
+            retry-attempts: 3
+            retry-delay: PT1S
+        cache:
+            enabled: ${MARKET_DATA_CACHE_ENABLED:true}
+            stock-price-ttl: PT15M
+            company-profile-ttl: PT24H
+            financial-metrics-ttl: PT6H
+            historical-prices-ttl: PT1H
+            max-cache-size: 10000
 
-springdoc:
-  api-docs:
-    enabled: ${SPRINGDOC_API_DOCS_ENABLED:true}
-    path: /v3/api-docs
-  swagger-ui:
-    enabled: ${SPRINGDOC_SWAGGER_UI_ENABLED:true}
-    path: /swagger-ui.html
-    operationsSorter: method
-    tagsSorter: alpha
-    tryItOutEnabled: true
-  show-actuator: false
-  paths-to-match: /api/**
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info
-  endpoint:
-    health:
-      show-details: ${MANAGEMENT_HEALTH_SHOW_DETAILS:never}
-
-logging:
-  level:
-    org.jds.edgar4j: INFO
-    org.springframework.data.mongodb: INFO
-    org.springframework.web: INFO
-
----
 spring:
-  config:
-    activate:
-      on-profile: elasticsearch
-  data:
-    elasticsearch:
-      repositories:
-        enabled: true
-      client:
-        reactive:
-          endpoints: ${ELASTICSEARCH_ENDPOINTS:localhost:9200}
-          username: ${ELASTICSEARCH_USERNAME:elastic}
-          password: ${ELASTICSEARCH_PASSWORD}
+    datasource:
+        url: jdbc:postgresql://localhost:5432/edgar4j
+        username: edgar4j
+        password: edgar4j
+        driver-class-name: org.postgresql.Driver
+        hikari:
+            maximum-pool-size: 50
+            minimum-idle: 10
+            connection-timeout: 30000
+            idle-timeout: 600000
+            max-lifetime: 1800000
+    jpa:
+        hibernate:
+            ddl-auto: update
+        show-sql: false
+        properties:
+            hibernate:
+                dialect: org.hibernate.dialect.PostgreSQLDialect
+                format_sql: true
+                jdbc:
+                    batch_size: 25
+                order_inserts: true
+                order_updates: true
+    # Redis Cache Configuration for Phase 3
+    data:
+        redis:
+            host: ${REDIS_HOST:localhost}
+            port: ${REDIS_PORT:6379}
+            password: ${REDIS_PASSWORD:}
+            timeout: PT5S
+            lettuce:
+                pool:
+                    max-active: 20
+                    max-idle: 10
+                    min-idle: 5
+        elasticsearch:
+            cluster-name: your-cluster-name
+            cluster-nodes: your-elasticsearch-url:9200
+            repositories:
+                enabled: false
+    cache:
+        type: redis
+        redis:
+            time-to-live: PT1H
+            cache-null-values: false
+
+# Async Configuration for Phase 3
+    task:
+        execution:
+            pool:
+                core-size: 8
+                max-size: 20
+                queue-capacity: 100
+                keep-alive: PT60S
+        scheduling:
+            pool:
+                size: 5
+
+# Management and Monitoring
+management:
+    endpoints:
+        web:
+            exposure:
+                include: health,info,metrics,prometheus
+    endpoint:
+        health:
+            show-details: when-authorized
+    metrics:
+        export:
+            prometheus:
+                enabled: true
+
+# Logging
+logging:
+    level:
+        org.jds.edgar4j: DEBUG
+        org.springframework.cache: DEBUG
+        org.springframework.web.client: DEBUG
+    pattern:
+        console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"

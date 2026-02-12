@@ -1,0 +1,23 @@
+services:
+  edgar4j-app:
+    build:
+      context: .
+      dockerfile: .codex.Dockerfile.backend17
+
+  frontend:
+    image: node:20-alpine
+    container_name: edgar4j-frontend
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:8080
+    command: sh -c "npm ci && npm run dev -- --host 0.0.0.0 --port 5173"
+    ports:
+      - "5173:5173"
+    depends_on:
+      - edgar4j-app
+
+volumes:
+  frontend_node_modules:

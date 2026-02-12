@@ -1,0 +1,61 @@
+HELP.md
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### VS Code ###
+.vscode/
+.dccache
+
+*.local.json
+
+### Environment files ###
+.env
+.env.local
+.env.*.local
+!.env.example
+
+### Docker ###
+docker-compose.override.yml
+
+### Logs ###
+*.log
+logs/
+
+### Frontend ###
+frontend/node_modules/
+frontend/dist/
+frontend/.env.local
+
+### Claude Code ###
+.claude/
+
+### Serena ###
+.serena/
+.codex-clean-main-20260212-2/frontend/src/app/api/endpoints/downloads.ts

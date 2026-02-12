@@ -129,6 +129,24 @@ export function useDownloadActions() {
     }
   }, []);
 
+  const downloadBulk = useCallback(async (
+    type: 'BULK_SUBMISSIONS' | 'BULK_COMPANY_FACTS',
+    userAgent?: string
+  ) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const job = await downloadsApi.downloadBulk({ type, userAgent });
+      return job;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to start bulk download';
+      setError(message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const cancelJob = useCallback(async (jobId: string) => {
     setLoading(true);
     setError(null);
@@ -148,6 +166,7 @@ export function useDownloadActions() {
     error,
     downloadTickers,
     downloadSubmissions,
+    downloadBulk,
     cancelJob,
   };
 }

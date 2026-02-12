@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Database, Search, Building2, Download, Settings, LayoutDashboard, Briefcase, Users, FileText, UserPlus, FileCheck, Globe, FileBarChart, Radio } from 'lucide-react';
+import { Database, Search, Building2, Download, Settings, LayoutDashboard, Radio } from 'lucide-react';
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -9,13 +9,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { path: '/', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/search', label: 'Search', icon: Search },
     { path: '/companies', label: 'Companies', icon: Building2 },
-    { path: '/form3', label: 'Form 3', icon: UserPlus },
-    { path: '/form5', label: 'Form 5', icon: FileCheck },
-    { path: '/form6k', label: '6-K', icon: Globe },
-    { path: '/form20f', label: '20-F', icon: FileBarChart },
-    { path: '/form8k', label: '8-K', icon: FileText },
-    { path: '/form13f', label: '13F', icon: Briefcase },
-    { path: '/form13dg', label: '13D/G', icon: Users },
     { path: '/remote-edgar', label: 'Remote', icon: Radio },
     { path: '/downloads', label: 'Downloads', icon: Download },
     { path: '/settings', label: 'Settings', icon: Settings }
