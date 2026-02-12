@@ -46,6 +46,7 @@ docker-compose.override.yml
 
 ### Logs ###
 *.log
+*.txt
 logs/
 
 ### Frontend ###
