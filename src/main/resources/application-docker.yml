@@ -17,7 +17,7 @@ spring:
       enabled: false
   data:
     mongodb:
-      uri: ${MONGODB_URI:${SPRING_DATA_MONGODB_URI:mongodb://admin:admin123@mongodb:27017/edgar?authSource=admin}}
+      uri: ${SPRING_DATA_MONGODB_URI:mongodb://admin:admin123@mongodb:27017/edgar?authSource=admin}
       auto-index-creation: false
 
 edgar4j:
