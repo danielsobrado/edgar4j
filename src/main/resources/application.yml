@@ -8,14 +8,13 @@ spring:
     config:
       enabled: ${SPRING_CLOUD_CONFIG_ENABLED:false}
       fail-fast: false
-  data:
-    mongodb:
-      uri: ${SPRING_DATA_MONGODB_URI:mongodb://admin:admin123@host.docker.internal:27017/edgar?authSource=admin}
-      database: ${MONGODB_DATABASE:edgar}
-      auto-index-creation: ${MONGODB_AUTO_INDEX_CREATION:true}
-    elasticsearch:
-      repositories:
-        enabled: ${ELASTICSEARCH_REPOSITORIES_ENABLED:false}
+  mongodb:
+    uri: ${MONGO_URL}
+    database: ${MONGODB_DATABASE:edgar}
+    auto-index-creation: ${MONGODB_AUTO_INDEX_CREATION:true}
+  elasticsearch:
+    repositories:
+      enabled: ${ELASTICSEARCH_REPOSITORIES_ENABLED:false}
 
 edgar4j:
   urls:
