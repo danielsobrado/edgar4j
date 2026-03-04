@@ -15,10 +15,10 @@ spring:
   cloud:
     config:
       enabled: false
-  data:
-    mongodb:
-      uri: ${SPRING_DATA_MONGODB_URI:mongodb://admin:admin123@mongodb:27017/edgar?authSource=admin}
-      auto-index-creation: false
+  #data:
+  #  mongodb:
+  #    uri: ${SPRING_DATA_MONGODB_URI:mongodb://admin:admin123@mongodb:27017/edgar?authSource=admin}
+  #    auto-index-creation: false
 
 edgar4j:
   sec:
