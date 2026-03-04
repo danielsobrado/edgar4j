@@ -5,7 +5,7 @@ import java.util.stream.Collectors;
 
 import org.jds.edgar4j.dto.request.CompanySearchRequest;
 import org.jds.edgar4j.dto.response.CompanyListResponse;
-import org.jds.edgar4j.dto.response.CompanyResponse;
+import org.jds.edgar4j.dto. response.CompanyResponse;
 import org.jds.edgar4j.dto.response.PaginatedResponse;
 import org.jds.edgar4j.model.Submissions;
 import org.jds.edgar4j.repository.SubmissionsRepository;
@@ -29,8 +29,12 @@ public class CompanyServiceImpl implements CompanyService {
     public PaginatedResponse<CompanyListResponse> searchCompanies(CompanySearchRequest request) {
         log.info("Searching companies with request: {}", request);
 
+        String sortDir = request.getSortDir();
+        if (sortDir == null) {
+            sortDir = "desc";
+        }
         Sort sort = Sort.by(
-                request.getSortDir().equalsIgnoreCase("desc") ? Sort.Direction.DESC : Sort.Direction.ASC,
+                sortDir.equalsIgnoreCase("desc") ? Sort.Direction.DESC : Sort.Direction.ASC,
                 request.getSortBy()
         );
         PageRequest pageRequest = PageRequest.of(request.getPage(), request.getSize(), sort);
@@ -61,7 +65,7 @@ public class CompanyServiceImpl implements CompanyService {
 
     @Override
     public Optional<CompanyResponse> getCompanyByTicker(String ticker) {
-        return submissionsRepository.findByCompanyNameContainingIgnoreCase(ticker)
+        return submissionsRepository.findByTickersContaining(ticker.toUpperCase())
                 .stream()
                 .findFirst()
                 .map(this::toCompanyResponse);

@@ -5,6 +5,8 @@ import java.util.List;
 
 import org.jds.edgar4j.config.AppConstants;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
@@ -50,6 +52,7 @@ public class FilingSearchRequest {
     @Builder.Default
     private String sortBy = "fillingDate";
 
+    @JsonProperty("sortDirection")
     @Pattern(regexp = "^(asc|desc)$", message = "Sort direction must be 'asc' or 'desc'")
     @Builder.Default
     private String sortDir = AppConstants.DEFAULT_SORT_DIRECTION;

@@ -33,5 +33,7 @@ public interface SubmissionsRepository extends MongoRepository<Submissions, Stri
     List<Submissions> findByInsiderTransactionForOwnerExistsTrue();
 
     List<Submissions> findByInsiderTransactionForIssuerExistsTrue();
+
+    List<Submissions> findByTickersContaining(String ticker);
 }
 

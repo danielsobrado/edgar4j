@@ -34,8 +34,8 @@ services:
     restart: unless-stopped
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-docker}
-      SPRING_DATA_MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME:-admin}:${MONGO_ROOT_PASSWORD:-admin123}@mongodb:27017/edgar?authSource=admin
-      SPRING_DATA_MONGODB_DATABASE: edgar
+      MONGO_URL: mongodb://${MONGO_ROOT_USERNAME:-admin}:${MONGO_ROOT_PASSWORD:-admin123}@mongodb:27017/edgar?authSource=admin
+      MONGODB_DATABASE: edgar
       SEC_USER_AGENT: ${SEC_USER_AGENT:-Edgar4j/1.0 (contact@example.com)}
     ports:
       - "8080:8080"

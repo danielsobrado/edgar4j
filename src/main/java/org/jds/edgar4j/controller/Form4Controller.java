@@ -59,15 +59,50 @@ public class Form4Controller {
 
     /**
      * Get Form 4 filings by trading symbol.
+     * Falls back to SEC API if local database is empty.
      */
     @GetMapping("/symbol/{symbol}")
     public ResponseEntity<Page<Form4>> getBySymbol(
             @PathVariable String symbol,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate) {
 
         PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "transactionDate"));
         Page<Form4> results = form4Service.findByTradingSymbol(symbol.toUpperCase(), pageRequest);
+        
+        // If no results in local DB, try SEC API as fallback
+        if (results.isEmpty()) {
+            log.info("No local Form 4 data for symbol {}, attempting SEC API fallback", symbol);
+            try {
+                LocalDate start = startDate != null ? parseDate(startDate) : LocalDate.now().minusYears(1);
+                LocalDate end = endDate != null ? parseDate(endDate) : LocalDate.now();
+                
+                // Cast to implementation to call SEC API fallback
+                if (form4Service instanceof org.jds.edgar4j.service.impl.Form4ServiceImpl) {
+                    org.jds.edgar4j.service.impl.Form4ServiceImpl serviceImpl = 
+                        (org.jds.edgar4j.service.impl.Form4ServiceImpl) form4Service;
+                    List<Form4> secApiResults = serviceImpl.fetchFromSecApi(
+                        symbol.toUpperCase(), start, end, size);
+                    
+                    if (!secApiResults.isEmpty()) {
+                        // Convert to Page
+                        int startIdx = page * size;
+                        int endIdx = Math.min(startIdx + size, secApiResults.size());
+                        List<Form4> pageContent = startIdx < secApiResults.size() 
+                            ? secApiResults.subList(startIdx, endIdx) 
+                            : List.of();
+                        
+                        results = new org.springframework.data.domain.PageImpl<>(
+                            pageContent, pageRequest, secApiResults.size());
+                    }
+                }
+            } catch (Exception e) {
+                log.error("SEC API fallback failed for symbol {}: {}", symbol, e.getMessage());
+            }
+        }
+        
         return ResponseEntity.ok(results);
     }
 
@@ -141,11 +176,28 @@ public class Form4Controller {
 
     /**
      * Get recent Form 4 filings.
+     * Falls back to SEC API if local database is empty.
      */
     @GetMapping("/recent")
     public ResponseEntity<List<Form4>> getRecentFilings(
             @RequestParam(defaultValue = "10") int limit) {
         List<Form4> results = form4Service.findRecentFilings(Math.min(limit, 100));
+        
+        // If no results in local DB, try SEC API as fallback
+        if (results.isEmpty()) {
+            log.info("No local recent Form 4 data, attempting SEC API fallback");
+            try {
+                // Cast to implementation to call SEC API fallback
+                if (form4Service instanceof org.jds.edgar4j.service.impl.Form4ServiceImpl) {
+                    org.jds.edgar4j.service.impl.Form4ServiceImpl serviceImpl = 
+                        (org.jds.edgar4j.service.impl.Form4ServiceImpl) form4Service;
+                    results = serviceImpl.fetchRecentFromSecApi(Math.min(limit, 100));
+                }
+            } catch (Exception e) {
+                log.error("SEC API fallback failed for recent filings: {}", e.getMessage());
+            }
+        }
+        
         return ResponseEntity.ok(results);
     }
 

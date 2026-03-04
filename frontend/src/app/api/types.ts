@@ -462,7 +462,37 @@ export interface Form8K {
   exhibits?: Form8KExhibit[];
 }
 
-// ========== Form 3 & 5 Types (Initial & Annual Ownership) ==========
+// ========== Form 3, 4 & 5 Types (Initial & Annual Ownership) ==========
+
+// Form 4 - Insider Transaction Report
+export interface Form4 {
+  id: string;
+  accessionNumber: string;
+  documentType?: string;
+  periodOfReport?: string;
+  // Issuer information
+  cik: string;
+  issuerName?: string;
+  tradingSymbol?: string;
+  // Reporting owner information
+  rptOwnerCik?: string;
+  rptOwnerName?: string;
+  officerTitle?: string;
+  isDirector?: boolean;
+  isOfficer?: boolean;
+  isTenPercentOwner?: boolean;
+  isOther?: boolean;
+  ownerType?: string;
+  // Primary transaction fields
+  securityTitle?: string;
+  transactionDate?: string;
+  transactionShares?: number;
+  transactionPricePerShare?: number;
+  transactionValue?: number;
+  acquiredDisposedCode?: string;
+  // All transactions
+  transactions?: Form4Transaction[];
+}
 
 export interface Form4Transaction {
   accessionNumber?: string;

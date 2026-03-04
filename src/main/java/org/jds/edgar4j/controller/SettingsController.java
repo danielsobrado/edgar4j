@@ -3,9 +3,11 @@ package org.jds.edgar4j.controller;
 import org.jds.edgar4j.dto.request.SettingsRequest;
 import org.jds.edgar4j.dto.response.ApiResponse;
 import org.jds.edgar4j.dto.response.SettingsResponse;
+import org.jds.edgar4j.job.TickerSyncJob;
 import org.jds.edgar4j.service.SettingsService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -21,6 +23,7 @@ import lombok.extern.slf4j.Slf4j;
 public class SettingsController {
 
     private final SettingsService settingsService;
+    private final TickerSyncJob tickerSyncJob;
 
     @GetMapping
     public ResponseEntity<ApiResponse<SettingsResponse>> getSettings() {
@@ -48,5 +51,26 @@ public class SettingsController {
         log.info("GET /api/settings/health/elasticsearch");
         SettingsResponse.ConnectionStatus status = settingsService.checkElasticsearchConnection();
         return ResponseEntity.ok(ApiResponse.success(status));
+    }
+
+    @PostMapping("/sync/tickers")
+    public ResponseEntity<ApiResponse<String>> triggerTickerSync() {
+        log.info("POST /api/settings/sync/tickers - Manual ticker sync triggered");
+        
+        if (tickerSyncJob.isRunning()) {
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.<String>error("Ticker sync is already running"));
+        }
+        
+        // Run sync in background (fire and forget)
+        new Thread(() -> {
+            try {
+                tickerSyncJob.triggerSync();
+            } catch (Exception e) {
+                log.error("Error triggering ticker sync", e);
+            }
+        }).start();
+        
+        return ResponseEntity.ok(ApiResponse.success("Ticker sync started", "Ticker sync job has been triggered"));
     }
 }

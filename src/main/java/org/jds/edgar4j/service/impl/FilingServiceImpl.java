@@ -30,8 +30,12 @@ public class FilingServiceImpl implements FilingService {
     public PaginatedResponse<FilingResponse> searchFilings(FilingSearchRequest request) {
         log.info("Searching filings with request: {}", request);
 
+        String sortDir = request.getSortDir();
+        if (sortDir == null) {
+            sortDir = "desc";
+        }
         Sort sort = Sort.by(
-                request.getSortDir().equalsIgnoreCase("desc") ? Sort.Direction.DESC : Sort.Direction.ASC,
+                sortDir.equalsIgnoreCase("desc") ? Sort.Direction.DESC : Sort.Direction.ASC,
                 request.getSortBy()
         );
         PageRequest pageRequest = PageRequest.of(request.getPage(), request.getSize(), sort);
