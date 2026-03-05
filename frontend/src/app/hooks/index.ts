@@ -44,14 +44,7 @@ export {
   useRecentForm3,
   useForm3Search,
 } from './useForm3';
-export {
-  useForm4,
-  useForm4ByAccession,
-  useForm4ByCik,
-  useForm4BySymbol,
-  useRecentForm4,
-  useForm4Search,
-} from './useForm4';
+export { useForm4Search } from './useForm4';
 export {
   useForm5,
   useForm5ByAccession,

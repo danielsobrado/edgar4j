@@ -1,110 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
-import { form4Api } from '../api/endpoints/form4';
-import { Form4, PaginatedResponse } from '../api/types';
-
-export function useForm4(id: string | undefined) {
-  const [form4, setForm4] = useState<Form4 | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!id) {
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    form4Api.getById(id)
-      .then(setForm4)
-      .catch(err => setError(err.message))
-      .finally(() => setLoading(false));
-  }, [id]);
-
-  return { form4, loading, error };
-}
-
-export function useForm4ByAccession(accessionNumber: string | undefined) {
-  const [form4, setForm4] = useState<Form4 | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!accessionNumber) {
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    form4Api.getByAccessionNumber(accessionNumber)
-      .then(setForm4)
-      .catch(err => setError(err.message))
-      .finally(() => setLoading(false));
-  }, [accessionNumber]);
-
-  return { form4, loading, error };
-}
-
-export function useForm4ByCik(cik: string | undefined, page = 0, size = 20) {
-  const [filings, setFilings] = useState<PaginatedResponse<Form4> | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!cik) {
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    form4Api.getByCik(cik, page, size)
-      .then(setFilings)
-      .catch(err => setError(err.message))
-      .finally(() => setLoading(false));
-  }, [cik, page, size]);
-
-  return { filings, loading, error };
-}
-
-export function useForm4BySymbol(symbol: string | undefined, page = 0, size = 20) {
-  const [filings, setFilings] = useState<PaginatedResponse<Form4> | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!symbol) {
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    form4Api.getBySymbol(symbol, page, size)
-      .then(setFilings)
-      .catch(err => setError(err.message))
-      .finally(() => setLoading(false));
-  }, [symbol, page, size]);
-
-  return { filings, loading, error };
-}
-
-export function useRecentForm4(limit = 10) {
-  const [filings, setFilings] = useState<Form4[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const refresh = useCallback(() => {
-    setLoading(true);
-    form4Api.getRecentFilings(limit)
-      .then(setFilings)
-      .catch(err => setError(err.message))
-      .finally(() => setLoading(false));
-  }, [limit]);
-
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
-
-  return { filings, loading, error, refresh };
-}
+import { useState, useCallback } from 'react';
+import { form4Api, SpringPage } from '../api/endpoints/form4';
+import { Form4 } from '../api/types';
 
 export function useForm4Search() {
   const [filings, setFilings] = useState<Form4[]>([]);
@@ -113,16 +9,20 @@ export function useForm4Search() {
   const [totalElements, setTotalElements] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
 
+  const handlePage = (data: SpringPage<Form4>) => {
+    setFilings(data.content ?? []);
+    setTotalElements(data.totalElements ?? 0);
+    setTotalPages(data.totalPages ?? 0);
+  };
+
   const searchByCik = useCallback(async (cik: string, page = 0, size = 20) => {
     setLoading(true);
     setError(null);
     try {
-      const data = await form4Api.getByCik(cik, page, size);
-      setFilings(data.content);
-      setTotalElements(data.totalElements);
-      setTotalPages(data.totalPages);
+      handlePage(await form4Api.getByCik(cik, page, size));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to search filings');
+      setFilings([]);
     } finally {
       setLoading(false);
     }
@@ -132,12 +32,10 @@ export function useForm4Search() {
     setLoading(true);
     setError(null);
     try {
-      const data = await form4Api.getBySymbol(symbol, page, size);
-      setFilings(data.content);
-      setTotalElements(data.totalElements);
-      setTotalPages(data.totalPages);
+      handlePage(await form4Api.getBySymbol(symbol, page, size));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to search filings');
+      setFilings([]);
     } finally {
       setLoading(false);
     }
@@ -147,12 +45,10 @@ export function useForm4Search() {
     setLoading(true);
     setError(null);
     try {
-      const data = await form4Api.getByDateRange(startDate, endDate, page, size);
-      setFilings(data.content);
-      setTotalElements(data.totalElements);
-      setTotalPages(data.totalPages);
+      handlePage(await form4Api.getByDateRange(startDate, endDate, page, size));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to search filings');
+      setFilings([]);
     } finally {
       setLoading(false);
     }
@@ -168,12 +64,10 @@ export function useForm4Search() {
     setLoading(true);
     setError(null);
     try {
-      const data = await form4Api.getBySymbolAndDateRange(symbol, startDate, endDate, page, size);
-      setFilings(data.content);
-      setTotalElements(data.totalElements);
-      setTotalPages(data.totalPages);
+      handlePage(await form4Api.getBySymbolAndDateRange(symbol, startDate, endDate, page, size));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to search filings');
+      setFilings([]);
     } finally {
       setLoading(false);
     }

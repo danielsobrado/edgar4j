@@ -43,6 +43,12 @@ class ApiClient {
     return response.data.data;
   }
 
+  /** Use when the backend returns the object directly (no ApiResponse wrapper). */
+  async getRaw<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
+    const response = await this.client.get<T>(url, config);
+    return response.data;
+  }
+
   async post<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> {
     const response = await this.client.post<ApiResponse<T>>(url, data, config);
     return response.data.data;
