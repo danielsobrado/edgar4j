@@ -321,24 +321,34 @@ public class Form4ServiceImpl implements Form4Service {
             log.debug("Submissions response for {}: {}", cik, submissionsJson.substring(0, Math.min(500, submissionsJson.length())));
             JsonNode submissionsRoot = mapper.readTree(submissionsJson);
             
-            // Parse recentFilings for Form 4 (SEC uses "form4" not "recentForm4")
-            JsonNode recentFilings = submissionsRoot.path("form4");
-            log.debug("Form 4 filings found: {} items", recentFilings.isArray() ? recentFilings.size() : 0);
-            if (recentFilings.isArray()) {
+            // SEC submissions JSON uses parallel arrays under filings.recent
+            // Structure: { "filings": { "recent": { "form": [...], "accessionNumber": [...], ... } } }
+            JsonNode recent = submissionsRoot.path("filings").path("recent");
+            JsonNode forms = recent.path("form");
+            JsonNode accessionNumbers = recent.path("accessionNumber");
+            JsonNode primaryDocuments = recent.path("primaryDocument");
+            JsonNode filingDates = recent.path("filingDate");
+            
+            log.debug("Total filings found in submissions for {}: {}", cik, forms.size());
+            
+            if (forms.isArray() && forms.size() > 0) {
                 int count = 0;
-                for (JsonNode filing : recentFilings) {
-                    if (count >= limit) break;
+                for (int i = 0; i < forms.size() && count < limit; i++) {
+                    // Only process Form 4 filings
+                    if (!"4".equals(forms.get(i).asText(""))) {
+                        continue;
+                    }
                     
-                    String accessionNumber = filing.path("accessionNumber").asText("");
-                    String primaryDocument = filing.path("primaryDocument").asText("");
-                    String filingDate = filing.path("filingDate").asText("");
+                    String accessionNumber = accessionNumbers.get(i).asText("");
+                    String primaryDocument = primaryDocuments.get(i).asText("");
+                    String filingDate = filingDates.get(i).asText("");
                     
                     if (accessionNumber.isEmpty() || primaryDocument.isEmpty()) {
                         continue;
                     }
                     
                     // Parse the filing date
-                    LocalDate filingLocalDate = null;
+                    LocalDate filingLocalDate;
                     try {
                         filingLocalDate = LocalDate.parse(filingDate);
                     } catch (Exception e) {
@@ -351,10 +361,18 @@ public class Form4ServiceImpl implements Form4Service {
                     }
                     
                     // Download and parse the Form 4
+                    // Strip XSL stylesheet directory prefix if present (e.g. "xslF345X05/wk-form4.xml")
+                    // When primaryDocument has a path prefix, SEC returns HTML not raw XML.
+                    String rawPrimaryDocument = primaryDocument.contains("/")
+                            ? primaryDocument.substring(primaryDocument.lastIndexOf('/') + 1)
+                            : primaryDocument;
                     try {
-                        String form4Xml = secApiClient.fetchForm4(cik, accessionNumber, primaryDocument);
+                        String form4Xml = secApiClient.fetchForm4(cik, accessionNumber, rawPrimaryDocument);
                         Form4 form4 = parseForm4(form4Xml, accessionNumber);
                         if (form4 != null) {
+                            if (form4.getTradingSymbol() == null || form4.getTradingSymbol().isBlank()) {
+                                form4.setTradingSymbol(symbol);
+                            }
                             form4List.add(form4);
                             count++;
                         }

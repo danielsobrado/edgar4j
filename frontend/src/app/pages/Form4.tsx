@@ -237,11 +237,7 @@ export function Form4Page() {
     searchBySymbolAndDateRange,
   } = useForm4Search();
 
-  // Auto-search on mount with default symbol or empty
-  React.useEffect(() => {
-    // Load recent transactions by searching with no symbol but default params
-    searchBySymbol('', 0, pageSize);
-  }, []);
+  // No auto-search on mount - user must enter a search term
 
   const handleSearch = useCallback(() => {
     setCurrentPage(0);
@@ -254,10 +250,8 @@ export function Form4Page() {
           } else {
             searchBySymbol(searchTerm.toUpperCase(), 0, pageSize);
           }
-        } else {
-          // Empty search = recent filings
-          searchBySymbol('', 0, pageSize);
         }
+        // Do nothing if symbol is empty - require user to enter a ticker
         break;
       case 'cik':
         if (searchTerm.trim()) {
@@ -283,12 +277,12 @@ export function Form4Page() {
           } else {
             searchBySymbol(searchTerm.toUpperCase(), page, pageSize);
           }
-        } else {
-          searchBySymbol('', page, pageSize);
         }
         break;
       case 'cik':
-        searchByCik(searchTerm, page, pageSize);
+        if (searchTerm.trim()) {
+          searchByCik(searchTerm, page, pageSize);
+        }
         break;
       case 'date':
         searchByDateRange(startDate, endDate, page, pageSize);
@@ -430,7 +424,11 @@ export function Form4Page() {
         {!loading && displayFilings.length === 0 && (
           <EmptyState
             type="search"
-            message={searchTerm || searchType === 'date' ? 'No transactions match your search criteria.' : 'No recent transactions available.'}
+            message={
+              searchTerm || searchType === 'date'
+                ? 'No transactions match your search criteria.'
+                : 'Enter a ticker symbol (e.g., PLTR, AAPL) and click Search to view insider transactions.'
+            }
           />
         )}
 

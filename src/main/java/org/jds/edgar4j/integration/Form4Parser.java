@@ -82,17 +82,20 @@ public class Form4Parser {
     }
 
     /**
-     * Cleans XML by removing problematic content (HTML wrappers, etc.).
+     * Cleans XML by removing problematic content (HTML wrappers, DOCTYPE declarations, etc.).
+     * Always starts from the root <ownershipDocument> element to skip <?xml?> and <!DOCTYPE>
+     * declarations which cause "disallow-doctype-decl" security errors in the XML parser.
      */
     private String cleanXml(String xml) {
         if (xml == null) {
             return null;
         }
 
-        int startIdx = xml.indexOf("<?xml");
-        if (startIdx == -1) {
-            startIdx = xml.indexOf("<ownershipDocument");
-        }
+        // Always start from <ownershipDocument> to skip XML declaration and DOCTYPE blocks.
+        // SEC Form 4 files contain <!DOCTYPE ownershipDocument [...]> which is blocked by
+        // the "disallow-doctype-decl" security feature. By starting at the root element
+        // we safely bypass it while retaining all transaction data.
+        int startIdx = xml.indexOf("<ownershipDocument");
 
         if (startIdx == -1) {
             log.warn("No XML content found in document");
