@@ -1,5 +1,7 @@
 # Test profile configuration
 spring:
+  main:
+    allow-bean-definition-overriding: true
   data:
     elasticsearch:
       repositories:

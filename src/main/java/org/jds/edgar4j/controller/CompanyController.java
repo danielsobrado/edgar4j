@@ -6,6 +6,7 @@ import org.jds.edgar4j.dto.response.CompanyListResponse;
 import org.jds.edgar4j.dto.response.CompanyResponse;
 import org.jds.edgar4j.dto.response.FilingResponse;
 import org.jds.edgar4j.dto.response.PaginatedResponse;
+import org.jds.edgar4j.model.CompanyTicker;
 import org.jds.edgar4j.service.CompanyService;
 import org.jds.edgar4j.service.FilingService;
 import org.springframework.http.ResponseEntity;
@@ -29,7 +30,9 @@ import lombok.extern.slf4j.Slf4j;
 public class CompanyController {
 
     private final CompanyService companyService;
-    private final FilingService filingService;
+    private final FilingService  filingService;
+
+    // ─── Company list / search ────────────────────────────────────────────────
 
     @Operation(summary = "Search companies", description = "Search and list companies with pagination and sorting")
     @GetMapping
@@ -39,69 +42,113 @@ public class CompanyController {
             @Parameter(description = "Page size") @RequestParam(defaultValue = "10") int size,
             @Parameter(description = "Sort field") @RequestParam(defaultValue = "name") String sortBy,
             @Parameter(description = "Sort direction (asc/desc)") @RequestParam(defaultValue = "asc") String sortDir) {
+
         log.info("GET /api/companies?search={}&page={}&size={}", search, page, size);
-
         CompanySearchRequest request = CompanySearchRequest.builder()
-                .searchTerm(search)
-                .page(page)
-                .size(size)
-                .sortBy(sortBy)
-                .sortDir(sortDir)
+                .searchTerm(search).page(page).size(size).sortBy(sortBy).sortDir(sortDir)
                 .build();
-
-        PaginatedResponse<CompanyListResponse> companies = companyService.searchCompanies(request);
-        return ResponseEntity.ok(ApiResponse.success(companies));
+        return ResponseEntity.ok(ApiResponse.success(companyService.searchCompanies(request)));
     }
 
-    @Operation(summary = "Get company by ID", description = "Retrieve a company by its internal ID")
+    // ─── Full company detail lookups ──────────────────────────────────────────
+
+    @Operation(summary = "Get company by ID", description = "Retrieve a company by its internal MongoDB ID")
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<CompanyResponse>> getCompanyById(
             @Parameter(description = "Company ID") @PathVariable String id) {
         log.info("GET /api/companies/{}", id);
         return companyService.getCompanyById(id)
-                .map(company -> ResponseEntity.ok(ApiResponse.success(company)))
+                .map(c -> ResponseEntity.ok(ApiResponse.success(c)))
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    @Operation(summary = "Get company by CIK", description = "Retrieve a company by its SEC CIK number")
+    @Operation(summary = "Get company by CIK",
+               description = "Retrieve company details by SEC CIK number. Uses company_tickers as primary source then enriches from submissions.")
     @GetMapping("/cik/{cik}")
     public ResponseEntity<ApiResponse<CompanyResponse>> getCompanyByCik(
-            @Parameter(description = "SEC CIK number", example = "0000320193") @PathVariable String cik) {
+            @Parameter(description = "SEC CIK number (padded or raw)", example = "0000320193") @PathVariable String cik) {
         log.info("GET /api/companies/cik/{}", cik);
         return companyService.getCompanyByCik(cik)
-                .map(company -> ResponseEntity.ok(ApiResponse.success(company)))
+                .map(c -> ResponseEntity.ok(ApiResponse.success(c)))
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    @Operation(summary = "Get company by ticker", description = "Retrieve a company by its stock ticker symbol")
+    @Operation(summary = "Get company by ticker",
+               description = "Retrieve company details by stock ticker symbol. Uses company_tickers as primary source then enriches from submissions.")
     @GetMapping("/ticker/{ticker}")
     public ResponseEntity<ApiResponse<CompanyResponse>> getCompanyByTicker(
             @Parameter(description = "Stock ticker symbol", example = "AAPL") @PathVariable String ticker) {
         log.info("GET /api/companies/ticker/{}", ticker);
         return companyService.getCompanyByTicker(ticker)
-                .map(company -> ResponseEntity.ok(ApiResponse.success(company)))
+                .map(c -> ResponseEntity.ok(ApiResponse.success(c)))
                 .orElse(ResponseEntity.notFound().build());
     }
+
+    // ─── Lightweight CIK ↔ Ticker cross-lookup ────────────────────────────────
+
+    @Operation(summary = "Get CIK for a ticker symbol",
+               description = "Fast lookup: returns only the zero-padded CIK string for the given ticker, using company_tickers collection.")
+    @GetMapping("/ticker/{ticker}/cik")
+    public ResponseEntity<ApiResponse<String>> getCikByTicker(
+            @Parameter(description = "Stock ticker symbol", example = "AAPL") @PathVariable String ticker) {
+        log.info("GET /api/companies/ticker/{}/cik", ticker);
+        return companyService.getCikByTicker(ticker)
+                .map(cik -> ResponseEntity.ok(ApiResponse.success(cik)))
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @Operation(summary = "Get ticker symbol for a CIK",
+               description = "Fast lookup: returns only the ticker string for the given CIK, using company_tickers collection.")
+    @GetMapping("/cik/{cik}/ticker")
+    public ResponseEntity<ApiResponse<String>> getTickerByCik(
+            @Parameter(description = "SEC CIK number (padded or raw)", example = "0000320193") @PathVariable String cik) {
+        log.info("GET /api/companies/cik/{}/ticker", cik);
+        return companyService.getTickerByCik(cik)
+                .map(t -> ResponseEntity.ok(ApiResponse.success(t)))
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @Operation(summary = "Get raw CompanyTicker document by ticker",
+               description = "Returns the raw company_tickers entry for a given ticker symbol.")
+    @GetMapping("/ticker/{ticker}/info")
+    public ResponseEntity<ApiResponse<CompanyTicker>> getCompanyTickerByTicker(
+            @Parameter(description = "Stock ticker symbol", example = "AAPL") @PathVariable String ticker) {
+        log.info("GET /api/companies/ticker/{}/info", ticker);
+        return companyService.getCompanyTickerByTicker(ticker)
+                .map(ct -> ResponseEntity.ok(ApiResponse.success(ct)))
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @Operation(summary = "Get raw CompanyTicker document by CIK",
+               description = "Returns the raw company_tickers entry for a given CIK.")
+    @GetMapping("/cik/{cik}/info")
+    public ResponseEntity<ApiResponse<CompanyTicker>> getCompanyTickerByCik(
+            @Parameter(description = "SEC CIK number (padded or raw)", example = "0000320193") @PathVariable String cik) {
+        log.info("GET /api/companies/cik/{}/info", cik);
+        return companyService.getCompanyTickerByCik(cik)
+                .map(ct -> ResponseEntity.ok(ApiResponse.success(ct)))
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    // ─── Filings ──────────────────────────────────────────────────────────────
 
     @Operation(summary = "Get company filings", description = "Retrieve SEC filings for a company by its internal ID")
     @GetMapping("/{id}/filings")
     public ResponseEntity<ApiResponse<PaginatedResponse<FilingResponse>>> getCompanyFilings(
             @Parameter(description = "Company ID") @PathVariable String id,
-            @Parameter(description = "Page number (0-based)") @RequestParam(defaultValue = "0") int page,
-            @Parameter(description = "Page size") @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
         log.info("GET /api/companies/{}/filings?page={}&size={}", id, page, size);
-        PaginatedResponse<FilingResponse> filings = filingService.getFilingsByCompany(id, page, size);
-        return ResponseEntity.ok(ApiResponse.success(filings));
+        return ResponseEntity.ok(ApiResponse.success(filingService.getFilingsByCompany(id, page, size)));
     }
 
     @Operation(summary = "Get company filings by CIK", description = "Retrieve SEC filings for a company by its CIK number")
     @GetMapping("/cik/{cik}/filings")
     public ResponseEntity<ApiResponse<PaginatedResponse<FilingResponse>>> getCompanyFilingsByCik(
             @Parameter(description = "SEC CIK number", example = "0000320193") @PathVariable String cik,
-            @Parameter(description = "Page number (0-based)") @RequestParam(defaultValue = "0") int page,
-            @Parameter(description = "Page size") @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
         log.info("GET /api/companies/cik/{}/filings?page={}&size={}", cik, page, size);
-        PaginatedResponse<FilingResponse> filings = filingService.getFilingsByCik(cik, page, size);
-        return ResponseEntity.ok(ApiResponse.success(filings));
+        return ResponseEntity.ok(ApiResponse.success(filingService.getFilingsByCik(cik, page, size)));
     }
 }
