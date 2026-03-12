@@ -6,6 +6,7 @@ import java.util.List;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import lombok.Getter;
 
@@ -45,6 +46,9 @@ public class SecApiConfig {
     @Value("${edgar4j.urls.companyTickersMFsUrl}")
     private String companyTickersMFsUrl;
 
+    @Value("${edgar4j.urls.eftsSearchUrl:https://efts.sec.gov/LATEST/search-index}")
+    private String eftsSearchUrl;
+
     public String formatCik(String cik) {
         try {
             long cikLong = Long.parseLong(cik);
@@ -60,7 +64,11 @@ public class SecApiConfig {
 
     public String getForm4Url(String cik, String accessionNumber, String primaryDocument) {
         String cleanedAccession = accessionNumber.replace("-", "");
-        return String.format("%s/%s/%s/%s", edgarDataArchivesUrl, cik, cleanedAccession, primaryDocument);
+        return String.format("%s/%s/%s/%s",
+                edgarDataArchivesUrl,
+                formatArchiveCik(cik),
+                cleanedAccession,
+                primaryDocument);
     }
 
     /**
@@ -68,7 +76,25 @@ public class SecApiConfig {
      */
     public String getFilingUrl(String cik, String accessionNumber, String document) {
         String cleanedAccession = accessionNumber.replace("-", "");
-        return String.format("%s/%s/%s/%s", edgarDataArchivesUrl, formatCik(cik), cleanedAccession, document);
+        return String.format("%s/%s/%s/%s",
+                edgarDataArchivesUrl,
+                formatArchiveCik(cik),
+                cleanedAccession,
+                document);
+    }
+
+    public String getEftsSearchUrl(String forms, String startDate, String endDate, int from, int size) {
+        return UriComponentsBuilder.fromUriString(eftsSearchUrl)
+                .queryParam("q", "\"\"")
+                .queryParam("forms", forms)
+                .queryParam("dateRange", "custom")
+                .queryParam("startdt", startDate)
+                .queryParam("enddt", endDate)
+                .queryParam("from", from)
+                .queryParam("size", size)
+                .build()
+                .encode()
+                .toUriString();
     }
 
     public List<String> getDailyMasterIndexUrls(LocalDate date) {
@@ -85,5 +111,17 @@ public class SecApiConfig {
     public String getArchiveUrl(String archivePath) {
         String normalizedPath = archivePath.startsWith("/") ? archivePath.substring(1) : archivePath;
         return String.format("%s/Archives/%s", baseSecUrl, normalizedPath);
+    }
+
+    private String formatArchiveCik(String cik) {
+        if (cik == null || cik.isBlank()) {
+            return "";
+        }
+
+        try {
+            return Long.toString(Long.parseLong(cik));
+        } catch (NumberFormatException e) {
+            return cik.replaceFirst("^0+(?!$)", "");
+        }
     }
 }

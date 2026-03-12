@@ -62,4 +62,19 @@ public class AppSettings {
     private String marketDataBaseUrl = "https://api.tiingo.com";
 
     private String marketDataApiKey;
+
+    @Builder.Default
+    private Boolean realtimeSyncEnabled = Boolean.TRUE;
+
+    @Builder.Default
+    private String realtimeSyncForms = "4";
+
+    @Builder.Default
+    private Integer realtimeSyncLookbackHours = 1;
+
+    @Builder.Default
+    private Integer realtimeSyncMaxPages = 10;
+
+    @Builder.Default
+    private Integer realtimeSyncPageSize = 100;
 }

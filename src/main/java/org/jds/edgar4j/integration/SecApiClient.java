@@ -7,8 +7,9 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDate;
 import java.time.Duration;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.zip.GZIPInputStream;
@@ -80,6 +81,21 @@ public class SecApiClient {
     public CompletableFuture<String> fetchForm4Async(String cik, String accessionNumber, String primaryDocument) {
         String url = config.getForm4Url(cik, accessionNumber, primaryDocument);
         return executeRequestAsync(url);
+    }
+
+    /**
+     * Fetches recent filings from the SEC EDGAR Full-Text Search API.
+     * EFTS responses are intentionally not cached because the index is used for
+     * near-real-time polling.
+     */
+    public String fetchEftsSearch(String forms, LocalDate startDate, LocalDate endDate, int from, int size) {
+        String url = config.getEftsSearchUrl(
+                forms,
+                startDate.format(DateTimeFormatter.ISO_LOCAL_DATE),
+                endDate.format(DateTimeFormatter.ISO_LOCAL_DATE),
+                from,
+                size);
+        return executeRequestNoCache(url);
     }
 
     /**
@@ -163,6 +179,25 @@ public class SecApiClient {
                         return body;
                     });
         });
+    }
+
+    private String executeRequestNoCache(String url) {
+        try {
+            rateLimiter.acquire();
+            log.debug("Fetching URL (no cache): {}", url);
+
+            HttpRequest request = buildRequest(url);
+            HttpResponse<InputStream> response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
+
+            validateResponse(response, url);
+            return readBody(response);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new SecApiException("Request interrupted", e);
+        } catch (Exception e) {
+            log.error("Error fetching URL (no cache): {}", url, e);
+            throw new SecApiException("Failed to fetch from SEC API: " + e.getMessage(), e);
+        }
     }
 
     private HttpRequest buildRequest(String url) {

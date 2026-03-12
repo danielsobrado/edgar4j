@@ -27,6 +27,11 @@ public class SettingsResponse {
     private String marketDataBaseUrl;
     private String marketDataApiKey;
     private boolean marketDataConfigured;
+    private boolean realtimeSyncEnabled;
+    private String realtimeSyncForms;
+    private int realtimeSyncLookbackHours;
+    private int realtimeSyncMaxPages;
+    private int realtimeSyncPageSize;
 
     private ApiEndpointsInfo apiEndpoints;
     private ConnectionStatus mongoDbStatus;

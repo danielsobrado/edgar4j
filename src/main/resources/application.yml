@@ -84,6 +84,7 @@ edgar4j:
         companyTickersUrl: https://www.sec.gov/files/company_tickers.json
         companyTickersExchangesUrl: https://www.sec.gov/files/company_tickers_exchange.json
         companyTickersMFsUrl: https://www.sec.gov/files/company_tickers_mf.json
+        eftsSearchUrl: https://efts.sec.gov/LATEST/search-index
     persistence:
         database: postgresql
     jobs:
@@ -94,6 +95,13 @@ edgar4j:
             enabled: ${MARKET_DATA_SYNC_ENABLED:true}
             cron: ${MARKET_DATA_SYNC_CRON:0 0 */2 * * MON-FRI}
             batch-size: ${MARKET_DATA_SYNC_BATCH_SIZE:50}
+        realtime-filing-sync:
+            enabled: ${REALTIME_FILING_SYNC_ENABLED:true}
+            cron: ${REALTIME_FILING_SYNC_CRON:0 */15 * * * *}
+            forms: ${REALTIME_FILING_SYNC_FORMS:4}
+            lookback-hours: ${REALTIME_FILING_SYNC_LOOKBACK_HOURS:1}
+            max-pages: ${REALTIME_FILING_SYNC_MAX_PAGES:10}
+            page-size: ${REALTIME_FILING_SYNC_PAGE_SIZE:100}
     # Phase 3: Market Data Provider Configuration
     providers:
         alpha-vantage:

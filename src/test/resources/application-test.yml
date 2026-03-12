@@ -41,6 +41,8 @@ edgar4j:
       enabled: false
     market-data-sync:
       enabled: false
+    realtime-filing-sync:
+      enabled: false
     ticker-sync:
       enabled: false
     filing-sync:

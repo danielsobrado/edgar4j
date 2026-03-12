@@ -21,6 +21,10 @@ public class SettingsServiceImpl implements SettingsService {
     private static final String DEFAULT_SETTINGS_ID = "default";
     private static final String DEFAULT_MARKET_DATA_PROVIDER = "NONE";
     private static final String DEFAULT_TIINGO_BASE_URL = "https://api.tiingo.com";
+    private static final String DEFAULT_REALTIME_SYNC_FORMS = "4";
+    private static final int DEFAULT_REALTIME_SYNC_LOOKBACK_HOURS = 1;
+    private static final int DEFAULT_REALTIME_SYNC_MAX_PAGES = 10;
+    private static final int DEFAULT_REALTIME_SYNC_PAGE_SIZE = 100;
 
     private final AppSettingsRepository appSettingsRepository;
     private final MongoTemplate mongoTemplate;
@@ -70,6 +74,21 @@ public class SettingsServiceImpl implements SettingsService {
         settings.setMarketDataProvider(normalizeMarketDataProvider(request.getMarketDataProvider()));
         settings.setMarketDataBaseUrl(normalizeMarketDataBaseUrl(request.getMarketDataBaseUrl()));
         settings.setMarketDataApiKey(trimToNull(request.getMarketDataApiKey()));
+        settings.setRealtimeSyncEnabled(request.getRealtimeSyncEnabled() != null
+                ? request.getRealtimeSyncEnabled()
+                : resolveRealtimeSyncEnabled(settings));
+        settings.setRealtimeSyncForms(request.getRealtimeSyncForms() != null
+                ? normalizeRealtimeSyncForms(request.getRealtimeSyncForms())
+                : resolveRealtimeSyncForms(settings));
+        settings.setRealtimeSyncLookbackHours(resolvePositiveInteger(
+                request.getRealtimeSyncLookbackHours(),
+                resolveRealtimeSyncLookbackHours(settings)));
+        settings.setRealtimeSyncMaxPages(resolvePositiveInteger(
+                request.getRealtimeSyncMaxPages(),
+                resolveRealtimeSyncMaxPages(settings)));
+        settings.setRealtimeSyncPageSize(resolvePositiveInteger(
+                request.getRealtimeSyncPageSize(),
+                resolveRealtimeSyncPageSize(settings)));
 
         settings = appSettingsRepository.save(settings);
         return toSettingsResponse(settings);
@@ -142,6 +161,11 @@ public class SettingsServiceImpl implements SettingsService {
                 .marketDataBaseUrl(resolveEffectiveMarketDataBaseUrl(settings))
                 .marketDataApiKey(settings.getMarketDataApiKey())
                 .marketDataConfigured(isMarketDataConfigured(settings))
+                .realtimeSyncEnabled(resolveRealtimeSyncEnabled(settings))
+                .realtimeSyncForms(resolveRealtimeSyncForms(settings))
+                .realtimeSyncLookbackHours(resolveRealtimeSyncLookbackHours(settings))
+                .realtimeSyncMaxPages(resolveRealtimeSyncMaxPages(settings))
+                .realtimeSyncPageSize(resolveRealtimeSyncPageSize(settings))
                 .apiEndpoints(SettingsResponse.ApiEndpointsInfo.builder()
                         .baseSecUrl(baseSecUrl)
                         .submissionsUrl(submissionsUrl)
@@ -205,6 +229,22 @@ public class SettingsServiceImpl implements SettingsService {
         return normalized.replaceAll("/+$", "");
     }
 
+    private String normalizeRealtimeSyncForms(String forms) {
+        if (forms == null || forms.isBlank()) {
+            return DEFAULT_REALTIME_SYNC_FORMS;
+        }
+
+        String normalized = java.util.Arrays.stream(forms.split(","))
+                .map(String::trim)
+                .filter(value -> !value.isEmpty())
+                .map(value -> value.replaceAll("\\s+", " ").toUpperCase())
+                .distinct()
+                .reduce((left, right) -> left + "," + right)
+                .orElse(DEFAULT_REALTIME_SYNC_FORMS);
+
+        return normalized.isBlank() ? DEFAULT_REALTIME_SYNC_FORMS : normalized;
+    }
+
     private boolean isMarketDataConfigured(AppSettings settings) {
         return "TIINGO".equals(resolveEffectiveMarketDataProvider(settings))
                 && resolveEffectiveMarketDataApiKey(settings) != null;
@@ -242,6 +282,39 @@ public class SettingsServiceImpl implements SettingsService {
         return tiingoEnvProperties.getBaseUrl()
                 .map(this::normalizeMarketDataBaseUrl)
                 .orElseGet(() -> normalizeMarketDataBaseUrl(explicitBaseUrl));
+    }
+
+    private boolean resolveRealtimeSyncEnabled(AppSettings settings) {
+        return settings.getRealtimeSyncEnabled() != null
+                ? settings.getRealtimeSyncEnabled()
+                : true;
+    }
+
+    private String resolveRealtimeSyncForms(AppSettings settings) {
+        return normalizeRealtimeSyncForms(settings.getRealtimeSyncForms());
+    }
+
+    private int resolveRealtimeSyncLookbackHours(AppSettings settings) {
+        Integer value = settings.getRealtimeSyncLookbackHours();
+        return value != null && value > 0 ? value : DEFAULT_REALTIME_SYNC_LOOKBACK_HOURS;
+    }
+
+    private int resolveRealtimeSyncMaxPages(AppSettings settings) {
+        Integer value = settings.getRealtimeSyncMaxPages();
+        return value != null && value > 0 ? value : DEFAULT_REALTIME_SYNC_MAX_PAGES;
+    }
+
+    private int resolveRealtimeSyncPageSize(AppSettings settings) {
+        Integer value = settings.getRealtimeSyncPageSize();
+        return value != null && value > 0 ? value : DEFAULT_REALTIME_SYNC_PAGE_SIZE;
+    }
+
+    private int resolvePositiveInteger(Integer requestedValue, int fallbackValue) {
+        if (requestedValue == null) {
+            return fallbackValue;
+        }
+
+        return requestedValue > 0 ? requestedValue : fallbackValue;
     }
 
     private void requireNonBlank(String value, String message) {

@@ -26,4 +26,9 @@ public class SettingsRequest {
     private String marketDataProvider;
     private String marketDataBaseUrl;
     private String marketDataApiKey;
+    private Boolean realtimeSyncEnabled;
+    private String realtimeSyncForms;
+    private Integer realtimeSyncLookbackHours;
+    private Integer realtimeSyncMaxPages;
+    private Integer realtimeSyncPageSize;
 }
