@@ -245,6 +245,7 @@ public class AlphaVantageProvider implements MarketDataProvider {
             stockPrice.setHigh(parseBigDecimal(quoteNode.path("03. high").asText()));
             stockPrice.setLow(parseBigDecimal(quoteNode.path("04. low").asText()));
             stockPrice.setClose(parseBigDecimal(quoteNode.path("08. previous close").asText()));
+            stockPrice.setPreviousClose(parseBigDecimal(quoteNode.path("08. previous close").asText()));
             stockPrice.setVolume(parseLong(quoteNode.path("06. volume").asText()));
             stockPrice.setDate(LocalDate.parse(quoteNode.path("07. latest trading day").asText()));
             stockPrice.setCurrency("USD");

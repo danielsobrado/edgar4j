@@ -39,6 +39,8 @@ edgar4j:
   jobs:
     sp500-sync:
       enabled: false
+    market-data-sync:
+      enabled: false
     ticker-sync:
       enabled: false
     filing-sync:

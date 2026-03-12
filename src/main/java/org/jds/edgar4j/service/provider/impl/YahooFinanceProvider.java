@@ -191,6 +191,10 @@ public class YahooFinanceProvider implements MarketDataProvider {
             StockPrice stockPrice = new StockPrice();
             stockPrice.setSymbol(symbol);
             stockPrice.setPrice(parseBigDecimal(meta.path("regularMarketPrice").asText()));
+            stockPrice.setPreviousClose(firstNonNull(
+                    parseBigDecimal(meta.path("previousClose").asText()),
+                    parseBigDecimal(meta.path("chartPreviousClose").asText())));
+            stockPrice.setMarketCap(parseLong(meta.path("marketCap").asText()));
             
             // Get the latest values from arrays
             JsonNode opens = quote.path("open");
@@ -206,6 +210,10 @@ public class YahooFinanceProvider implements MarketDataProvider {
                 stockPrice.setLow(parseBigDecimal(lows.get(lastIndex).asText()));
                 stockPrice.setClose(parseBigDecimal(closes.get(lastIndex).asText()));
                 stockPrice.setVolume(volumes.get(lastIndex).asLong());
+            }
+
+            if (stockPrice.getClose() == null) {
+                stockPrice.setClose(stockPrice.getPreviousClose());
             }
             
             stockPrice.setDate(LocalDate.now());
@@ -300,5 +308,30 @@ public class YahooFinanceProvider implements MarketDataProvider {
             log.debug("Unable to parse BigDecimal: {}", value);
             return null;
         }
+    }
+
+    private Long parseLong(String value) {
+        if (value == null || value.trim().isEmpty() || "null".equals(value)) {
+            return null;
+        }
+        try {
+            return Long.parseLong(value);
+        } catch (NumberFormatException e) {
+            log.debug("Unable to parse Long: {}", value);
+            return null;
+        }
+    }
+
+    @SafeVarargs
+    private final <T> T firstNonNull(T... values) {
+        if (values == null) {
+            return null;
+        }
+        for (T value : values) {
+            if (value != null) {
+                return value;
+            }
+        }
+        return null;
     }
 }

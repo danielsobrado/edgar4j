@@ -59,7 +59,9 @@ public interface MarketDataProvider {
         private BigDecimal high;
         private BigDecimal low;
         private BigDecimal close;
+        private BigDecimal previousClose;
         private Long volume;
+        private Long marketCap;
         private LocalDate date;
         private String currency;
         private String exchange;
@@ -91,8 +93,14 @@ public interface MarketDataProvider {
         public BigDecimal getClose() { return close; }
         public void setClose(BigDecimal close) { this.close = close; }
 
+        public BigDecimal getPreviousClose() { return previousClose; }
+        public void setPreviousClose(BigDecimal previousClose) { this.previousClose = previousClose; }
+
         public Long getVolume() { return volume; }
         public void setVolume(Long volume) { this.volume = volume; }
+
+        public Long getMarketCap() { return marketCap; }
+        public void setMarketCap(Long marketCap) { this.marketCap = marketCap; }
 
         public LocalDate getDate() { return date; }
         public void setDate(LocalDate date) { this.date = date; }

@@ -250,6 +250,7 @@ public class FinnhubProvider implements MarketDataProvider {
             stockPrice.setHigh(parseBigDecimal(rootNode.path("h").asText())); // high price
             stockPrice.setLow(parseBigDecimal(rootNode.path("l").asText())); // low price
             stockPrice.setClose(parseBigDecimal(rootNode.path("pc").asText())); // previous close
+            stockPrice.setPreviousClose(parseBigDecimal(rootNode.path("pc").asText()));
             stockPrice.setDate(LocalDate.now());
             stockPrice.setCurrency("USD");
             stockPrice.setExchange("US");

@@ -90,6 +90,10 @@ edgar4j:
         sp500-sync:
             enabled: ${SP500_SYNC_ENABLED:true}
             cron: ${SP500_SYNC_CRON:0 0 3 * * SUN}
+        market-data-sync:
+            enabled: ${MARKET_DATA_SYNC_ENABLED:true}
+            cron: ${MARKET_DATA_SYNC_CRON:0 0 */2 * * MON-FRI}
+            batch-size: ${MARKET_DATA_SYNC_BATCH_SIZE:50}
     # Phase 3: Market Data Provider Configuration
     providers:
         alpha-vantage:
