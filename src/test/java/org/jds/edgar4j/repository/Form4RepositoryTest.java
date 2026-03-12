@@ -356,6 +356,61 @@ class Form4RepositoryTest {
         assertEquals(2, found.get().getTransactions().size());
     }
 
+    @Test
+    @Order(18)
+    @DisplayName("Should find recent acquisitions from nested transactions")
+    void shouldFindRecentAcquisitionsFromNestedTransactions() {
+        LocalDate recentDate = LocalDate.now().minusDays(2);
+
+        Form4 nestedAcquisition = createForm4(ACCESSION_1, "MSFT", "789019", "John Doe");
+        nestedAcquisition.setTransactionDate(recentDate);
+        nestedAcquisition.setAcquiredDisposedCode("D");
+        nestedAcquisition.setTransactions(List.of(
+                Form4Transaction.builder()
+                        .accessionNumber(ACCESSION_1)
+                        .transactionType("NON_DERIVATIVE")
+                        .transactionCode("P")
+                        .transactionShares(100f)
+                        .transactionPricePerShare(25f)
+                        .transactionValue(2500f)
+                        .transactionDate(recentDate)
+                        .acquiredDisposedCode("A")
+                        .build()));
+        form4Repository.save(nestedAcquisition);
+
+        Form4 oldAcquisition = createForm4(ACCESSION_2, "AAPL", "320193", "Tim Cook");
+        oldAcquisition.setTransactionDate(LocalDate.now().minusDays(45));
+        form4Repository.save(oldAcquisition);
+
+        List<Form4> acquisitions = form4Repository.findRecentAcquisitions(LocalDate.now().minusDays(30));
+
+        assertEquals(1, acquisitions.size());
+        assertEquals(ACCESSION_1, acquisitions.get(0).getAccessionNumber());
+    }
+
+    @Test
+    @Order(19)
+    @DisplayName("Should find acquisitions by code and minimum transaction date with pagination")
+    void shouldFindByAcquiredDisposedCodeAndTransactionDateGreaterThanEqual() {
+        Form4 recentBuy = createForm4(ACCESSION_1, "MSFT", "789019", "John Doe");
+        recentBuy.setTransactionDate(LocalDate.now().minusDays(3));
+        recentBuy.setAcquiredDisposedCode("A");
+        form4Repository.save(recentBuy);
+
+        Form4 olderBuy = createForm4(ACCESSION_2, "AAPL", "320193", "Tim Cook");
+        olderBuy.setTransactionDate(LocalDate.now().minusDays(40));
+        olderBuy.setAcquiredDisposedCode("A");
+        form4Repository.save(olderBuy);
+
+        Page<Form4> page = form4Repository.findByAcquiredDisposedCodeAndTransactionDateGreaterThanEqual(
+                "A",
+                LocalDate.now().minusDays(30),
+                PageRequest.of(0, 10));
+
+        assertEquals(1, page.getTotalElements());
+        assertEquals(ACCESSION_1, page.getContent().get(0).getAccessionNumber());
+    }
+
     private Form4 createForm4(String accessionNumber, String symbol, String cik, String ownerName) {
         return Form4.builder()
                 .accessionNumber(accessionNumber)

@@ -75,6 +75,12 @@ public interface Form4Repository extends MongoRepository<Form4, String> {
     @Query("{ 'acquiredDisposedCode': ?0 }")
     Page<Form4> findByAcquiredDisposedCode(String code, Pageable pageable);
 
+    @Query("{ 'transactionDate': { $gte: ?0 }, $or: [ { 'acquiredDisposedCode': 'A' }, { 'transactions': { $elemMatch: { 'acquiredDisposedCode': 'A' } } } ] }")
+    List<Form4> findRecentAcquisitions(LocalDate since);
+
+    Page<Form4> findByAcquiredDisposedCodeAndTransactionDateGreaterThanEqual(
+            String code, LocalDate since, Pageable pageable);
+
     // Find recent filings
     List<Form4> findTop10ByOrderByTransactionDateDesc();
 
