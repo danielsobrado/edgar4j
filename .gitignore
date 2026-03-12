@@ -83,3 +83,4 @@ WORK_PROGRESS.md
 target/
 build.log
 start_log*.txt
+docs/

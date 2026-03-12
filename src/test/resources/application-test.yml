@@ -37,6 +37,8 @@ edgar4j:
     user-agent: Edgar4j-Test/1.0 (test@example.com)
     rate-limit-per-second: 10
   jobs:
+    sp500-sync:
+      enabled: false
     ticker-sync:
       enabled: false
     filing-sync:

@@ -86,6 +86,10 @@ edgar4j:
         companyTickersMFsUrl: https://www.sec.gov/files/company_tickers_mf.json
     persistence:
         database: postgresql
+    jobs:
+        sp500-sync:
+            enabled: ${SP500_SYNC_ENABLED:true}
+            cron: ${SP500_SYNC_CRON:0 0 3 * * SUN}
     # Phase 3: Market Data Provider Configuration
     providers:
         alpha-vantage:

@@ -28,6 +28,8 @@ edgar4j:
     username: ${EDGAR4J_SECURITY_USERNAME:admin}
     password: ${EDGAR4J_SECURITY_PASSWORD:admin123}
   jobs:
+    sp500-sync:
+      enabled: true
     ticker-sync:
       enabled: true
     filing-sync:

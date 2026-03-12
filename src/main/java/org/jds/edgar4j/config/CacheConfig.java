@@ -26,6 +26,7 @@ public class CacheConfig {
     public static final String CACHE_HISTORICAL_PRICES = "historicalPrices";
     public static final String CACHE_COMPANY_PROFILES = "companyProfiles";
     public static final String CACHE_FINANCIAL_METRICS = "financialMetrics";
+    public static final String CACHE_SP500 = "sp500Constituents";
 
     @Bean
     public CacheManager cacheManager() {
@@ -39,7 +40,8 @@ public class CacheConfig {
                 new ConcurrentMapCache(CACHE_STOCK_PRICES),
                 new ConcurrentMapCache(CACHE_HISTORICAL_PRICES),
                 new ConcurrentMapCache(CACHE_COMPANY_PROFILES),
-                new ConcurrentMapCache(CACHE_FINANCIAL_METRICS)
+                new ConcurrentMapCache(CACHE_FINANCIAL_METRICS),
+                new ConcurrentMapCache(CACHE_SP500)
         ));
         return cacheManager;
     }
