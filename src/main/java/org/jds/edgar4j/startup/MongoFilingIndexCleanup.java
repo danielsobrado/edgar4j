@@ -1,0 +1,45 @@
+package org.jds.edgar4j.startup;
+
+import java.util.List;
+
+import org.jds.edgar4j.model.Filling;
+import org.springframework.boot.ApplicationRunner;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.index.IndexInfo;
+import org.springframework.data.mongodb.core.index.IndexOperations;
+import org.springframework.stereotype.Component;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class MongoFilingIndexCleanup implements ApplicationRunner {
+
+    private static final List<String> INVALID_UNIQUE_INDEXES = List.of(
+            "fillingType.number",
+            "formType.number"
+    );
+
+    private final MongoTemplate mongoTemplate;
+
+    @Override
+    public void run(org.springframework.boot.ApplicationArguments args) {
+        IndexOperations indexOperations = mongoTemplate.indexOps(Filling.class);
+
+        for (IndexInfo indexInfo : indexOperations.getIndexInfo()) {
+            if (!indexInfo.isUnique()) {
+                continue;
+            }
+
+            String indexName = indexInfo.getName();
+            if (!INVALID_UNIQUE_INDEXES.contains(indexName)) {
+                continue;
+            }
+
+            log.warn("Dropping invalid unique Mongo index '{}' from fillings collection", indexName);
+            indexOperations.dropIndex(indexName);
+        }
+    }
+}

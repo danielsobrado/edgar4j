@@ -1,0 +1,53 @@
+# Test profile configuration
+spring:
+  main:
+    allow-bean-definition-overriding: true
+  datasource:
+    url: jdbc:h2:mem:edgar4jtest;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  batch:
+    job:
+      enabled: false
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    database-platform: org.hibernate.dialect.H2Dialect
+  data:
+    elasticsearch:
+      repositories:
+        enabled: false
+    mongodb:
+      database: edgar_test
+      auto-index-creation: true
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.elasticsearch.ElasticsearchDataAutoConfiguration
+      - org.springframework.boot.autoconfigure.elasticsearch.ElasticsearchRestClientAutoConfiguration
+
+edgar4j:
+  security:
+    enabled: false
+  urls:
+    baseSecUrl: https://www.sec.gov
+    baseDataSecUrl: https://data.sec.gov
+    companyTickersUrl: https://www.sec.gov/files/company_tickers.json
+  sec:
+    user-agent: Edgar4j-Test/1.0 (test@example.com)
+    rate-limit-per-second: 10
+  jobs:
+    ticker-sync:
+      enabled: false
+    filing-sync:
+      enabled: false
+    data-integrity:
+      enabled: false
+  elasticsearch:
+    startup:
+      enabled: false
+
+logging:
+  level:
+    org.jds.edgar4j: DEBUG
+    org.springframework.data.mongodb: WARN

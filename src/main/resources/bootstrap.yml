@@ -1,0 +1,7 @@
+# Bootstrap configuration - loaded before application.yml
+# Disables Spring Cloud Config client to prevent connection attempts to localhost:8888
+spring:
+  cloud:
+    config:
+      enabled: false
+      fail-fast: false

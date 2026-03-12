@@ -1,0 +1,43 @@
+{
+  "properties": {
+    "year": {
+      "type": "integer"
+    },
+    "quarter": {
+      "type": "integer"
+    },
+    "entries": {
+      "type": "nested",
+      "properties": {
+        "cik": {
+          "type": "keyword"
+        },
+        "companyName": {
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
+        },
+        "formType": {
+          "type": "keyword"
+        },
+        "dateFiled": {
+          "type": "date",
+          "format": "strict_date_optional_time||epoch_millis"
+        },
+        "fileName": {
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
+        }
+      }
+    }
+  }
+}

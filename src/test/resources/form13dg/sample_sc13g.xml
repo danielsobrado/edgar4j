@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<edgarSubmission>
+    <schemaVersion>1.0</schemaVersion>
+    <headerData>
+        <submissionType>SCHEDULE 13G</submissionType>
+        <filerInfo>
+            <filer>
+                <credentials>
+                    <cik>0002345678</cik>
+                    <ccc>XXXXXXXX</ccc>
+                </credentials>
+            </filer>
+        </filerInfo>
+    </headerData>
+    <formData>
+        <coverPage>
+            <issuerName>TECH INNOVATIONS INC</issuerName>
+            <issuerCik>0008765432</issuerCik>
+            <cusipNumber>880088009</cusipNumber>
+            <securityTitle>Class A Common Stock</securityTitle>
+            <dateOfEvent>2024-12-31</dateOfEvent>
+            <filedDate>2025-01-10</filedDate>
+            <isAmendment>false</isAmendment>
+        </coverPage>
+        <reportingPersonInfo>
+            <nameOfReportingPerson>VANGUARD GROUP INC</nameOfReportingPerson>
+            <reportingPersonCik>0002345678</reportingPersonCik>
+            <identificationOrResidence>
+                <citizenshipOrPlaceOfOrganization>Pennsylvania</citizenshipOrPlaceOfOrganization>
+            </identificationOrResidence>
+            <address>
+                <street1>100 Vanguard Blvd</street1>
+                <city>Malvern</city>
+                <stateOrCountry>PA</stateOrCountry>
+                <zipCode>19355</zipCode>
+            </address>
+            <typeOfReportingPerson>IA, IC</typeOfReportingPerson>
+            <ownershipInfo>
+                <soleVotingPower>0</soleVotingPower>
+                <sharedVotingPower>0</sharedVotingPower>
+                <soleDispositivePower>12500000</soleDispositivePower>
+                <sharedDispositivePower>500000</sharedDispositivePower>
+                <aggregateAmountBeneficiallyOwned>13000000</aggregateAmountBeneficiallyOwned>
+                <checkIfExcludesCertainShares>false</checkIfExcludesCertainShares>
+                <percentOfClass>9.8</percentOfClass>
+            </ownershipInfo>
+        </reportingPersonInfo>
+        <signatureBlock>
+            <signatureName>Jane Doe</signatureName>
+            <signatureTitle>General Counsel</signatureTitle>
+            <signatureDate>2025-01-10</signatureDate>
+        </signatureBlock>
+    </formData>
+</edgarSubmission>

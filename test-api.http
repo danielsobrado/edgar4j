@@ -1,0 +1,68 @@
+### Form 3 Controller Tests
+
+### Get Form3 filings by symbol AMPX
+GET http://localhost:8080/api/form3/symbol/ampx?page=0&size=20
+Content-Type: application/json
+
+###
+# Alternative: Get AMPX with different page size
+GET http://localhost:8080/api/form3/symbol/ampx?page=0&size=10
+Content-Type: application/json
+
+###
+# Get AMPX filings - page 1
+GET http://localhost:8080/api/form3/symbol/ampx?page=1&size=20
+Content-Type: application/json
+
+###
+# Get Form3 by specific ID
+GET http://localhost:8080/api/form3/:id
+Content-Type: application/json
+
+###
+# Get Form3 by accession number
+GET http://localhost:8080/api/form3/accession/0001193125-23-123456
+Content-Type: application/json
+
+###
+# Get Form3 by CIK
+GET http://localhost:8080/api/form3/cik/0000320193?page=0&size=20
+Content-Type: application/json
+
+###
+# Get recent Form3 filings
+GET http://localhost:8080/api/form3/recent?limit=10
+Content-Type: application/json
+
+###
+# Get Form3 by date range
+GET http://localhost:8080/api/form3/date-range?startDate=2023-01-01&endDate=2023-12-31&page=0&size=20
+Content-Type: application/json
+
+###
+# Save a new Form3 (POST)
+POST http://localhost:8080/api/form3
+Content-Type: application/json
+
+{
+  "accessionNumber": "0001193125-24-001234",
+  "documentType": "3",
+  "periodOfReport": "2024-02-19",
+  "filedDate": "2024-02-20",
+  "cik": "0001234567",
+  "issuerName": "Ampex Corporation",
+  "tradingSymbol": "AMPX",
+  "rptOwnerCik": "0001111111",
+  "rptOwnerName": "John Doe",
+  "officerTitle": "CEO",
+  "isDirector": true,
+  "isOfficer": true,
+  "isTenPercentOwner": false,
+  "isOther": false,
+  "ownerType": "Officer"
+}
+
+###
+# Delete Form3 by ID
+DELETE http://localhost:8080/api/form3/:id
+Content-Type: application/json

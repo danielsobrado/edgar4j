@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xbrli:xbrl
+    xmlns:xbrli="http://www.xbrl.org/2003/instance"
+    xmlns:dei="http://xbrl.sec.gov/dei/2024"
+    xmlns:us-gaap="http://fasb.org/us-gaap/2024"
+    xmlns:iso4217="http://www.xbrl.org/2003/iso4217"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+
+    <xbrli:context id="C1">
+        <xbrli:entity>
+            <xbrli:identifier scheme="http://www.sec.gov/CIK">0001234567</xbrli:identifier>
+        </xbrli:entity>
+        <xbrli:period>
+            <xbrli:endDate>2025-12-31</xbrli:endDate>
+        </xbrli:period>
+    </xbrli:context>
+
+    <xbrli:unit id="U1">
+        <xbrli:measure>iso4217:USD</xbrli:measure>
+    </xbrli:unit>
+
+    <dei:DocumentType contextRef="C1">20-F</dei:DocumentType>
+    <dei:EntityRegistrantName contextRef="C1">ACME FOREIGN LTD</dei:EntityRegistrantName>
+    <dei:EntityCentralIndexKey contextRef="C1">0001234567</dei:EntityCentralIndexKey>
+    <dei:TradingSymbol contextRef="C1">ACME</dei:TradingSymbol>
+    <dei:DocumentPeriodEndDate contextRef="C1">2025-12-31</dei:DocumentPeriodEndDate>
+    <dei:DocumentFiscalYearFocus contextRef="C1">2025</dei:DocumentFiscalYearFocus>
+    <dei:DocumentFiscalPeriodFocus contextRef="C1">FY</dei:DocumentFiscalPeriodFocus>
+    <dei:CurrentFiscalYearEndDate contextRef="C1">--12-31</dei:CurrentFiscalYearEndDate>
+    <dei:EntityCommonStockSharesOutstanding contextRef="C1" unitRef="U1" decimals="0">1000000</dei:EntityCommonStockSharesOutstanding>
+
+    <us-gaap:Assets contextRef="C1" unitRef="U1" decimals="0">5000000</us-gaap:Assets>
+    <us-gaap:Revenues contextRef="C1" unitRef="U1" decimals="0">7000000</us-gaap:Revenues>
+</xbrli:xbrl>
+

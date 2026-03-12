@@ -1,0 +1,63 @@
+package org.jds.edgar4j.model;
+
+import java.util.Date;
+import java.util.List;
+
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+import com.fasterxml.jackson.databind.PropertyNamingStrategies;
+import com.fasterxml.jackson.databind.annotation.JsonNaming;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
+
+
+/**
+ * @author J. Daniel Sobrado
+ * @version 1.0
+ * @since 2022-09-18
+ */
+@EqualsAndHashCode(callSuper=false)
+@Builder
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+@Document(collection = "submissions")
+public class Submissions {
+
+    @Id
+    private String id;
+
+    private String name;
+    private String companyName;
+
+    @Indexed(unique = true)
+    private String cik;
+    private String entityType;
+    private String sic;
+    private String sicDescription;
+    private boolean insiderTransactionForOwnerExists;
+    private boolean insiderTransactionForIssuerExists;
+    private List<String> tickers;
+    private List<String> exchanges;
+    private String ein;
+    private String description;
+    private String website;
+    private String investorWebsite;
+    private String category;
+    private Long fiscalYearEnd;
+    private String stateOfIncorporation;
+    private String stateOfIncorporationDescription;
+    private String fileName;
+    private Long fillingCount;
+    private Date fillingFrom;
+    private Date fillingTo;
+
+}
+
