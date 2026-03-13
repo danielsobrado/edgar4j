@@ -3,6 +3,7 @@ package org.jds.edgar4j.service.impl;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
@@ -74,7 +75,7 @@ class SettingsServiceImplTest {
     void getSettingsShouldRedactSecrets() {
         when(appSettingsRepository.findById("default")).thenReturn(Optional.of(AppSettings.builder()
                 .id("default")
-                .userAgent("Edgar4j/1.0 (ops@example.com)")
+                .userAgent("Edgar4j/1.0 (sec-ops@mycompany.com)")
                 .smtpPassword("smtp-secret")
                 .marketDataProvider("TIINGO")
                 .marketDataProviders(AppSettings.MarketDataProvidersSettings.builder()
@@ -93,8 +94,10 @@ class SettingsServiceImplTest {
         assertTrue(response.isSmtpPasswordConfigured());
         assertNull(response.getMarketDataApiKey());
         assertTrue(response.isMarketDataApiKeyConfigured());
+        assertEquals(SettingsResponse.ApiKeySource.STORED, response.getMarketDataApiKeySource());
         assertTrue(response.isMarketDataConfigured());
         assertTrue(response.getMarketDataProviders().getTiingo().isApiKeyConfigured());
+        assertEquals(SettingsResponse.ApiKeySource.STORED, response.getMarketDataProviders().getTiingo().getApiKeySource());
         assertTrue(response.getMarketDataProviders().getTiingo().isConfigured());
     }
 
@@ -103,7 +106,7 @@ class SettingsServiceImplTest {
     void updateSettingsShouldPreserveStoredSecrets() {
         AppSettings existingSettings = AppSettings.builder()
                 .id("default")
-                .userAgent("Edgar4j/1.0 (ops@example.com)")
+                .userAgent("Edgar4j/1.0 (sec-ops@mycompany.com)")
                 .emailNotifications(true)
                 .notificationEmailTo("alerts@example.com")
                 .notificationEmailFrom("noreply@example.com")
@@ -125,7 +128,7 @@ class SettingsServiceImplTest {
         when(appSettingsRepository.save(any(AppSettings.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         SettingsRequest request = SettingsRequest.builder()
-                .userAgent("Edgar4j/1.1 (ops@example.com)")
+                .userAgent("Edgar4j/1.1 (sec-ops@mycompany.com)")
                 .autoRefresh(true)
                 .refreshInterval(300)
                 .darkMode(false)
@@ -163,6 +166,111 @@ class SettingsServiceImplTest {
     }
 
     @Test
+    @DisplayName("updateSettings should preserve the stored SEC user agent when the request omits it")
+    void updateSettingsShouldPreserveStoredUserAgentWhenRequestOmitsIt() {
+        AppSettings existingSettings = AppSettings.builder()
+                .id("default")
+                .userAgent("My Company sec-ops@mycompany.com")
+                .marketDataProvider("NONE")
+                .build();
+        when(appSettingsRepository.findById("default")).thenReturn(Optional.of(existingSettings));
+        when(appSettingsRepository.save(any(AppSettings.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        SettingsRequest request = SettingsRequest.builder()
+                .autoRefresh(true)
+                .refreshInterval(300)
+                .darkMode(false)
+                .emailNotifications(false)
+                .smtpPort(587)
+                .smtpStartTlsEnabled(true)
+                .realtimeSyncEnabled(true)
+                .realtimeSyncForms("4")
+                .realtimeSyncLookbackHours(1)
+                .realtimeSyncMaxPages(10)
+                .realtimeSyncPageSize(100)
+                .build();
+
+        SettingsResponse response = settingsService.updateSettings(request);
+
+        assertEquals("My Company sec-ops@mycompany.com", response.getUserAgent());
+    }
+
+    @Test
+    @DisplayName("updateSettings should reject placeholder SEC user agents")
+    void updateSettingsShouldRejectPlaceholderSecUserAgents() {
+        when(appSettingsRepository.findById("default")).thenReturn(Optional.of(AppSettings.builder()
+                .id("default")
+                .userAgent("My Company sec-ops@mycompany.com")
+                .build()));
+
+        SettingsRequest request = SettingsRequest.builder()
+                .userAgent("Edgar4j/1.0 (contact@example.com)")
+                .autoRefresh(true)
+                .refreshInterval(300)
+                .darkMode(false)
+                .emailNotifications(false)
+                .smtpPort(587)
+                .smtpStartTlsEnabled(true)
+                .realtimeSyncEnabled(true)
+                .realtimeSyncForms("4")
+                .realtimeSyncLookbackHours(1)
+                .realtimeSyncMaxPages(10)
+                .realtimeSyncPageSize(100)
+                .build();
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> settingsService.updateSettings(request));
+
+        assertTrue(exception.getMessage().contains("real contact email"));
+    }
+
+    @Test
+    @DisplayName("updateSettings should preserve insider purchase defaults when the request omits them")
+    void updateSettingsShouldPreserveInsiderPurchaseDefaultsWhenRequestOmitsThem() {
+        AppSettings existingSettings = AppSettings.builder()
+                .id("default")
+                .userAgent("Edgar4j/1.0 (sec-ops@mycompany.com)")
+                .marketDataProvider("NONE")
+                .insiderPurchaseLookbackDays(90)
+                .insiderPurchaseMinMarketCap(1_500_000_000d)
+                .insiderPurchaseSp500Only(true)
+                .insiderPurchaseMinTransactionValue(250_000d)
+                .build();
+        when(appSettingsRepository.findById("default")).thenReturn(Optional.of(existingSettings));
+        when(appSettingsRepository.save(any(AppSettings.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        SettingsRequest request = SettingsRequest.builder()
+                .userAgent("Edgar4j/1.1 (sec-ops@mycompany.com)")
+                .autoRefresh(true)
+                .refreshInterval(300)
+                .darkMode(false)
+                .emailNotifications(false)
+                .smtpPort(587)
+                .smtpStartTlsEnabled(true)
+                .realtimeSyncEnabled(true)
+                .realtimeSyncForms("4")
+                .realtimeSyncLookbackHours(1)
+                .realtimeSyncMaxPages(10)
+                .realtimeSyncPageSize(100)
+                .build();
+
+        SettingsResponse response = settingsService.updateSettings(request);
+
+        ArgumentCaptor<AppSettings> savedCaptor = ArgumentCaptor.forClass(AppSettings.class);
+        verify(appSettingsRepository).save(savedCaptor.capture());
+
+        assertEquals(90, savedCaptor.getValue().getInsiderPurchaseLookbackDays());
+        assertEquals(1_500_000_000d, savedCaptor.getValue().getInsiderPurchaseMinMarketCap());
+        assertTrue(savedCaptor.getValue().isInsiderPurchaseSp500Only());
+        assertEquals(250_000d, savedCaptor.getValue().getInsiderPurchaseMinTransactionValue());
+        assertEquals(90, response.getInsiderPurchaseLookbackDays());
+        assertEquals(1_500_000_000d, response.getInsiderPurchaseMinMarketCap());
+        assertTrue(response.isInsiderPurchaseSp500Only());
+        assertEquals(250_000d, response.getInsiderPurchaseMinTransactionValue());
+    }
+
+    @Test
     @DisplayName("updateSettings should persist provider-specific credentials without overwriting other providers")
     void updateSettingsShouldPersistProviderSpecificCredentials() {
         AppSettings existingSettings = AppSettings.builder()
@@ -186,7 +294,7 @@ class SettingsServiceImplTest {
         when(appSettingsRepository.save(any(AppSettings.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         SettingsRequest request = SettingsRequest.builder()
-                .userAgent("Edgar4j/1.0 (ops@example.com)")
+                .userAgent("Edgar4j/1.0 (sec-ops@mycompany.com)")
                 .autoRefresh(true)
                 .refreshInterval(300)
                 .darkMode(false)
@@ -230,7 +338,7 @@ class SettingsServiceImplTest {
         when(appSettingsRepository.save(any(AppSettings.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         SettingsRequest request = SettingsRequest.builder()
-                .userAgent("Edgar4j/1.0 (ops@example.com)")
+                .userAgent("Edgar4j/1.0 (sec-ops@mycompany.com)")
                 .autoRefresh(true)
                 .refreshInterval(300)
                 .darkMode(false)
@@ -264,7 +372,7 @@ class SettingsServiceImplTest {
         when(appSettingsRepository.save(any(AppSettings.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         SettingsRequest request = SettingsRequest.builder()
-                .userAgent("Edgar4j/1.0 (ops@example.com)")
+                .userAgent("Edgar4j/1.0 (sec-ops@mycompany.com)")
                 .autoRefresh(true)
                 .refreshInterval(300)
                 .darkMode(false)
@@ -290,7 +398,9 @@ class SettingsServiceImplTest {
         assertEquals("FINNHUB", response.getMarketDataProvider());
         assertTrue(response.isMarketDataConfigured());
         assertTrue(response.isMarketDataApiKeyConfigured());
+        assertEquals(SettingsResponse.ApiKeySource.FALLBACK, response.getMarketDataApiKeySource());
         assertTrue(response.getMarketDataProviders().getFinnhub().isApiKeyConfigured());
+        assertEquals(SettingsResponse.ApiKeySource.FALLBACK, response.getMarketDataProviders().getFinnhub().getApiKeySource());
         assertTrue(response.getMarketDataProviders().getFinnhub().isConfigured());
     }
 
@@ -301,7 +411,7 @@ class SettingsServiceImplTest {
         when(appSettingsRepository.findById("default")).thenReturn(Optional.of(existingSettings));
 
         SettingsRequest request = SettingsRequest.builder()
-                .userAgent("Edgar4j/1.0 (ops@example.com)")
+                .userAgent("Edgar4j/1.0 (sec-ops@mycompany.com)")
                 .autoRefresh(true)
                 .refreshInterval(300)
                 .darkMode(false)
@@ -322,5 +432,25 @@ class SettingsServiceImplTest {
                 () -> settingsService.updateSettings(request));
 
         assertTrue(exception.getMessage().contains("HTTP or HTTPS"));
+    }
+
+    @Test
+    @DisplayName("getSettings should keep provider defaults in property config until market data settings are explicitly saved")
+    void getSettingsShouldKeepProviderDefaultsInPropertyConfigUntilExplicitlySaved() {
+        marketDataProviderProperties.getYahooFinance().setEnabled(false);
+        marketDataProviderProperties.getYahooFinance().setBaseUrl("https://custom.yahoo.example/chart");
+        when(appSettingsRepository.findById("default")).thenReturn(Optional.empty());
+        when(appSettingsRepository.save(any(AppSettings.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        SettingsResponse response = settingsService.getSettings();
+
+        ArgumentCaptor<AppSettings> savedCaptor = ArgumentCaptor.forClass(AppSettings.class);
+        verify(appSettingsRepository).save(savedCaptor.capture());
+
+        assertNull(savedCaptor.getValue().getMarketDataProvider());
+        assertNull(savedCaptor.getValue().getMarketDataBaseUrl());
+        assertNull(savedCaptor.getValue().getMarketDataProviders());
+        assertFalse(response.getMarketDataProviders().getYahooFinance().isEnabled());
+        assertEquals("https://custom.yahoo.example/chart", response.getMarketDataProviders().getYahooFinance().getBaseUrl());
     }
 }

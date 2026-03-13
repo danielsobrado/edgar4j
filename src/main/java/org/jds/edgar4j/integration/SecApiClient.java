@@ -128,11 +128,14 @@ public class SecApiClient {
             HttpRequest request = buildRequest(url);
             HttpResponse<InputStream> response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
 
-            validateResponse(response, url);
             String body = readBody(response);
+            validateResponse(response.statusCode(), url, body);
             downloadedResourceStore.writeText(CACHE_NAMESPACE, url, body, StandardCharsets.UTF_8);
             return body;
 
+        } catch (SecApiException e) {
+            log.warn("SEC request failed for {}: {}", url, e.getMessage());
+            throw e;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new SecApiException("Request interrupted", e);
@@ -173,8 +176,8 @@ public class SecApiClient {
             HttpRequest request = buildRequest(u);
             return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofInputStream())
                     .thenApply(response -> {
-                        validateResponse(response, u);
                         String body = readBody(response);
+                        validateResponse(response.statusCode(), u, body);
                         downloadedResourceStore.writeText(CACHE_NAMESPACE, u, body, StandardCharsets.UTF_8);
                         return body;
                     });
@@ -189,8 +192,12 @@ public class SecApiClient {
             HttpRequest request = buildRequest(url);
             HttpResponse<InputStream> response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
 
-            validateResponse(response, url);
-            return readBody(response);
+            String body = readBody(response);
+            validateResponse(response.statusCode(), url, body);
+            return body;
+        } catch (SecApiException e) {
+            log.warn("SEC request failed for {}: {}", url, e.getMessage());
+            throw e;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new SecApiException("Request interrupted", e);
@@ -208,18 +215,24 @@ public class SecApiClient {
                 .timeout(TIMEOUT)
                 .header("User-Agent", userAgent)
                 .header("Accept", "application/json, text/html, application/xml, text/plain")
+                .header("Accept-Encoding", "gzip, deflate")
                 .GET()
                 .build();
     }
 
-    private void validateResponse(HttpResponse<?> response, String url) {
-        int statusCode = response.statusCode();
-
+    private void validateResponse(int statusCode, String url, String body) {
         if (statusCode == 404) {
             throw new SecApiException("Resource not found: " + url);
-        } else if (statusCode == 429) {
+        }
+        if (statusCode == 429) {
             throw new SecApiException("Rate limit exceeded. Please try again later.");
-        } else if (statusCode >= 400) {
+        }
+        if (statusCode == 403 && SecAccessDiagnostics.isUndeclaredAutomationBlock(body)) {
+            throw new SecApiException(SecAccessDiagnostics.buildUndeclaredAutomationBlockMessage(
+                    url,
+                    SecAccessDiagnostics.extractReferenceId(body)));
+        }
+        if (statusCode >= 400) {
             throw new SecApiException("SEC API error: HTTP " + statusCode + " for URL: " + url);
         }
 

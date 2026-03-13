@@ -1,16 +1,23 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, TrendingUp, Building2, Clock, FileText, RefreshCw } from 'lucide-react';
-import { useDashboard } from '../hooks';
+import { Search, TrendingUp, Building2, Clock, FileText, RefreshCw, ArrowUpRight, ArrowDownRight, ShoppingCart } from 'lucide-react';
+import { useDashboard, useTopInsiderPurchases } from '../hooks';
 import { FormTypeBadge } from '../components/FormTypeBadge';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { ErrorMessage } from '../components/common/ErrorMessage';
 import { EmptyState } from '../components/common/EmptyState';
+import { buildForm4SearchUrl } from '../utils';
 
 export function Dashboard() {
   const navigate = useNavigate();
   const [quickSearch, setQuickSearch] = React.useState('');
   const { stats, recentSearches, recentFilings, loading, error, refresh } = useDashboard();
+  const {
+    purchases: topPurchases,
+    loading: topLoading,
+    error: topError,
+    refresh: refreshTopPurchases,
+  } = useTopInsiderPurchases(5);
 
   const buildQuickSearchUrl = (value: string) => {
     const trimmedValue = value.trim();
@@ -234,6 +241,78 @@ export function Dashboard() {
             </div>
           )}
         </div>
+      </div>
+
+      <div className="bg-white rounded-lg shadow-sm p-6">
+        <div className="mb-4 flex items-center gap-2">
+          <ShoppingCart className="w-5 h-5" />
+          <h3>Top Insider Purchases</h3>
+          <div className="ml-auto flex items-center gap-3">
+            <button
+              onClick={refreshTopPurchases}
+              className="p-1 hover:bg-gray-100 rounded"
+              title="Refresh insider purchases"
+            >
+              <RefreshCw className={`w-4 h-4 text-gray-400 ${topLoading ? 'animate-spin' : ''}`} />
+            </button>
+            <button
+              onClick={() => navigate('/insider-purchases')}
+              className="text-sm text-blue-600 hover:underline"
+            >
+              View All
+            </button>
+          </div>
+        </div>
+
+        {topError ? (
+          <ErrorMessage
+            title="Failed to load insider purchases"
+            message={topError}
+            onRetry={refreshTopPurchases}
+          />
+        ) : topLoading ? (
+          <LoadingSpinner size="md" className="py-8" />
+        ) : topPurchases.length === 0 ? (
+          <EmptyState
+            type="filings"
+            title="No recent insider purchases"
+            message="Insider purchase data will appear once Form 4 filings are synced."
+          />
+        ) : (
+          <div className="space-y-2">
+            {topPurchases.map((purchase, index) => (
+              <div
+                key={`${purchase.accessionNumber}-${index}`}
+                className="flex items-center justify-between gap-3 py-2 border-b border-gray-100 last:border-0"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <span
+                    className={`min-w-[72px] text-sm font-semibold flex items-center gap-0.5 ${
+                      (purchase.percentChange ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'
+                    }`}
+                  >
+                    {(purchase.percentChange ?? 0) >= 0 ? (
+                      <ArrowUpRight className="w-3.5 h-3.5" />
+                    ) : (
+                      <ArrowDownRight className="w-3.5 h-3.5" />
+                    )}
+                    {purchase.percentChange != null
+                      ? `${purchase.percentChange >= 0 ? '+' : ''}${purchase.percentChange.toFixed(1)}%`
+                      : '-'}
+                  </span>
+                  <button
+                    onClick={() => navigate(buildForm4SearchUrl({ ticker: purchase.ticker, cik: purchase.cik }))}
+                    className="truncate text-left text-sm text-blue-600 hover:underline"
+                    title={purchase.companyName ?? purchase.ticker}
+                  >
+                    {purchase.companyName ?? purchase.ticker}
+                  </button>
+                </div>
+                <span className="text-xs text-gray-500 font-mono whitespace-nowrap">{purchase.ticker}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -32,6 +32,10 @@ public class WebClientConfig {
             if (accept == null || accept.isBlank()) {
                 builder.header(HttpHeaders.ACCEPT, "application/json, text/html, application/xml");
             }
+            String acceptEncoding = request.headers().getFirst(HttpHeaders.ACCEPT_ENCODING);
+            if (acceptEncoding == null || acceptEncoding.isBlank()) {
+                builder.header(HttpHeaders.ACCEPT_ENCODING, "gzip, deflate");
+            }
             return next.exchange(builder.build());
         };
 

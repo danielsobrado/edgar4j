@@ -9,12 +9,19 @@ services:
       - SPRING_MONGODB_DATABASE=edgar
       - SPRING_DATA_MONGODB_AUTO_INDEX_CREATION=false
       - MONGODB_AUTO_INDEX_CREATION=false
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/edgar4j
+      - SPRING_DATASOURCE_USERNAME=edgar4j
+      - SPRING_DATASOURCE_PASSWORD=edgar4j
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_DATA_REDIS_PORT=6379
       - EDGAR4J_SECURITY_ENABLED=false
       - SPRING_ELASTICSEARCH_URIS=http://elasticsearch:9200
       - SPRING_DATA_ELASTICSEARCH_CLIENT_REACTIVE_ENDPOINTS=elasticsearch:9200
       - MANAGEMENT_HEALTH_ELASTICSEARCH_ENABLED=false
     depends_on:
       mongo:
+        condition: service_started
+      postgres:
         condition: service_started
       elasticsearch:
         condition: service_started
@@ -38,7 +45,7 @@ services:
       - "5173:5173"
     depends_on:
       edgar4j-app:
-        condition: service_started
+        condition: service_healthy
     restart: unless-stopped
 
   mongo:

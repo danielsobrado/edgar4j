@@ -8,7 +8,7 @@
  * In development, falls back to localhost. In production, requires explicit configuration.
  */
 export function getApiBaseUrl(): string {
-  const url = import.meta.env.VITE_API_URL;
+  const url = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL;
 
   if (!url) {
     if (import.meta.env.DEV) {

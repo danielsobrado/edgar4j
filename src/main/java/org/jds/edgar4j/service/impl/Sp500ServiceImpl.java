@@ -39,7 +39,8 @@ import lombok.extern.slf4j.Slf4j;
 public class Sp500ServiceImpl implements Sp500Service {
 
     private static final String WIKIPEDIA_SP500_URL = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies";
-    private static final String DEFAULT_USER_AGENT = "Edgar4j/1.0 (contact@example.com)";
+    private static final String DEFAULT_USER_AGENT =
+            "Mozilla/5.0 (compatible; Edgar4j/1.0; +https://github.com/jds/edgar4j)";
     private static final int CONNECT_TIMEOUT_MS = 15_000;
     private static final int MINIMUM_EXPECTED_COLUMNS = 7;
     private static final int TICKER_COLUMN = 0;

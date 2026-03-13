@@ -4,11 +4,11 @@ import java.util.List;
 
 import org.jds.edgar4j.dto.response.InsiderPurchaseResponse;
 import org.jds.edgar4j.dto.response.InsiderPurchaseSummary;
-import org.springframework.data.domain.Page;
+import org.jds.edgar4j.dto.response.PaginatedResponse;
 
 public interface InsiderPurchaseService {
 
-    Page<InsiderPurchaseResponse> getRecentInsiderPurchases(
+    PaginatedResponse<InsiderPurchaseResponse> getRecentInsiderPurchases(
             int lookbackDays,
             Double minMarketCap,
             boolean sp500Only,

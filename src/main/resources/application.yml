@@ -73,6 +73,8 @@ spring:
       pool:
         size: 5
 edgar4j:
+    sec:
+        user-agent: ${SEC_USER_AGENT:}
     urls:
         baseSecUrl: https://www.sec.gov
         baseDataSecUrl: https://data.sec.gov
@@ -152,7 +154,14 @@ management:
                 include: health,info,metrics,prometheus
     endpoint:
         health:
+            probes:
+                enabled: true
             show-details: when-authorized
+    health:
+        livenessstate:
+            enabled: true
+        readinessstate:
+            enabled: true
     metrics:
         export:
             prometheus:
@@ -161,8 +170,8 @@ management:
 # Logging
 logging:
     level:
-        org.jds.edgar4j: DEBUG
-        org.springframework.cache: DEBUG
-        org.springframework.web.client: DEBUG
+        org.jds.edgar4j: INFO
+        org.springframework.cache: WARN
+        org.springframework.web.client: WARN
     pattern:
         console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"

@@ -37,7 +37,7 @@ export function buildInsiderPurchasesQuery(filter: InsiderPurchaseFilter = {}): 
 export const insiderPurchasesApi = {
   getInsiderPurchases: (filter: InsiderPurchaseFilter = {}): Promise<PaginatedResponse<InsiderPurchase>> => {
     const query = buildInsiderPurchasesQuery(filter);
-    return apiClient.get<PaginatedResponse<InsiderPurchase>>(`/insider-purchases?${query}`);
+    return apiClient.get<PaginatedResponse<InsiderPurchase>>(`/insider-purchases${query ? `?${query}` : ''}`);
   },
 
   getTopInsiderPurchases: (limit: number = 10): Promise<InsiderPurchase[]> => {

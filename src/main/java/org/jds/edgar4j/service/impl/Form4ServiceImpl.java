@@ -15,9 +15,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.stream.Collectors;
 
+import org.jds.edgar4j.exception.SecApiException;
 import org.jds.edgar4j.integration.Form4Parser;
+import org.jds.edgar4j.integration.SecAccessDiagnostics;
 import org.jds.edgar4j.integration.SecApiClient;
 import org.jds.edgar4j.model.Company;
 import org.jds.edgar4j.model.Filling;
@@ -90,19 +93,22 @@ public class Form4ServiceImpl implements Form4Service {
                 .uri(URI.create(formUrl))
                 .header("User-Agent", settingsService.getUserAgent())
                 .header("Accept", "application/xml, text/xml, */*")
+                .header("Accept-Encoding", "gzip, deflate")
                 .GET()
                 .build();
 
         return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
-                    if (response.statusCode() == 200 && response.body() != null && !response.body().isBlank()) {
+                    String body = response.body();
+                    validateDownloadResponse(formUrl, response.statusCode(), body);
+                    if (body != null && !body.isBlank()) {
                         downloadedResourceStore.writeText(
                                 CACHE_NAMESPACE,
                                 formUrl,
-                                response.body(),
+                                body,
                                 java.nio.charset.StandardCharsets.UTF_8);
                     }
-                    return response.body();
+                    return body;
                 })
                 .whenComplete((body, error) -> {
                     if (error != null) {
@@ -138,8 +144,19 @@ public class Form4ServiceImpl implements Form4Service {
     public CompletableFuture<Form4> downloadAndParseForm4(String cik, String accessionNumber, String primaryDocument) {
         return downloadForm4(cik, accessionNumber, primaryDocument)
                 .thenApply(xml -> parseForm4(xml, accessionNumber))
-                .exceptionally(e -> {
-                    log.error("Error downloading/parsing Form 4: {}", accessionNumber, e);
+                .handle((form4, error) -> {
+                    if (error == null) {
+                        return form4;
+                    }
+
+                    Throwable cause = unwrap(error);
+                    if (SecAccessDiagnostics.isUndeclaredAutomationBlock(cause)) {
+                        throw cause instanceof RuntimeException runtimeException
+                                ? runtimeException
+                                : new CompletionException(cause);
+                    }
+
+                    log.error("Error downloading/parsing Form 4: {}", accessionNumber, cause);
                     return null;
                 });
     }
@@ -607,6 +624,13 @@ public class Form4ServiceImpl implements Form4Service {
                             count++;
                         }
                     } catch (Exception e) {
+                        if (SecAccessDiagnostics.isUndeclaredAutomationBlock(e)) {
+                            log.warn(
+                                    "SEC blocked Form 4 fallback requests while fetching {}. {}",
+                                    accessionNumber,
+                                    e.getMessage());
+                            break;
+                        }
                         log.warn("Failed to fetch Form 4: {} - {}", accessionNumber, e.getMessage());
                     }
                 }
@@ -692,6 +716,13 @@ public class Form4ServiceImpl implements Form4Service {
                     Thread.sleep(100);
                     
                 } catch (Exception e) {
+                    if (SecAccessDiagnostics.isUndeclaredAutomationBlock(e)) {
+                        log.warn(
+                                "SEC blocked recent Form 4 fallback requests while processing {}. {}",
+                                ticker,
+                                e.getMessage());
+                        break;
+                    }
                     log.debug("Error processing company {}: {}", ticker, e.getMessage());
                 }
             }
@@ -699,9 +730,38 @@ public class Form4ServiceImpl implements Form4Service {
             log.info("Fetched {} recent Form 4 filings from SEC API", form4List.size());
             
         } catch (Exception e) {
+            if (SecAccessDiagnostics.isUndeclaredAutomationBlock(e)) {
+                log.warn("SEC blocked recent Form 4 fallback requests. {}", e.getMessage());
+                return form4List;
+            }
             log.error("Error fetching recent filings from SEC API: {}", e.getMessage(), e);
         }
         
         return form4List;
+    }
+
+    private void validateDownloadResponse(String formUrl, int statusCode, String body) {
+        if (SecAccessDiagnostics.isUndeclaredAutomationBlock(body)) {
+            throw new SecApiException(SecAccessDiagnostics.buildUndeclaredAutomationBlockMessage(
+                    formUrl,
+                    SecAccessDiagnostics.extractReferenceId(body)));
+        }
+        if (statusCode == 404) {
+            throw new SecApiException("Form 4 resource not found: " + formUrl);
+        }
+        if (statusCode >= 400) {
+            throw new SecApiException("SEC Form 4 download failed with HTTP " + statusCode + " for URL: " + formUrl);
+        }
+        if (body == null || body.isBlank()) {
+            throw new SecApiException("SEC Form 4 response was empty for URL: " + formUrl);
+        }
+    }
+
+    private Throwable unwrap(Throwable throwable) {
+        Throwable current = throwable;
+        while (current instanceof CompletionException && current.getCause() != null) {
+            current = current.getCause();
+        }
+        return current;
     }
 }

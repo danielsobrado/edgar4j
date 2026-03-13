@@ -3,6 +3,8 @@ import {
   buildLegacySelectedMarketDataFields,
   buildMarketDataProvidersRequest,
   createMarketDataProviderFormState,
+  getMarketDataProviderDefinition,
+  getProviderSecretHint,
   normalizeMarketDataProvider,
 } from './marketDataSettings';
 
@@ -31,6 +33,7 @@ describe('marketDataSettings', () => {
           enabled: false,
           baseUrl: 'https://api.tiingo.com',
           apiKeyConfigured: true,
+          apiKeySource: 'STORED',
           configured: true,
         },
       },
@@ -39,8 +42,10 @@ describe('marketDataSettings', () => {
     expect(state.finnhub.enabled).toBe(true);
     expect(state.finnhub.baseUrl).toBe('https://finnhub.io/api/v1');
     expect(state.finnhub.apiKeyConfigured).toBe(true);
+    expect(state.finnhub.apiKeySource).toBe('UNKNOWN');
     expect(state.finnhub.configured).toBe(true);
     expect(state.tiingo.apiKeyConfigured).toBe(true);
+    expect(state.tiingo.apiKeySource).toBe('STORED');
   });
 
   it('builds provider request payloads without overwriting saved secrets when fields are blank', () => {
@@ -50,6 +55,7 @@ describe('marketDataSettings', () => {
         baseUrl: 'https://api.tiingo.com',
         apiKey: '',
         apiKeyConfigured: true,
+        apiKeySource: 'STORED',
         configured: true,
         clearApiKey: false,
       },
@@ -58,6 +64,7 @@ describe('marketDataSettings', () => {
         baseUrl: 'https://query1.finance.yahoo.com/v8/finance/chart',
         apiKey: '',
         apiKeyConfigured: false,
+        apiKeySource: 'NONE',
         configured: true,
         clearApiKey: false,
       },
@@ -66,6 +73,7 @@ describe('marketDataSettings', () => {
         baseUrl: 'https://finnhub.io/api/v1',
         apiKey: 'finnhub-secret',
         apiKeyConfigured: false,
+        apiKeySource: 'NONE',
         configured: false,
         clearApiKey: false,
       },
@@ -74,6 +82,7 @@ describe('marketDataSettings', () => {
         baseUrl: 'https://www.alphavantage.co/query',
         apiKey: '',
         apiKeyConfigured: false,
+        apiKeySource: 'NONE',
         configured: false,
         clearApiKey: true,
       },
@@ -94,5 +103,23 @@ describe('marketDataSettings', () => {
     expect(legacyFields.marketDataBaseUrl).toBe('https://finnhub.io/api/v1');
     expect(legacyFields.marketDataApiKey).toBe('new-key');
     expect(legacyFields.clearMarketDataApiKey).toBe(false);
+  });
+
+  it('explains when a provider key comes from fallback server configuration', () => {
+    const hint = getProviderSecretHint(
+      getMarketDataProviderDefinition('FINNHUB'),
+      {
+        enabled: true,
+        baseUrl: 'https://finnhub.io/api/v1',
+        apiKey: '',
+        apiKeyConfigured: true,
+        apiKeySource: 'FALLBACK',
+        configured: true,
+        clearApiKey: false,
+      },
+    );
+
+    expect(hint).toContain('server configuration');
+    expect(hint).toContain('will not remove');
   });
 });

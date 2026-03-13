@@ -40,7 +40,7 @@ public class SecurityConfig {
 
         return configured
                 .authorizeExchange(auth -> auth
-                        .pathMatchers("/actuator/health", "/actuator/info").permitAll()
+                        .pathMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
                         .pathMatchers("/api/**", "/actuator/**", "/swagger-ui/**", "/v3/api-docs/**").authenticated()
                         .anyExchange().permitAll()
                 )

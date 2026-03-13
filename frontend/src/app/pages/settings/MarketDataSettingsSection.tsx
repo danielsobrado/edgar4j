@@ -143,7 +143,7 @@ export function MarketDataSettingsSection({
                         })}
                         className="text-xs text-slate-600 hover:text-slate-900"
                       >
-                        {value.clearApiKey ? 'Undo clear' : 'Clear saved key'}
+                        {value.clearApiKey ? 'Undo clear' : 'Clear AppSettings key'}
                       </button>
                     </div>
                     <input

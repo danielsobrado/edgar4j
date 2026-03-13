@@ -35,10 +35,10 @@ public class SettingsRequest {
     @Builder.Default
     private Boolean clearMarketDataApiKey = Boolean.FALSE;
     // Insider Purchases Dashboard defaults
-    private int insiderPurchaseLookbackDays;
-    private double insiderPurchaseMinMarketCap;
-    private boolean insiderPurchaseSp500Only;
-    private double insiderPurchaseMinTransactionValue;
+    private Integer insiderPurchaseLookbackDays;
+    private Double insiderPurchaseMinMarketCap;
+    private Boolean insiderPurchaseSp500Only;
+    private Double insiderPurchaseMinTransactionValue;
 
     // Real-time Filing Sync
     private Boolean realtimeSyncEnabled;

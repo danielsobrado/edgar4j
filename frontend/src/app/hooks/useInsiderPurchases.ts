@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { insiderPurchasesApi } from '../api';
 import {
   InsiderPurchase,
@@ -30,8 +30,15 @@ export function useInsiderPurchases(initialFilter: InsiderPurchaseFilter = {}) {
     loading: true,
     error: null,
   });
+  const requestIdRef = useRef(0);
+  const mountedRef = useRef(true);
+
+  useEffect(() => () => {
+    mountedRef.current = false;
+  }, []);
 
   const fetchData = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
     setState((prev) => ({ ...prev, loading: true, error: null }));
 
     try {
@@ -40,6 +47,10 @@ export function useInsiderPurchases(initialFilter: InsiderPurchaseFilter = {}) {
         insiderPurchasesApi.getSummary(filter.lookbackDays ?? 30),
       ]);
 
+      if (!mountedRef.current || requestId !== requestIdRef.current) {
+        return;
+      }
+
       setState({
         purchases,
         summary,
@@ -47,6 +58,10 @@ export function useInsiderPurchases(initialFilter: InsiderPurchaseFilter = {}) {
         error: null,
       });
     } catch (error) {
+      if (!mountedRef.current || requestId !== requestIdRef.current) {
+        return;
+      }
+
       setState((prev) => ({
         ...prev,
         loading: false,
@@ -71,18 +86,33 @@ export function useTopInsiderPurchases(limit: number = 10) {
   const [purchases, setPurchases] = useState<InsiderPurchase[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const requestIdRef = useRef(0);
+  const mountedRef = useRef(true);
+
+  useEffect(() => () => {
+    mountedRef.current = false;
+  }, []);
 
   const fetchData = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
     setLoading(true);
     setError(null);
 
     try {
       const data = await insiderPurchasesApi.getTopInsiderPurchases(limit);
+      if (!mountedRef.current || requestId !== requestIdRef.current) {
+        return;
+      }
       setPurchases(data);
     } catch (err) {
+      if (!mountedRef.current || requestId !== requestIdRef.current) {
+        return;
+      }
       setError(err instanceof Error ? err.message : 'Failed to load top insider purchases');
     } finally {
-      setLoading(false);
+      if (mountedRef.current && requestId === requestIdRef.current) {
+        setLoading(false);
+      }
     }
   }, [limit]);
 

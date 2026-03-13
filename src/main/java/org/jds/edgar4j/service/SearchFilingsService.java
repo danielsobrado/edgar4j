@@ -1,17 +1,19 @@
 package org.jds.edgar4j.service;
 
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import java.util.List;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+
 import org.jds.edgar4j.client.EdgarFilingsClient;
+import org.jds.edgar4j.integration.SecUserAgentPolicy;
 import org.jds.edgar4j.model.search.FilingResult;
 import org.jds.edgar4j.model.search.FilingSearch;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.regex.Pattern;
-import java.util.List;
-import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
@@ -32,15 +34,9 @@ public class SearchFilingsService {
     }
 
     private void validateUserAgent(String userAgent) {
-        if (userAgent.isEmpty() || isInvalidUserAgent(userAgent)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Please provide a valid User Agent. Visit https://www.sec.gov/os/accessing-edgar-data for more information");
+        if (!SecUserAgentPolicy.isValid(userAgent)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, SecUserAgentPolicy.guidance());
         }
-    }
-
-    private boolean isInvalidUserAgent(String userAgent) {
-        // Matches a valid User-Agent string format
-        Pattern pattern = Pattern.compile("^[A-Za-z0-9\\-_.]+/[A-Za-z0-9\\-_.]+(\\s*\\([A-Za-z0-9\\-_.]+;\\s*[A-Za-z0-9\\-_.]+(;\\s*[A-Za-z0-9\\-_.]+)*\\))?$", Pattern.CASE_INSENSITIVE);
-        return !pattern.matcher(userAgent).matches();
     }
 
     private int countWordHits(String text, List<String> wordList) {

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { useForm13F, useRecentForm13F, useForm13FSearch } from './useForm13F';
 import { mockForm13F, mockForm13FList, mockForm13FPaginated } from '../../test/mocks/apiMocks';
 
@@ -89,7 +89,9 @@ describe('useForm13F', () => {
       });
 
       // Call refresh
-      result.current.refresh();
+      await act(async () => {
+        await result.current.refresh();
+      });
 
       await waitFor(() => {
         expect(form13fApi.getRecentFilings).toHaveBeenCalledTimes(2);
@@ -107,7 +109,9 @@ describe('useForm13F', () => {
       expect(result.current.filings).toEqual([]);
 
       // Trigger search
-      await result.current.searchByFilerName('Vanguard');
+      await act(async () => {
+        await result.current.searchByFilerName('Vanguard');
+      });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -123,7 +127,9 @@ describe('useForm13F', () => {
 
       const { result } = renderHook(() => useForm13FSearch());
 
-      await result.current.searchByCusip('037833100');
+      await act(async () => {
+        await result.current.searchByCusip('037833100');
+      });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -138,7 +144,9 @@ describe('useForm13F', () => {
 
       const { result } = renderHook(() => useForm13FSearch());
 
-      await result.current.searchByFilerName('Test');
+      await act(async () => {
+        await result.current.searchByFilerName('Test');
+      });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);

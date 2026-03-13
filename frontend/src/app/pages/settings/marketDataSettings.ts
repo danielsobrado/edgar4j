@@ -1,4 +1,5 @@
 import {
+  MarketDataApiKeySource,
   MarketDataProvider,
   MarketDataProviderRequest,
   MarketDataProvidersRequest,
@@ -26,6 +27,7 @@ export interface MarketDataProviderFormValue {
   baseUrl: string;
   apiKey: string;
   apiKeyConfigured: boolean;
+  apiKeySource: MarketDataApiKeySource;
   configured: boolean;
   clearApiKey: boolean;
 }
@@ -126,6 +128,12 @@ export function createMarketDataProviderFormState(settings?: Settings | null): M
       apiKeyConfigured: providerSettings?.apiKeyConfigured
         ?? (selected ? settings?.marketDataApiKeyConfigured : undefined)
         ?? false,
+      apiKeySource: providerSettings?.apiKeySource
+        ?? (selected ? settings?.marketDataApiKeySource : undefined)
+        ?? ((providerSettings?.apiKeyConfigured
+          ?? (selected ? settings?.marketDataApiKeyConfigured : undefined))
+          ? 'UNKNOWN'
+          : 'NONE'),
       configured: providerSettings?.configured
         ?? (selected ? settings?.marketDataConfigured : undefined)
         ?? false,
@@ -177,9 +185,12 @@ export function getProviderStatusLabel(
     return 'Disabled';
   }
   if (value.clearApiKey) {
-    return definition.requiresApiKey ? 'Key will be cleared' : 'Pending save';
+    return definition.requiresApiKey ? 'Key update pending' : 'Pending save';
   }
   if (value.configured) {
+    if (definition.requiresApiKey && value.apiKeySource === 'FALLBACK') {
+      return 'Ready via fallback';
+    }
     return 'Ready';
   }
   if (definition.requiresApiKey && !value.apiKeyConfigured && !value.apiKey) {
@@ -196,13 +207,22 @@ export function getProviderSecretHint(
     return 'No API key required.';
   }
   if (value.clearApiKey) {
+    if (value.apiKeySource === 'FALLBACK' || value.apiKeySource === 'UNKNOWN') {
+      return 'The AppSettings override will be removed when you save, but server-side fallback credentials may still keep this provider operational.';
+    }
     return 'The saved API key will be removed when you save settings.';
   }
   if (value.apiKey) {
     return 'A new API key will replace the saved credential when you save.';
   }
-  if (value.apiKeyConfigured) {
+  if (value.apiKeySource === 'STORED') {
     return 'A saved API key is already configured. Leave the field blank to keep it unchanged.';
+  }
+  if (value.apiKeySource === 'FALLBACK') {
+    return 'An API key is supplied by server configuration. Clearing AppSettings here will not remove that fallback credential.';
+  }
+  if (value.apiKeySource === 'UNKNOWN') {
+    return 'An API key is already configured. Leave the field blank to keep it unchanged.';
   }
   return 'Enter an API key to enable this provider.';
 }

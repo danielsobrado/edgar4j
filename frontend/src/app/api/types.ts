@@ -249,6 +249,7 @@ export interface Settings {
   marketDataBaseUrl?: string;
   marketDataApiKey?: string;
   marketDataApiKeyConfigured?: boolean;
+  marketDataApiKeySource?: MarketDataApiKeySource;
   marketDataConfigured?: boolean;
   marketDataProviders?: MarketDataProvidersSettings;
   // Insider Purchases Dashboard defaults
@@ -313,12 +314,14 @@ export interface SettingsRequest {
 }
 
 export type MarketDataProvider = 'NONE' | 'TIINGO' | 'YAHOOFINANCE' | 'FINNHUB' | 'ALPHAVANTAGE';
+export type MarketDataApiKeySource = 'NONE' | 'STORED' | 'FALLBACK' | 'UNKNOWN';
 
 export interface MarketDataProviderSettings {
   enabled: boolean;
   baseUrl?: string;
   apiKey?: string;
   apiKeyConfigured?: boolean;
+  apiKeySource?: MarketDataApiKeySource;
   configured?: boolean;
 }
 
@@ -832,13 +835,20 @@ export interface InsiderPurchaseSummary {
   negativeChangeCount: number;
 }
 
+export type InsiderPurchaseSortBy =
+  | 'percentChange'
+  | 'ticker'
+  | 'transactionDate'
+  | 'transactionValue'
+  | 'marketCap';
+
 export interface InsiderPurchaseFilter {
   lookbackDays?: number;
   minMarketCap?: number;
   sp500Only?: boolean;
   minTransactionValue?: number;
-  sortBy?: string;
-  sortDir?: string;
+  sortBy?: InsiderPurchaseSortBy;
+  sortDir?: 'asc' | 'desc';
   page?: number;
   size?: number;
 }

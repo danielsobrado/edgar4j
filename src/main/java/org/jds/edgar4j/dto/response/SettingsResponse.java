@@ -31,6 +31,7 @@ public class SettingsResponse {
     @ToString.Exclude
     private String marketDataApiKey;
     private boolean marketDataApiKeyConfigured;
+    private ApiKeySource marketDataApiKeySource;
     private boolean marketDataConfigured;
     private MarketDataProvidersResponse marketDataProviders;
     // Insider Purchases Dashboard defaults
@@ -82,6 +83,12 @@ public class SettingsResponse {
         private ProviderResponse alphaVantage;
     }
 
+    public enum ApiKeySource {
+        NONE,
+        STORED,
+        FALLBACK
+    }
+
     @Data
     @Builder
     @NoArgsConstructor
@@ -92,6 +99,7 @@ public class SettingsResponse {
         @ToString.Exclude
         private String apiKey;
         private boolean apiKeyConfigured;
+        private ApiKeySource apiKeySource;
         private boolean configured;
     }
 }

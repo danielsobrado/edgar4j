@@ -12,6 +12,17 @@ vi.mock('../api/endpoints/insiderPurchases', () => ({
 
 import { insiderPurchasesApi } from '../api/endpoints/insiderPurchases';
 
+function createDeferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+
+  return { promise, resolve, reject };
+}
+
 const mockPurchase = {
   ticker: 'ACME',
   companyName: 'Acme Corporation',
@@ -126,6 +137,67 @@ describe('useInsiderPurchases', () => {
 
     expect(result.current.error).toBe('Failed to load');
     expect(result.current.purchases).toBeNull();
+  });
+
+  it('ignores stale responses when filters change quickly', async () => {
+    const firstPurchases = createDeferred<typeof mockPaginatedPurchases>();
+    const firstSummary = createDeferred<typeof mockSummary>();
+    const secondPurchases = createDeferred<typeof mockPaginatedPurchases>();
+    const secondSummary = createDeferred<typeof mockSummary>();
+    const refreshedPurchases = {
+      ...mockPaginatedPurchases,
+      content: [{ ...mockPurchase, ticker: 'MSFT', companyName: 'Microsoft Corporation' }],
+    };
+    const refreshedSummary = {
+      ...mockSummary,
+      totalPurchases: 2,
+    };
+
+    vi.mocked(insiderPurchasesApi.getInsiderPurchases)
+      .mockReturnValueOnce(firstPurchases.promise)
+      .mockReturnValueOnce(secondPurchases.promise);
+    vi.mocked(insiderPurchasesApi.getSummary)
+      .mockReturnValueOnce(firstSummary.promise)
+      .mockReturnValueOnce(secondSummary.promise);
+
+    const { result } = renderHook(() => useInsiderPurchases());
+
+    await waitFor(() => {
+      expect(insiderPurchasesApi.getInsiderPurchases).toHaveBeenCalledTimes(1);
+    });
+
+    act(() => {
+      result.current.setFilter((prev) => ({
+        ...prev,
+        lookbackDays: 14,
+      }));
+    });
+
+    await waitFor(() => {
+      expect(insiderPurchasesApi.getInsiderPurchases).toHaveBeenCalledTimes(2);
+    });
+
+    await act(async () => {
+      secondPurchases.resolve(refreshedPurchases);
+      secondSummary.resolve(refreshedSummary);
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.purchases?.content[0].ticker).toBe('MSFT');
+    expect(result.current.summary?.totalPurchases).toBe(2);
+
+    await act(async () => {
+      firstPurchases.resolve(mockPaginatedPurchases);
+      firstSummary.resolve(mockSummary);
+      await Promise.resolve();
+    });
+
+    expect(result.current.purchases?.content[0].ticker).toBe('MSFT');
+    expect(result.current.summary?.totalPurchases).toBe(2);
   });
 });
 

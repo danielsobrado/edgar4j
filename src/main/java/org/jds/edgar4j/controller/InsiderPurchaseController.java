@@ -5,8 +5,8 @@ import java.util.List;
 import org.jds.edgar4j.dto.response.ApiResponse;
 import org.jds.edgar4j.dto.response.InsiderPurchaseResponse;
 import org.jds.edgar4j.dto.response.InsiderPurchaseSummary;
+import org.jds.edgar4j.dto.response.PaginatedResponse;
 import org.jds.edgar4j.service.InsiderPurchaseService;
-import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -38,7 +38,7 @@ public class InsiderPurchaseController {
                     description = "Insider purchases retrieved successfully")
     })
     @GetMapping
-    public ResponseEntity<ApiResponse<Page<InsiderPurchaseResponse>>> getInsiderPurchases(
+    public ResponseEntity<ApiResponse<PaginatedResponse<InsiderPurchaseResponse>>> getInsiderPurchases(
             @Parameter(description = "Days to look back")
             @RequestParam(defaultValue = "30") int lookbackDays,
             @Parameter(description = "Minimum market cap in USD")

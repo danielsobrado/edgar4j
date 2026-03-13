@@ -7,15 +7,17 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import java.time.LocalDateTime;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
+import org.jds.edgar4j.integration.SecAccessDiagnostics;
 import org.jds.edgar4j.integration.SecApiClient;
 import org.jds.edgar4j.model.AppSettings;
 import org.jds.edgar4j.model.Filling;
@@ -275,6 +277,30 @@ class RealtimeFilingSyncJobTest {
         assertEquals(0, job.getLastSyncTotalScanned());
     }
 
+    @Test
+    @DisplayName("syncRecentFilings should enter cooldown after an SEC automation block")
+    void syncRecentFilingsShouldEnterCooldownAfterSecAutomationBlock() {
+        when(appSettingsRepository.findById("default")).thenReturn(Optional.of(
+                AppSettings.builder()
+                        .realtimeSyncEnabled(Boolean.TRUE)
+                        .realtimeSyncForms("4")
+                        .realtimeSyncMaxPages(1)
+                        .realtimeSyncPageSize(10)
+                        .build()));
+        when(secApiClient.fetchEftsSearch(eq("4"), any(LocalDate.class), any(LocalDate.class), eq(0), eq(10)))
+                .thenThrow(new RuntimeException(SecAccessDiagnostics.buildUndeclaredAutomationBlockMessage(
+                        "https://efts.sec.gov/search",
+                        "ref-123")));
+
+        RealtimeFilingSyncJob job = createJob();
+
+        job.syncRecentFilings();
+        job.syncRecentFilings();
+
+        verify(secApiClient, times(1)).fetchEftsSearch(eq("4"), any(LocalDate.class), any(LocalDate.class), eq(0), eq(10));
+        assertFalse(job.isRunning());
+    }
+
     private RealtimeFilingSyncJob createJob() {
         RealtimeFilingSyncJob job = new RealtimeFilingSyncJob(
                 secApiClient,
@@ -295,6 +321,7 @@ class RealtimeFilingSyncJobTest {
         ReflectionTestUtils.setField(job, "lookbackHoursFallback", 1);
         ReflectionTestUtils.setField(job, "maxPagesFallback", 10);
         ReflectionTestUtils.setField(job, "pageSizeFallback", 100);
+        ReflectionTestUtils.setField(job, "secBlockCooldownMinutes", 10);
         return job;
     }
 }

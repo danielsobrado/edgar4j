@@ -26,7 +26,7 @@ public class AppSettings {
     private String id;
 
     @Builder.Default
-    private String userAgent = "Edgar4j/1.0 (contact@example.com)";
+    private String userAgent = "Edgar4j/1.0";
 
     @Builder.Default
     private boolean autoRefresh = true;
@@ -57,17 +57,14 @@ public class AppSettings {
     @Builder.Default
     private boolean smtpStartTlsEnabled = true;
 
-    @Builder.Default
-    private String marketDataProvider = "NONE";
+    private String marketDataProvider;
 
-    @Builder.Default
-    private String marketDataBaseUrl = "https://api.tiingo.com";
+    private String marketDataBaseUrl;
 
     @ToString.Exclude
     private String marketDataApiKey;
 
-    @Builder.Default
-    private MarketDataProvidersSettings marketDataProviders = MarketDataProvidersSettings.defaultSettings();
+    private MarketDataProvidersSettings marketDataProviders;
 
     // --- Insider Purchases Dashboard defaults ---
 

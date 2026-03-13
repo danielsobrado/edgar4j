@@ -6,6 +6,7 @@ import java.util.Locale;
 import org.jds.edgar4j.config.TiingoEnvProperties;
 import org.jds.edgar4j.dto.request.SettingsRequest;
 import org.jds.edgar4j.dto.response.SettingsResponse;
+import org.jds.edgar4j.integration.SecUserAgentPolicy;
 import org.jds.edgar4j.model.AppSettings;
 import org.jds.edgar4j.properties.MarketDataProviderProperties;
 import org.jds.edgar4j.repository.AppSettingsRepository;
@@ -63,16 +64,20 @@ public class SettingsServiceImpl implements SettingsService {
         AppSettings settings = getOrCreateDefaultSettings();
         log.info("Updating settings: {}", summarizeRequest(request));
 
-        String selectedMarketDataProvider = normalizeMarketDataProvider(request.getMarketDataProvider());
-        AppSettings.MarketDataProvidersSettings marketDataProviders = mergeMarketDataProviders(
-                request,
-                settings,
-                selectedMarketDataProvider);
+        String selectedMarketDataProvider = request.getMarketDataProvider() != null
+                ? normalizeMarketDataProvider(request.getMarketDataProvider())
+                : normalizeStoredMarketDataProvider(settings);
+        AppSettings.MarketDataProvidersSettings marketDataProviders = hasMarketDataSettingsUpdate(request)
+                ? mergeMarketDataProviders(
+                        request,
+                        settings,
+                        selectedMarketDataProvider)
+                : settings.getMarketDataProviders();
 
         validateEmailNotificationSettings(request, settings);
         validateMarketDataSettings(buildMarketDataPreview(settings, selectedMarketDataProvider, marketDataProviders));
 
-        settings.setUserAgent(request.getUserAgent());
+        settings.setUserAgent(resolveUserAgent(request.getUserAgent(), settings));
         settings.setAutoRefresh(request.isAutoRefresh());
         settings.setRefreshInterval(request.getRefreshInterval());
         settings.setDarkMode(request.isDarkMode());
@@ -90,11 +95,18 @@ public class SettingsServiceImpl implements SettingsService {
         settings.setMarketDataProvider(selectedMarketDataProvider);
         settings.setMarketDataProviders(marketDataProviders);
         syncLegacySelectedMarketDataFields(settings);
-        settings.setInsiderPurchaseLookbackDays(
-                request.getInsiderPurchaseLookbackDays() > 0 ? request.getInsiderPurchaseLookbackDays() : 30);
-        settings.setInsiderPurchaseMinMarketCap(request.getInsiderPurchaseMinMarketCap());
-        settings.setInsiderPurchaseSp500Only(request.isInsiderPurchaseSp500Only());
-        settings.setInsiderPurchaseMinTransactionValue(request.getInsiderPurchaseMinTransactionValue());
+        settings.setInsiderPurchaseLookbackDays(resolvePositiveInteger(
+                request.getInsiderPurchaseLookbackDays(),
+                resolveInsiderPurchaseLookbackDays(settings)));
+        settings.setInsiderPurchaseMinMarketCap(resolveNonNegativeDouble(
+                request.getInsiderPurchaseMinMarketCap(),
+                resolveInsiderPurchaseMinMarketCap(settings)));
+        settings.setInsiderPurchaseSp500Only(request.getInsiderPurchaseSp500Only() != null
+                ? request.getInsiderPurchaseSp500Only()
+                : resolveInsiderPurchaseSp500Only(settings));
+        settings.setInsiderPurchaseMinTransactionValue(resolveNonNegativeDouble(
+                request.getInsiderPurchaseMinTransactionValue(),
+                resolveInsiderPurchaseMinTransactionValue(settings)));
         settings.setRealtimeSyncEnabled(request.getRealtimeSyncEnabled() != null
                 ? request.getRealtimeSyncEnabled()
                 : resolveRealtimeSyncEnabled(settings));
@@ -116,7 +128,22 @@ public class SettingsServiceImpl implements SettingsService {
 
     @Override
     public String getUserAgent() {
-        return getOrCreateDefaultSettings().getUserAgent();
+        AppSettings settings = getOrCreateDefaultSettings();
+        String storedUserAgent = SecUserAgentPolicy.normalize(settings.getUserAgent());
+        if (SecUserAgentPolicy.isValid(storedUserAgent)) {
+            return storedUserAgent;
+        }
+
+        String fallbackUserAgent = SecUserAgentPolicy.normalize(configuredUserAgent);
+        if (SecUserAgentPolicy.isValid(fallbackUserAgent)) {
+            return fallbackUserAgent;
+        }
+
+        String effectiveUserAgent = storedUserAgent != null ? storedUserAgent : fallbackUserAgent;
+        if (effectiveUserAgent != null) {
+            log.warn("SEC user agent is not SEC-compliant. {}", SecUserAgentPolicy.guidance());
+        }
+        return effectiveUserAgent;
     }
 
     @Override
@@ -155,8 +182,12 @@ public class SettingsServiceImpl implements SettingsService {
                 .orElseGet(() -> {
                     AppSettings.AppSettingsBuilder builder = AppSettings.builder()
                             .id(DEFAULT_SETTINGS_ID);
-                    if (configuredUserAgent != null && !configuredUserAgent.isBlank()) {
-                        builder.userAgent(configuredUserAgent);
+                    String normalizedConfiguredUserAgent = SecUserAgentPolicy.normalize(configuredUserAgent);
+                    if (normalizedConfiguredUserAgent != null) {
+                        if (!SecUserAgentPolicy.isValid(normalizedConfiguredUserAgent)) {
+                            log.warn("Configured SEC user agent is not SEC-compliant. {}", SecUserAgentPolicy.guidance());
+                        }
+                        builder.userAgent(normalizedConfiguredUserAgent);
                     }
                     return appSettingsRepository.save(builder.build());
                 });
@@ -165,9 +196,10 @@ public class SettingsServiceImpl implements SettingsService {
     private SettingsResponse toSettingsResponse(AppSettings settings) {
         String selectedProvider = resolveSelectedMarketDataProvider(settings);
         MarketDataProviderSettingsResolver.ResolvedProviderConfig selectedConfig = resolveSelectedProviderConfig(settings);
+        SettingsResponse.ApiKeySource selectedApiKeySource = resolveApiKeySource(selectedProvider, settings);
 
         return SettingsResponse.builder()
-                .userAgent(settings.getUserAgent())
+                .userAgent(SecUserAgentPolicy.normalize(settings.getUserAgent()))
                 .autoRefresh(settings.isAutoRefresh())
                 .refreshInterval(settings.getRefreshInterval())
                 .darkMode(settings.isDarkMode())
@@ -184,13 +216,13 @@ public class SettingsServiceImpl implements SettingsService {
                 .marketDataBaseUrl(selectedConfig != null ? selectedConfig.baseUrl() : null)
                 .marketDataApiKey(null)
                 .marketDataApiKeyConfigured(selectedConfig != null && selectedConfig.apiKeyConfigured())
+                .marketDataApiKeySource(selectedApiKeySource)
                 .marketDataConfigured(selectedConfig != null && selectedConfig.operational())
                 .marketDataProviders(toMarketDataProvidersResponse(settings))
-                .insiderPurchaseLookbackDays(settings.getInsiderPurchaseLookbackDays() > 0
-                        ? settings.getInsiderPurchaseLookbackDays() : 30)
-                .insiderPurchaseMinMarketCap(settings.getInsiderPurchaseMinMarketCap())
-                .insiderPurchaseSp500Only(settings.isInsiderPurchaseSp500Only())
-                .insiderPurchaseMinTransactionValue(settings.getInsiderPurchaseMinTransactionValue())
+                .insiderPurchaseLookbackDays(resolveInsiderPurchaseLookbackDays(settings))
+                .insiderPurchaseMinMarketCap(resolveInsiderPurchaseMinMarketCap(settings))
+                .insiderPurchaseSp500Only(resolveInsiderPurchaseSp500Only(settings))
+                .insiderPurchaseMinTransactionValue(resolveInsiderPurchaseMinTransactionValue(settings))
                 .realtimeSyncEnabled(resolveRealtimeSyncEnabled(settings))
                 .realtimeSyncForms(resolveRealtimeSyncForms(settings))
                 .realtimeSyncLookbackHours(resolveRealtimeSyncLookbackHours(settings))
@@ -209,20 +241,22 @@ public class SettingsServiceImpl implements SettingsService {
 
     private SettingsResponse.MarketDataProvidersResponse toMarketDataProvidersResponse(AppSettings settings) {
         return SettingsResponse.MarketDataProvidersResponse.builder()
-                .tiingo(toProviderResponse(marketDataProviderSettingsResolver.resolve(MarketDataProviders.TIINGO, settings)))
-                .yahooFinance(toProviderResponse(marketDataProviderSettingsResolver.resolve(MarketDataProviders.YAHOO_FINANCE, settings)))
-                .finnhub(toProviderResponse(marketDataProviderSettingsResolver.resolve(MarketDataProviders.FINNHUB, settings)))
-                .alphaVantage(toProviderResponse(marketDataProviderSettingsResolver.resolve(MarketDataProviders.ALPHA_VANTAGE, settings)))
+                .tiingo(toProviderResponse(MarketDataProviders.TIINGO, settings))
+                .yahooFinance(toProviderResponse(MarketDataProviders.YAHOO_FINANCE, settings))
+                .finnhub(toProviderResponse(MarketDataProviders.FINNHUB, settings))
+                .alphaVantage(toProviderResponse(MarketDataProviders.ALPHA_VANTAGE, settings))
                 .build();
     }
 
-    private SettingsResponse.ProviderResponse toProviderResponse(
-            MarketDataProviderSettingsResolver.ResolvedProviderConfig providerConfig) {
+    private SettingsResponse.ProviderResponse toProviderResponse(String providerName, AppSettings settings) {
+        MarketDataProviderSettingsResolver.ResolvedProviderConfig providerConfig =
+                marketDataProviderSettingsResolver.resolve(providerName, settings);
         return SettingsResponse.ProviderResponse.builder()
                 .enabled(providerConfig.enabled())
                 .baseUrl(providerConfig.baseUrl())
                 .apiKey(null)
                 .apiKeyConfigured(providerConfig.apiKeyConfigured())
+                .apiKeySource(resolveApiKeySource(providerName, settings))
                 .configured(providerConfig.operational())
                 .build();
     }
@@ -418,6 +452,13 @@ public class SettingsServiceImpl implements SettingsService {
     }
 
     private void syncLegacySelectedMarketDataFields(AppSettings settings) {
+        String explicitSelectedProvider = normalizeStoredMarketDataProvider(settings);
+        if (explicitSelectedProvider == null || MarketDataProviders.NONE.equals(explicitSelectedProvider)) {
+            settings.setMarketDataBaseUrl(null);
+            settings.setMarketDataApiKey(null);
+            return;
+        }
+
         MarketDataProviderSettingsResolver.ResolvedProviderConfig selectedConfig = resolveSelectedProviderConfig(settings);
         if (selectedConfig == null) {
             settings.setMarketDataBaseUrl(null);
@@ -432,6 +473,11 @@ public class SettingsServiceImpl implements SettingsService {
 
     private String normalizeMarketDataProvider(String provider) {
         return MarketDataProviders.normalize(provider);
+    }
+
+    private String normalizeStoredMarketDataProvider(AppSettings settings) {
+        String storedProvider = settings != null ? trimToNull(settings.getMarketDataProvider()) : null;
+        return storedProvider != null ? normalizeMarketDataProvider(storedProvider) : null;
     }
 
     private String normalizeMarketDataBaseUrl(String provider, String baseUrl) {
@@ -486,6 +532,14 @@ public class SettingsServiceImpl implements SettingsService {
         return normalized.isBlank() ? DEFAULT_REALTIME_SYNC_FORMS : normalized;
     }
 
+    private String resolveUserAgent(String requestedUserAgent, AppSettings existingSettings) {
+        if (requestedUserAgent == null) {
+            return SecUserAgentPolicy.normalize(existingSettings.getUserAgent());
+        }
+
+        return SecUserAgentPolicy.normalizeAndValidate(requestedUserAgent);
+    }
+
     private String resolveSelectedMarketDataProvider(AppSettings settings) {
         return marketDataProviderSettingsResolver.resolveSelectedProvider(settings);
     }
@@ -530,6 +584,14 @@ public class SettingsServiceImpl implements SettingsService {
         return requestedValue > 0 ? requestedValue : fallbackValue;
     }
 
+    private double resolveNonNegativeDouble(Double requestedValue, double fallbackValue) {
+        if (requestedValue == null) {
+            return fallbackValue;
+        }
+
+        return requestedValue >= 0d ? requestedValue : fallbackValue;
+    }
+
     private String summarizeRequest(SettingsRequest request) {
         return String.format(
                 "userAgent=%s, emailNotifications=%s, marketDataProvider=%s, realtimeSyncEnabled=%s, realtimeSyncForms=%s",
@@ -538,6 +600,14 @@ public class SettingsServiceImpl implements SettingsService {
                 normalizeMarketDataProvider(request.getMarketDataProvider()),
                 request.getRealtimeSyncEnabled(),
                 trimToNull(request.getRealtimeSyncForms()));
+    }
+
+    private boolean hasMarketDataSettingsUpdate(SettingsRequest request) {
+        return request.getMarketDataProvider() != null
+                || request.getMarketDataBaseUrl() != null
+                || request.getMarketDataApiKey() != null
+                || Boolean.TRUE.equals(request.getClearMarketDataApiKey())
+                || request.getMarketDataProviders() != null;
     }
 
     private String resolveSecretValue(String requestedValue, String existingValue, Boolean clearSecret) {
@@ -578,6 +648,23 @@ public class SettingsServiceImpl implements SettingsService {
         return trimmed.replaceAll("/+$", "");
     }
 
+    private int resolveInsiderPurchaseLookbackDays(AppSettings settings) {
+        int value = settings.getInsiderPurchaseLookbackDays();
+        return value > 0 ? value : 30;
+    }
+
+    private double resolveInsiderPurchaseMinMarketCap(AppSettings settings) {
+        return Math.max(0d, settings.getInsiderPurchaseMinMarketCap());
+    }
+
+    private boolean resolveInsiderPurchaseSp500Only(AppSettings settings) {
+        return settings.isInsiderPurchaseSp500Only();
+    }
+
+    private double resolveInsiderPurchaseMinTransactionValue(AppSettings settings) {
+        return Math.max(0d, settings.getInsiderPurchaseMinTransactionValue());
+    }
+
     private String resolveLegacyStoredBaseUrl(String providerName, AppSettings settings, boolean providerSelectedInStoredSettings) {
         if (!providerSelectedInStoredSettings || settings == null) {
             return null;
@@ -616,6 +703,32 @@ public class SettingsServiceImpl implements SettingsService {
             case MarketDataProviders.ALPHA_VANTAGE -> settings.getMarketDataProviders().getAlphaVantage();
             default -> null;
         };
+    }
+
+    private SettingsResponse.ApiKeySource resolveApiKeySource(String providerName, AppSettings settings) {
+        if (providerName == null || MarketDataProviders.NONE.equals(providerName)) {
+            return SettingsResponse.ApiKeySource.NONE;
+        }
+        if (hasStoredProviderApiKey(providerName, settings)) {
+            return SettingsResponse.ApiKeySource.STORED;
+        }
+
+        MarketDataProviderSettingsResolver.ResolvedProviderConfig resolvedConfig =
+                marketDataProviderSettingsResolver.resolve(providerName, settings);
+        return resolvedConfig.apiKeyConfigured()
+                ? SettingsResponse.ApiKeySource.FALLBACK
+                : SettingsResponse.ApiKeySource.NONE;
+    }
+
+    private boolean hasStoredProviderApiKey(String providerName, AppSettings settings) {
+        AppSettings.ProviderSettings storedProviderSettings = getStoredProviderSettings(settings, providerName);
+        if (trimToNull(storedProviderSettings != null ? storedProviderSettings.getApiKey() : null) != null) {
+            return true;
+        }
+
+        boolean providerSelectedInStoredSettings = providerName.equals(normalizeMarketDataProvider(
+                settings != null ? settings.getMarketDataProvider() : null));
+        return trimToNull(resolveLegacyStoredApiKey(providerName, settings, providerSelectedInStoredSettings)) != null;
     }
 
     private String firstNonBlank(String... values) {

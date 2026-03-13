@@ -12,7 +12,7 @@ Most settings are configured via environment variables (with sane defaults for l
 
 ### SEC access
 
-- `SEC_USER_AGENT`: User-Agent sent to `sec.gov` / `data.sec.gov` (recommended to set to your app + contact info).
+- `SEC_USER_AGENT`: User-Agent sent to `sec.gov` / `data.sec.gov`. Use a real identifier plus a monitored contact email such as `Your Company Name sec-ops@your-company.com`. Do not use `example.com` or noreply addresses.
 - `edgar4j.sec.rate-limit-per-second` (env: `EDGAR4J_SEC_RATE_LIMIT_PER_SECOND` if you map it yourself): Max requests/sec enforced by the internal rate limiter (default `10`).
 
 ### Storage (daily index downloads)
@@ -113,6 +113,8 @@ docker compose ps
 - Frontend: `http://localhost:5173`
 - Backend API: `http://localhost:8080`
 - Health check: `http://localhost:8080/actuator/health`
+- Readiness check: `http://localhost:8080/actuator/health/readiness`
+- Liveness check: `http://localhost:8080/actuator/health/liveness`
 
 Useful Docker commands:
 
@@ -132,6 +134,10 @@ docker compose down
 # Stop and remove volumes (destructive)
 docker compose down -v
 ```
+
+## Staging Readiness
+
+Use [docs/staging-smoke-checklist.md](docs/staging-smoke-checklist.md) as the final pre-release and post-deploy smoke test guide.
 
 ## Submissions API
 

@@ -1,10 +1,12 @@
 package org.jds.edgar4j.service.insider;
 
 import org.jds.edgar4j.service.insider.impl.EdgarApiServiceImpl;
+import org.jds.edgar4j.service.SettingsService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -13,6 +15,8 @@ import java.time.LocalDate;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.when;
 
 /**
  * Unit tests for EdgarApiService implementation
@@ -25,11 +29,15 @@ import static org.junit.jupiter.api.Assertions.*;
 @ExtendWith(MockitoExtension.class)
 class EdgarApiServiceTest {
 
+    @Mock
+    private SettingsService settingsService;
+
     private EdgarApiServiceImpl edgarApiService;
 
     @BeforeEach
     void setUp() {
-        edgarApiService = new EdgarApiServiceImpl();
+        lenient().when(settingsService.getUserAgent()).thenReturn("My Company sec-ops@mycompany.com");
+        edgarApiService = new EdgarApiServiceImpl(settingsService);
         
         // Set test URLs using reflection to avoid Spring context for unit tests
         ReflectionTestUtils.setField(edgarApiService, "submissionsCIKUrl", "https://data.sec.gov/submissions/CIK");

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { useForm8K, useRecentForm8K, useForm8KSearch } from './useForm8K';
 import { mockForm8K, mockForm8KList, mockForm8KPaginated } from '../../test/mocks/apiMocks';
 
@@ -87,7 +87,9 @@ describe('useForm8K', () => {
         expect(result.current.loading).toBe(false);
       });
 
-      result.current.refresh();
+      await act(async () => {
+        await result.current.refresh();
+      });
 
       await waitFor(() => {
         expect(form8kApi.getRecentFilings).toHaveBeenCalledTimes(2);
@@ -101,7 +103,9 @@ describe('useForm8K', () => {
 
       const { result } = renderHook(() => useForm8KSearch());
 
-      await result.current.searchByCik('0001234567');
+      await act(async () => {
+        await result.current.searchByCik('0001234567');
+      });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -117,7 +121,9 @@ describe('useForm8K', () => {
 
       const { result } = renderHook(() => useForm8KSearch());
 
-      await result.current.searchBySymbol('AAPL');
+      await act(async () => {
+        await result.current.searchBySymbol('AAPL');
+      });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -132,7 +138,9 @@ describe('useForm8K', () => {
 
       const { result } = renderHook(() => useForm8KSearch());
 
-      await result.current.searchByDateRange('2024-01-01', '2024-12-31');
+      await act(async () => {
+        await result.current.searchByDateRange('2024-01-01', '2024-12-31');
+      });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -146,7 +154,9 @@ describe('useForm8K', () => {
 
       const { result } = renderHook(() => useForm8KSearch());
 
-      await result.current.searchByCik('test');
+      await act(async () => {
+        await result.current.searchByCik('test');
+      });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);

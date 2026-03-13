@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { useForm20F, useRecentForm20F, useForm20FSearch } from './useForm20F';
 import { mockForm20F, mockForm20FList, mockForm20FPaginated } from '../../test/mocks/apiMocks';
 
@@ -87,7 +87,9 @@ describe('useForm20F', () => {
         expect(result.current.loading).toBe(false);
       });
 
-      result.current.refresh();
+      await act(async () => {
+        await result.current.refresh();
+      });
 
       await waitFor(() => {
         expect(form20fApi.getRecentFilings).toHaveBeenCalledTimes(2);
@@ -101,7 +103,9 @@ describe('useForm20F', () => {
 
       const { result } = renderHook(() => useForm20FSearch());
 
-      await result.current.searchByCik('0001234567');
+      await act(async () => {
+        await result.current.searchByCik('0001234567');
+      });
 
       await waitFor(() => {
         expect(result.current.filings.length).toBeGreaterThan(0);
@@ -117,7 +121,9 @@ describe('useForm20F', () => {
 
       const { result } = renderHook(() => useForm20FSearch());
 
-      await result.current.searchBySymbol('FCRP');
+      await act(async () => {
+        await result.current.searchBySymbol('FCRP');
+      });
 
       await waitFor(() => {
         expect(result.current.filings.length).toBeGreaterThan(0);
@@ -132,7 +138,9 @@ describe('useForm20F', () => {
 
       const { result } = renderHook(() => useForm20FSearch());
 
-      await result.current.searchByDateRange('2024-01-01', '2024-12-31');
+      await act(async () => {
+        await result.current.searchByDateRange('2024-01-01', '2024-12-31');
+      });
 
       await waitFor(() => {
         expect(result.current.filings.length).toBeGreaterThan(0);
@@ -146,7 +154,9 @@ describe('useForm20F', () => {
 
       const { result } = renderHook(() => useForm20FSearch());
 
-      await result.current.searchByCik('test');
+      await act(async () => {
+        await result.current.searchByCik('test');
+      });
 
       await waitFor(() => {
         expect(result.current.error).not.toBeNull();

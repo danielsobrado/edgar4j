@@ -15,6 +15,7 @@ import java.util.Set;
 
 import org.jds.edgar4j.dto.response.InsiderPurchaseResponse;
 import org.jds.edgar4j.dto.response.InsiderPurchaseSummary;
+import org.jds.edgar4j.dto.response.PaginatedResponse;
 import org.jds.edgar4j.model.CompanyMarketData;
 import org.jds.edgar4j.model.Form4;
 import org.jds.edgar4j.model.Form4Transaction;
@@ -27,7 +28,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Page;
 
 @ExtendWith(MockitoExtension.class)
 class InsiderPurchaseServiceImplTest {
@@ -76,7 +76,7 @@ class InsiderPurchaseServiceImplTest {
                 .currentPrice(125d)
                 .marketCap(3_200_000_000_000d)
                 .build()));
-        Page<InsiderPurchaseResponse> result = insiderPurchaseService.getRecentInsiderPurchases(
+        PaginatedResponse<InsiderPurchaseResponse> result = insiderPurchaseService.getRecentInsiderPurchases(
                 30,
                 1_000_000_000d,
                 true,
@@ -218,7 +218,7 @@ class InsiderPurchaseServiceImplTest {
                 .marketCap(400_000_000_000d)
                 .build()));
 
-        Page<InsiderPurchaseResponse> result = insiderPurchaseService.getRecentInsiderPurchases(
+        PaginatedResponse<InsiderPurchaseResponse> result = insiderPurchaseService.getRecentInsiderPurchases(
                 30,
                 null,
                 false,

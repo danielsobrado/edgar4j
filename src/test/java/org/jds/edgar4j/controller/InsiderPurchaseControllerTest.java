@@ -81,6 +81,8 @@ class InsiderPurchaseControllerTest {
                     .jsonPath("$.data.content[0].ticker").isEqualTo("AAPL")
                     .jsonPath("$.data.content[0].sp500").isEqualTo(true)
                     .jsonPath("$.data.content[0].percentChange").value(closeTo(20d, 0.0001d))
+                    .jsonPath("$.data.page").isEqualTo(0)
+                    .jsonPath("$.data.hasNext").isEqualTo(false)
                     .jsonPath("$.data.totalElements").isEqualTo(1);
         }
     }

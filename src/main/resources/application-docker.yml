@@ -15,18 +15,30 @@ spring:
   cloud:
     config:
       enabled: false
-  #data:
-  #  mongodb:
-  #    uri: ${SPRING_DATA_MONGODB_URI:mongodb://admin:admin123@mongodb:27017/edgar?authSource=admin}
-  #    auto-index-creation: false
+  mongodb:
+    uri: ${SPRING_MONGODB_URI:${MONGO_URL:mongodb://mongo:27017/edgar}}
+    database: ${SPRING_MONGODB_DATABASE:${MONGODB_DATABASE:edgar}}
+    auto-index-creation: ${SPRING_DATA_MONGODB_AUTO_INDEX_CREATION:false}
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://postgres:5432/edgar4j}
+    username: ${SPRING_DATASOURCE_USERNAME:edgar4j}
+    password: ${SPRING_DATASOURCE_PASSWORD:edgar4j}
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:redis}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+      password: ${SPRING_DATA_REDIS_PASSWORD:}
+  elasticsearch:
+    repositories:
+      enabled: ${ELASTICSEARCH_REPOSITORIES_ENABLED:false}
 
 edgar4j:
   sec:
-    user-agent: ${SEC_USER_AGENT:Edgar4j/1.0 (contact@example.com)}
+    user-agent: ${SEC_USER_AGENT:}
   security:
     enabled: ${EDGAR4J_SECURITY_ENABLED:false}
-    username: ${EDGAR4J_SECURITY_USERNAME:admin}
-    password: ${EDGAR4J_SECURITY_PASSWORD:admin123}
+    username: ${EDGAR4J_SECURITY_USERNAME:}
+    password: ${EDGAR4J_SECURITY_PASSWORD:}
   jobs:
     sp500-sync:
       enabled: true
@@ -39,6 +51,18 @@ edgar4j:
     filing-sync:
       enabled: true
     data-integrity:
+      enabled: true
+
+management:
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
       enabled: true
 
 logging:

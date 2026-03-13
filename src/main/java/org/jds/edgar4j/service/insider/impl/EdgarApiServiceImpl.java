@@ -2,13 +2,6 @@ package org.jds.edgar4j.service.insider.impl;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.jds.edgar4j.properties.Edgar4JProperties;
-import org.jds.edgar4j.service.insider.EdgarApiService;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
-
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -22,6 +15,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
+import org.jds.edgar4j.service.SettingsService;
+import org.jds.edgar4j.service.insider.EdgarApiService;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
 /**
  * Implementation of EdgarApiService for SEC EDGAR API integration
  * 
@@ -34,10 +35,13 @@ import java.util.concurrent.CompletableFuture;
 @RequiredArgsConstructor
 public class EdgarApiServiceImpl implements EdgarApiService {
 
+    private static final String DEFAULT_USER_AGENT = "Edgar4J/1.0";
+
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final HttpClient httpClient = HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(30))
         .build();
+    private final SettingsService settingsService;
 
     @Value("${edgar4j.urls.submissionsCIKUrl}")
     private String submissionsCIKUrl;
@@ -48,7 +52,6 @@ public class EdgarApiServiceImpl implements EdgarApiService {
     @Value("${edgar4j.urls.companyTickersUrl}")
     private String companyTickersUrl;
 
-    private static final String USER_AGENT = "Edgar4J/1.0 (edgar4j@example.com)";
     private static final DecimalFormat CIK_FORMAT = new DecimalFormat("0000000000");
 
     @Override
@@ -62,8 +65,9 @@ public class EdgarApiServiceImpl implements EdgarApiService {
                 
                 HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
-                    .header("User-Agent", USER_AGENT)
+                    .header("User-Agent", resolveUserAgent())
                     .header("Accept", "application/json")
+                    .header("Accept-Encoding", "gzip, deflate")
                     .timeout(Duration.ofSeconds(30))
                     .build();
                 
@@ -98,8 +102,9 @@ public class EdgarApiServiceImpl implements EdgarApiService {
                 
                 HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
-                    .header("User-Agent", USER_AGENT)
+                    .header("User-Agent", resolveUserAgent())
                     .header("Accept", "application/xml, text/xml, */*")
+                    .header("Accept-Encoding", "gzip, deflate")
                     .timeout(Duration.ofSeconds(30))
                     .build();
                 
@@ -131,8 +136,9 @@ public class EdgarApiServiceImpl implements EdgarApiService {
                 
                 HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
-                    .header("User-Agent", USER_AGENT)
+                    .header("User-Agent", resolveUserAgent())
                     .header("Accept", "application/json")
+                    .header("Accept-Encoding", "gzip, deflate")
                     .timeout(Duration.ofSeconds(30))
                     .build();
                 
@@ -177,8 +183,9 @@ public class EdgarApiServiceImpl implements EdgarApiService {
             try {
                 HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(companyTickersUrl))
-                    .header("User-Agent", USER_AGENT)
+                    .header("User-Agent", resolveUserAgent())
                     .header("Accept", "application/json")
+                    .header("Accept-Encoding", "gzip, deflate")
                     .timeout(Duration.ofSeconds(30))
                     .build();
                 
@@ -409,8 +416,9 @@ public class EdgarApiServiceImpl implements EdgarApiService {
             
             HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
-                .header("User-Agent", USER_AGENT)
+                .header("User-Agent", resolveUserAgent())
                 .header("Accept", "text/plain")
+                .header("Accept-Encoding", "gzip, deflate")
                 .timeout(Duration.ofSeconds(30))
                 .build();
             
@@ -503,5 +511,17 @@ public class EdgarApiServiceImpl implements EdgarApiService {
             log.warn("Error extracting CIK from accession number: {}", accessionNumber);
         }
         return null;
+    }
+
+    private String resolveUserAgent() {
+        try {
+            String configuredUserAgent = settingsService.getUserAgent();
+            if (configuredUserAgent != null && !configuredUserAgent.isBlank()) {
+                return configuredUserAgent.trim();
+            }
+        } catch (Exception e) {
+            log.debug("Falling back to default user agent for insider SEC API client", e);
+        }
+        return DEFAULT_USER_AGENT;
     }
 }

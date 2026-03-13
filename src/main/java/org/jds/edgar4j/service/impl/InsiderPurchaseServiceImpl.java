@@ -16,6 +16,7 @@ import java.util.stream.Stream;
 import org.jds.edgar4j.config.AppConstants;
 import org.jds.edgar4j.dto.response.InsiderPurchaseResponse;
 import org.jds.edgar4j.dto.response.InsiderPurchaseSummary;
+import org.jds.edgar4j.dto.response.PaginatedResponse;
 import org.jds.edgar4j.model.CompanyMarketData;
 import org.jds.edgar4j.model.Form4;
 import org.jds.edgar4j.model.Form4Transaction;
@@ -23,9 +24,6 @@ import org.jds.edgar4j.repository.Form4Repository;
 import org.jds.edgar4j.service.CompanyMarketDataService;
 import org.jds.edgar4j.service.InsiderPurchaseService;
 import org.jds.edgar4j.service.Sp500Service;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import lombok.RequiredArgsConstructor;
@@ -46,7 +44,7 @@ public class InsiderPurchaseServiceImpl implements InsiderPurchaseService {
     private final Sp500Service sp500Service;
 
     @Override
-    public Page<InsiderPurchaseResponse> getRecentInsiderPurchases(
+    public PaginatedResponse<InsiderPurchaseResponse> getRecentInsiderPurchases(
             int lookbackDays,
             Double minMarketCap,
             boolean sp500Only,
@@ -80,9 +78,10 @@ public class InsiderPurchaseServiceImpl implements InsiderPurchaseService {
         int start = Math.min(sanitizedPage * sanitizedSize, responses.size());
         int end = Math.min(start + sanitizedSize, responses.size());
 
-        return new PageImpl<>(
+        return PaginatedResponse.of(
                 responses.subList(start, end),
-                PageRequest.of(sanitizedPage, sanitizedSize),
+                sanitizedPage,
+                sanitizedSize,
                 responses.size());
     }
 

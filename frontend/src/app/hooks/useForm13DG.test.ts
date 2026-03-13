@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { useForm13DG, useRecentForm13DG, useForm13DGSearch } from './useForm13DG';
 import { mockForm13DG, mockForm13DGList, mockForm13DGPaginated } from '../../test/mocks/apiMocks';
 
@@ -100,7 +100,9 @@ describe('useForm13DG', () => {
         expect(result.current.loading).toBe(false);
       });
 
-      result.current.refresh();
+      await act(async () => {
+        await result.current.refresh();
+      });
 
       await waitFor(() => {
         expect(form13dgApi.getRecentFilings).toHaveBeenCalledTimes(2);
@@ -114,7 +116,9 @@ describe('useForm13DG', () => {
 
       const { result } = renderHook(() => useForm13DGSearch());
 
-      await result.current.searchByFilerName('Carl Icahn');
+      await act(async () => {
+        await result.current.searchByFilerName('Carl Icahn');
+      });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -129,7 +133,9 @@ describe('useForm13DG', () => {
 
       const { result } = renderHook(() => useForm13DGSearch());
 
-      await result.current.searchByIssuerName('Apple');
+      await act(async () => {
+        await result.current.searchByIssuerName('Apple');
+      });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -142,7 +148,9 @@ describe('useForm13DG', () => {
 
       const { result } = renderHook(() => useForm13DGSearch());
 
-      await result.current.searchByScheduleType('13D');
+      await act(async () => {
+        await result.current.searchByScheduleType('13D');
+      });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -156,7 +164,9 @@ describe('useForm13DG', () => {
 
       const { result } = renderHook(() => useForm13DGSearch());
 
-      await result.current.getActivistFilings();
+      await act(async () => {
+        await result.current.getActivistFilings();
+      });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -170,7 +180,9 @@ describe('useForm13DG', () => {
 
       const { result } = renderHook(() => useForm13DGSearch());
 
-      await result.current.getAboveThreshold(10);
+      await act(async () => {
+        await result.current.getAboveThreshold(10);
+      });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -184,7 +196,9 @@ describe('useForm13DG', () => {
 
       const { result } = renderHook(() => useForm13DGSearch());
 
-      await result.current.searchByFilerName('Test');
+      await act(async () => {
+        await result.current.searchByFilerName('Test');
+      });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Database, Search, Building2, Download, Settings, LayoutDashboard, Radio, Briefcase, Users, FileText, UserPlus, FileCheck, Globe, FileBarChart, TrendingUp, ChevronDown, Bell } from 'lucide-react';
+import { Database, Search, Building2, Download, Settings, LayoutDashboard, Radio, Briefcase, Users, FileText, UserPlus, FileCheck, Globe, FileBarChart, TrendingUp, ChevronDown, Bell, ShoppingCart } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -9,6 +9,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   const primaryNavItems = [
     { path: '/', label: 'Dashboard', icon: LayoutDashboard },
+    { path: '/insider-purchases', label: 'Insider Buys', icon: ShoppingCart },
     { path: '/search', label: 'Search', icon: Search },
     { path: '/companies', label: 'Companies', icon: Building2 },
     { path: '/remote-edgar', label: 'Remote', icon: Radio },

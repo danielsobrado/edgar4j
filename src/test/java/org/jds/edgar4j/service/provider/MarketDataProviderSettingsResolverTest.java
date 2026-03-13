@@ -35,13 +35,23 @@ class MarketDataProviderSettingsResolverTest {
     }
 
     @Test
-    @DisplayName("resolveSelectedProvider should honor an explicit NONE selection even when Tiingo env credentials exist")
+    @DisplayName("resolveSelectedProvider should honor an explicit NONE selection")
     void resolveSelectedProviderShouldHonorExplicitNone() {
         String selectedProvider = resolver.resolveSelectedProvider(AppSettings.builder()
                 .marketDataProvider("NONE")
                 .build());
 
         assertEquals(MarketDataProviders.NONE, selectedProvider);
+    }
+
+    @Test
+    @DisplayName("resolveSelectedProvider should fall back to Tiingo when no explicit provider is stored")
+    void resolveSelectedProviderShouldFallbackToTiingoWhenNoExplicitProviderIsStored() {
+        when(tiingoEnvProperties.hasApiToken()).thenReturn(true);
+
+        String selectedProvider = resolver.resolveSelectedProvider(AppSettings.builder().build());
+
+        assertEquals(MarketDataProviders.TIINGO, selectedProvider);
     }
 
     @Test

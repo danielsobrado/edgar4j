@@ -74,6 +74,7 @@ public class DownloadDailyMasterService {
                 .uri(url)
                 .accept(MediaType.TEXT_PLAIN)
                 .header(HttpHeaders.USER_AGENT, userAgent)
+                .header(HttpHeaders.ACCEPT_ENCODING, "gzip, deflate")
                 .exchangeToMono(response -> response.statusCode().is2xxSuccessful()
                         ? response.bodyToMono(String.class)
                         : Mono.empty())

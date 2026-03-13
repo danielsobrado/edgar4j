@@ -1,5 +1,7 @@
 package org.jds.edgar4j.job;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -12,9 +14,11 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
+import org.jds.edgar4j.integration.SecAccessDiagnostics;
 import org.jds.edgar4j.integration.SecApiClient;
 import org.jds.edgar4j.integration.model.EftsSearchResponse;
 import org.jds.edgar4j.model.AppSettings;
@@ -76,6 +80,7 @@ public class RealtimeFilingSyncJob {
     private final AtomicBoolean isRunning = new AtomicBoolean(false);
     private final AtomicInteger lastSyncNewCount = new AtomicInteger(0);
     private final AtomicInteger lastSyncTotalScanned = new AtomicInteger(0);
+    private final AtomicReference<Instant> secBlockCooldownUntil = new AtomicReference<>();
 
     @Value("${edgar4j.jobs.realtime-filing-sync.enabled:true}")
     private boolean enabledFallback;
@@ -92,11 +97,20 @@ public class RealtimeFilingSyncJob {
     @Value("${edgar4j.jobs.realtime-filing-sync.page-size:100}")
     private int pageSizeFallback;
 
+    @Value("${edgar4j.jobs.realtime-filing-sync.sec-block-cooldown-minutes:10}")
+    private int secBlockCooldownMinutes;
+
     @Scheduled(cron = "${edgar4j.jobs.realtime-filing-sync.cron:0 */15 * * * *}")
     public void syncRecentFilings() {
         SyncConfig config = resolveSyncConfig();
         if (!config.enabled()) {
             log.debug("Realtime filing sync is disabled");
+            return;
+        }
+        if (isSecBlockCooldownActive()) {
+            log.warn(
+                    "Skipping realtime filing sync until {} because SEC blocked this environment as an undeclared automated tool",
+                    secBlockCooldownUntil.get());
             return;
         }
 
@@ -155,6 +169,9 @@ public class RealtimeFilingSyncJob {
                             newFilings++;
                         }
                     } catch (Exception e) {
+                        if (isSecAutomationBlock(e)) {
+                            throw e;
+                        }
                         log.debug("Failed to process filing {}: {}", accessionNumber, e.getMessage());
                     }
                 }
@@ -171,6 +188,14 @@ public class RealtimeFilingSyncJob {
                     totalScanned,
                     System.currentTimeMillis() - startTime);
         } catch (Exception e) {
+            if (isSecAutomationBlock(e)) {
+                Instant blockedUntil = activateSecBlockCooldown();
+                log.warn(
+                        "SEC blocked realtime filing sync as an undeclared automated tool. Cooling down until {}. {}",
+                        blockedUntil,
+                        summarizeException(e));
+                return;
+            }
             log.error("Error during realtime filing sync", e);
         } finally {
             isRunning.set(false);
@@ -299,6 +324,11 @@ public class RealtimeFilingSyncJob {
 
                 return names.isEmpty() ? FilingDirectory.EMPTY : new FilingDirectory(names);
             } catch (Exception e) {
+                if (isSecAutomationBlock(e)) {
+                    throw e instanceof RuntimeException runtimeException
+                            ? runtimeException
+                            : new IllegalStateException(e);
+                }
                 log.debug("Failed to load filing directory for {}: {}", accessionNumber, e.getMessage());
                 return FilingDirectory.EMPTY;
             }
@@ -570,6 +600,37 @@ public class RealtimeFilingSyncJob {
 
     private int resolvePositive(Integer value, int fallback) {
         return value != null && value > 0 ? value : fallback;
+    }
+
+    private boolean isSecBlockCooldownActive() {
+        Instant blockedUntil = secBlockCooldownUntil.get();
+        if (blockedUntil == null) {
+            return false;
+        }
+        if (Instant.now().isBefore(blockedUntil)) {
+            return true;
+        }
+        secBlockCooldownUntil.compareAndSet(blockedUntil, null);
+        return false;
+    }
+
+    private Instant activateSecBlockCooldown() {
+        int cooldownMinutes = secBlockCooldownMinutes > 0 ? secBlockCooldownMinutes : 10;
+        Instant blockedUntil = Instant.now().plus(Duration.ofMinutes(cooldownMinutes));
+        secBlockCooldownUntil.set(blockedUntil);
+        return blockedUntil;
+    }
+
+    private boolean isSecAutomationBlock(Throwable throwable) {
+        return SecAccessDiagnostics.isUndeclaredAutomationBlock(throwable);
+    }
+
+    private String summarizeException(Throwable throwable) {
+        Throwable current = throwable;
+        while (current.getCause() != null) {
+            current = current.getCause();
+        }
+        return current.getMessage() != null ? current.getMessage() : throwable.toString();
     }
 
     LocalDateTime currentDateTime() {
