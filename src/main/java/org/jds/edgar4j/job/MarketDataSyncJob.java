@@ -5,10 +5,12 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.jds.edgar4j.model.Form4;
+import org.jds.edgar4j.model.Form4Transaction;
 import org.jds.edgar4j.repository.Form4Repository;
 import org.jds.edgar4j.service.CompanyMarketDataService;
 import org.jds.edgar4j.service.Sp500Service;
@@ -53,11 +55,7 @@ public class MarketDataSyncJob {
 
             Set<String> sp500Tickers = new LinkedHashSet<>(sp500Service.getAllTickers());
             LocalDate since = LocalDate.now().minusDays(30);
-            Set<String> insiderTickers = form4Repository.findByTransactionDateBetween(since, LocalDate.now()).stream()
-                    .map(Form4::getTradingSymbol)
-                    .map(this::normalizeTicker)
-                    .filter(java.util.Objects::nonNull)
-                    .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+            Set<String> insiderTickers = loadRecentInsiderTickers(since);
 
             Set<String> allTickers = new LinkedHashSet<>(sp500Tickers);
             allTickers.addAll(insiderTickers);
@@ -104,5 +102,34 @@ public class MarketDataSyncJob {
 
         String normalized = ticker.trim().replace('.', '-').toUpperCase(java.util.Locale.ROOT);
         return normalized.isBlank() ? null : normalized;
+    }
+
+    private Set<String> loadRecentInsiderTickers(LocalDate since) {
+        return form4Repository.findRecentAcquisitions(since).stream()
+                .filter(Objects::nonNull)
+                .filter(form4 -> hasRecentPurchaseActivity(form4, since))
+                .map(Form4::getTradingSymbol)
+                .map(this::normalizeTicker)
+                .filter(Objects::nonNull)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private boolean hasRecentPurchaseActivity(Form4 form4, LocalDate since) {
+        if (form4.getTransactions() == null || form4.getTransactions().isEmpty()) {
+            return "A".equalsIgnoreCase(form4.getAcquiredDisposedCode())
+                    && form4.getTransactionDate() != null
+                    && !form4.getTransactionDate().isBefore(since);
+        }
+
+        return form4.getTransactions().stream()
+                .filter(Objects::nonNull)
+                .anyMatch(transaction -> isRecentOpenMarketPurchase(transaction, since));
+    }
+
+    private boolean isRecentOpenMarketPurchase(Form4Transaction transaction, LocalDate since) {
+        return "P".equalsIgnoreCase(transaction.getTransactionCode())
+                && "A".equalsIgnoreCase(transaction.getAcquiredDisposedCode())
+                && transaction.getTransactionDate() != null
+                && !transaction.getTransactionDate().isBefore(since);
     }
 }

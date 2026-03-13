@@ -12,6 +12,7 @@ import org.springframework.security.core.userdetails.User;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.core.userdetails.ReactiveUserDetailsService;
+import org.springframework.security.web.server.context.NoOpServerSecurityContextRepository;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 
 @Configuration
@@ -28,6 +29,7 @@ public class SecurityConfig {
     public SecurityWebFilterChain filterChain(ServerHttpSecurity http) {
         ServerHttpSecurity configured = http
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
+                .securityContextRepository(NoOpServerSecurityContextRepository.getInstance())
                 .cors(Customizer.withDefaults());
 
         if (!securityProperties.isEnabled()) {
@@ -39,7 +41,7 @@ public class SecurityConfig {
         return configured
                 .authorizeExchange(auth -> auth
                         .pathMatchers("/actuator/health", "/actuator/info").permitAll()
-                        .pathMatchers("/api/**", "/actuator/**").authenticated()
+                        .pathMatchers("/api/**", "/actuator/**", "/swagger-ui/**", "/v3/api-docs/**").authenticated()
                         .anyExchange().permitAll()
                 )
                 .httpBasic(Customizer.withDefaults())

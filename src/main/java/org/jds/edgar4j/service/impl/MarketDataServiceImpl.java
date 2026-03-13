@@ -38,6 +38,9 @@ import org.jds.edgar4j.model.AppSettings;
 import org.jds.edgar4j.repository.AppSettingsRepository;
 import org.jds.edgar4j.service.MarketDataService;
 import org.jds.edgar4j.service.SettingsService;
+import org.jds.edgar4j.service.provider.MarketDataProvider;
+import org.jds.edgar4j.service.provider.MarketDataProviderSettingsResolver;
+import org.jds.edgar4j.service.provider.MarketDataProviders;
 import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -52,8 +55,6 @@ import lombok.extern.slf4j.Slf4j;
 public class MarketDataServiceImpl implements MarketDataService {
 
     private static final String DEFAULT_SETTINGS_ID = "default";
-    private static final String DEFAULT_PROVIDER = "NONE";
-    private static final String TIINGO_PROVIDER = "TIINGO";
     private static final String DEFAULT_TIINGO_BASE_URL = "https://api.tiingo.com";
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ISO_LOCAL_DATE;
     private static final Duration TIINGO_TIMEOUT = Duration.ofSeconds(30);
@@ -62,6 +63,8 @@ public class MarketDataServiceImpl implements MarketDataService {
     private final SettingsService settingsService;
     private final ObjectMapper objectMapper;
     private final TiingoEnvProperties tiingoEnvProperties;
+    private final org.jds.edgar4j.service.provider.MarketDataService providerMarketDataService;
+    private final MarketDataProviderSettingsResolver marketDataProviderSettingsResolver;
 
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(TIINGO_TIMEOUT)
@@ -77,12 +80,16 @@ public class MarketDataServiceImpl implements MarketDataService {
 
         AppSettings settings = getSettings();
         String provider = resolveProvider(settings);
-        if (DEFAULT_PROVIDER.equals(provider)) {
+        if (MarketDataProviders.NONE.equals(provider)) {
             throw new IllegalStateException("Market data is disabled. Configure Tiingo in Settings to show price charts.");
         }
-        if (!TIINGO_PROVIDER.equals(provider)) {
+        if (MarketDataProviders.isProviderServiceProvider(provider)) {
+            return getProviderBackedDailyPrices(normalizedTicker, startDate, endDate, provider);
+        }
+        if (!MarketDataProviders.TIINGO.equals(provider)) {
             throw new IllegalArgumentException("Unsupported market data provider: " + provider);
         }
+
         String apiKey = resolveApiKey(settings);
         if (apiKey == null) {
             throw new IllegalStateException("Tiingo API key is missing. Configure it in Settings to show price charts.");
@@ -122,6 +129,30 @@ public class MarketDataServiceImpl implements MarketDataService {
                 .build();
     }
 
+    private MarketDataResponse getProviderBackedDailyPrices(
+            String ticker,
+            LocalDate startDate,
+            LocalDate endDate,
+            String provider) {
+        List<MarketDataProvider.StockPrice> prices = providerMarketDataService
+                .getHistoricalPrices(ticker, startDate, endDate, provider)
+                .join();
+
+        List<MarketDataResponse.PriceBar> priceBars = prices.stream()
+                .filter(price -> price.getDate() != null)
+                .sorted(Comparator.comparing(MarketDataProvider.StockPrice::getDate))
+                .map(this::toPriceBar)
+                .toList();
+
+        return MarketDataResponse.builder()
+                .ticker(ticker)
+                .provider(provider)
+                .startDate(startDate)
+                .endDate(endDate)
+                .prices(priceBars)
+                .build();
+    }
+
     private AppSettings getSettings() {
         return appSettingsRepository.findById(DEFAULT_SETTINGS_ID)
                 .orElseGet(() -> AppSettings.builder().id(DEFAULT_SETTINGS_ID).build());
@@ -133,13 +164,6 @@ public class MarketDataServiceImpl implements MarketDataService {
             throw new IllegalArgumentException("Ticker is required");
         }
         return normalized;
-    }
-
-    private String normalizeProvider(String provider) {
-        if (provider == null || provider.isBlank()) {
-            return DEFAULT_PROVIDER;
-        }
-        return provider.trim().toUpperCase(Locale.ROOT);
     }
 
     private String normalizeBaseUrl(String baseUrl) {
@@ -165,42 +189,37 @@ public class MarketDataServiceImpl implements MarketDataService {
     }
 
     private String resolveProvider(AppSettings settings) {
-        String provider = normalizeProvider(settings.getMarketDataProvider());
-        if (DEFAULT_PROVIDER.equals(provider) && tiingoEnvProperties.hasApiToken()) {
-            return TIINGO_PROVIDER;
-        }
-        return provider;
+        return marketDataProviderSettingsResolver.resolveSelectedProvider(settings);
     }
 
     private String resolveApiKey(AppSettings settings) {
-        String explicitKey = normalizeToken(settings.getMarketDataApiKey());
-        if (explicitKey != null) {
-            return explicitKey;
-        }
-        return tiingoEnvProperties.getApiToken().orElse(null);
+        return marketDataProviderSettingsResolver.resolve(MarketDataProviders.TIINGO, settings).apiKey();
     }
 
     private String resolveBaseUrl(AppSettings settings) {
-        String explicitBaseUrl = normalizeToken(settings.getMarketDataBaseUrl());
-        if (explicitBaseUrl != null) {
-            String normalizedExplicitBaseUrl = normalizeBaseUrl(explicitBaseUrl);
-            if (!DEFAULT_TIINGO_BASE_URL.equals(normalizedExplicitBaseUrl)) {
-                return normalizedExplicitBaseUrl;
-            }
-        }
-
-        return tiingoEnvProperties.getBaseUrl()
-                .map(this::normalizeBaseUrl)
-                .orElseGet(() -> normalizeBaseUrl(explicitBaseUrl));
+        return normalizeBaseUrl(marketDataProviderSettingsResolver.resolve(MarketDataProviders.TIINGO, settings).baseUrl());
     }
 
-    private String normalizeToken(String token) {
-        if (token == null) {
-            return null;
-        }
+    private MarketDataResponse.PriceBar toPriceBar(MarketDataProvider.StockPrice stockPrice) {
+        return MarketDataResponse.PriceBar.builder()
+                .date(stockPrice.getDate())
+                .open(firstNonZero(stockPrice.getOpen(), stockPrice.getPrice()))
+                .high(firstNonZero(stockPrice.getHigh(), stockPrice.getPrice()))
+                .low(firstNonZero(stockPrice.getLow(), stockPrice.getPrice()))
+                .close(firstNonZero(stockPrice.getClose(), stockPrice.getPrice()))
+                .volume(stockPrice.getVolume() != null ? stockPrice.getVolume().doubleValue() : 0d)
+                .build();
+    }
 
-        String trimmed = token.trim();
-        return trimmed.isEmpty() ? null : trimmed;
+    private double firstNonZero(java.math.BigDecimal primaryValue, java.math.BigDecimal fallbackValue) {
+        if (primaryValue != null) {
+            return primaryValue.doubleValue();
+        }
+        return valueOrZero(fallbackValue);
+    }
+
+    private double valueOrZero(java.math.BigDecimal value) {
+        return value != null ? value.doubleValue() : 0d;
     }
 
     private List<MarketDataResponse.PriceBar> downloadTiingoPrices(

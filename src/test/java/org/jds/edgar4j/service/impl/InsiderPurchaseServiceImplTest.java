@@ -201,6 +201,39 @@ class InsiderPurchaseServiceImplTest {
         assertEquals(250f, response.getTransactionValue());
     }
 
+    @Test
+    @DisplayName("getRecentInsiderPurchases should include only qualifying transactions within the requested lookback")
+    void getRecentInsiderPurchasesShouldFilterNestedTransactionsByDate() {
+        Form4 mixedDateForm = createForm4("0009999999-26-000009", "NFLX", "Netflix", "Officer", "Ivy Insider");
+        mixedDateForm.setTransactionDate(LocalDate.now().minusDays(2));
+        mixedDateForm.setTransactions(List.of(
+                createTransaction("P", "A", 10f, 30f, LocalDate.now().minusDays(40)),
+                createTransaction("P", "A", 5f, 35f, LocalDate.now().minusDays(2))));
+
+        when(form4Repository.findRecentAcquisitions(any(LocalDate.class))).thenReturn(List.of(mixedDateForm));
+        when(sp500Service.getAllTickers()).thenReturn(Set.of());
+        when(companyMarketDataService.getMarketData("NFLX")).thenReturn(Optional.of(CompanyMarketData.builder()
+                .ticker("NFLX")
+                .currentPrice(40d)
+                .marketCap(400_000_000_000d)
+                .build()));
+
+        Page<InsiderPurchaseResponse> result = insiderPurchaseService.getRecentInsiderPurchases(
+                30,
+                null,
+                false,
+                null,
+                "transactionDate",
+                "desc",
+                0,
+                10);
+
+        assertEquals(1, result.getTotalElements());
+        InsiderPurchaseResponse response = result.getContent().get(0);
+        assertEquals(LocalDate.now().minusDays(2), response.getTransactionDate());
+        assertEquals(175f, response.getTransactionValue());
+    }
+
     private Form4 createForm4(
             String accessionNumber,
             String ticker,

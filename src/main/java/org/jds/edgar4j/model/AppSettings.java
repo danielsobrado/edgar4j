@@ -11,6 +11,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 
 @EqualsAndHashCode(callSuper = false)
 @Builder
@@ -50,6 +51,7 @@ public class AppSettings {
 
     private String smtpUsername;
 
+    @ToString.Exclude
     private String smtpPassword;
 
     @Builder.Default
@@ -61,7 +63,27 @@ public class AppSettings {
     @Builder.Default
     private String marketDataBaseUrl = "https://api.tiingo.com";
 
+    @ToString.Exclude
     private String marketDataApiKey;
+
+    @Builder.Default
+    private MarketDataProvidersSettings marketDataProviders = MarketDataProvidersSettings.defaultSettings();
+
+    // --- Insider Purchases Dashboard defaults ---
+
+    @Builder.Default
+    private int insiderPurchaseLookbackDays = 30;
+
+    @Builder.Default
+    private double insiderPurchaseMinMarketCap = 0;
+
+    @Builder.Default
+    private boolean insiderPurchaseSp500Only = false;
+
+    @Builder.Default
+    private double insiderPurchaseMinTransactionValue = 0;
+
+    // --- Real-time Filing Sync configuration ---
 
     @Builder.Default
     private Boolean realtimeSyncEnabled = Boolean.TRUE;
@@ -77,4 +99,69 @@ public class AppSettings {
 
     @Builder.Default
     private Integer realtimeSyncPageSize = 100;
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class MarketDataProvidersSettings {
+
+        @Builder.Default
+        private ProviderSettings tiingo = ProviderSettings.tiingoDefaults();
+
+        @Builder.Default
+        private ProviderSettings yahooFinance = ProviderSettings.yahooFinanceDefaults();
+
+        @Builder.Default
+        private ProviderSettings finnhub = ProviderSettings.finnhubDefaults();
+
+        @Builder.Default
+        private ProviderSettings alphaVantage = ProviderSettings.alphaVantageDefaults();
+
+        public static MarketDataProvidersSettings defaultSettings() {
+            return MarketDataProvidersSettings.builder().build();
+        }
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ProviderSettings {
+
+        private Boolean enabled;
+
+        private String baseUrl;
+
+        @ToString.Exclude
+        private String apiKey;
+
+        static ProviderSettings tiingoDefaults() {
+            return ProviderSettings.builder()
+                    .enabled(Boolean.FALSE)
+                    .baseUrl("https://api.tiingo.com")
+                    .build();
+        }
+
+        static ProviderSettings yahooFinanceDefaults() {
+            return ProviderSettings.builder()
+                    .enabled(Boolean.TRUE)
+                    .baseUrl("https://query1.finance.yahoo.com/v8/finance/chart")
+                    .build();
+        }
+
+        static ProviderSettings finnhubDefaults() {
+            return ProviderSettings.builder()
+                    .enabled(Boolean.FALSE)
+                    .baseUrl("https://finnhub.io/api/v1")
+                    .build();
+        }
+
+        static ProviderSettings alphaVantageDefaults() {
+            return ProviderSettings.builder()
+                    .enabled(Boolean.FALSE)
+                    .baseUrl("https://www.alphavantage.co/query")
+                    .build();
+        }
+    }
 }

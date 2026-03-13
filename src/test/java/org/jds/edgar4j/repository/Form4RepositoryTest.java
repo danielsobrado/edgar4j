@@ -363,7 +363,7 @@ class Form4RepositoryTest {
         LocalDate recentDate = LocalDate.now().minusDays(2);
 
         Form4 nestedAcquisition = createForm4(ACCESSION_1, "MSFT", "789019", "John Doe");
-        nestedAcquisition.setTransactionDate(recentDate);
+        nestedAcquisition.setTransactionDate(LocalDate.now().minusDays(45));
         nestedAcquisition.setAcquiredDisposedCode("D");
         nestedAcquisition.setTransactions(List.of(
                 Form4Transaction.builder()

@@ -1,11 +1,17 @@
 package org.jds.edgar4j.service.impl;
 
+import java.net.URI;
+import java.util.Locale;
+
 import org.jds.edgar4j.config.TiingoEnvProperties;
 import org.jds.edgar4j.dto.request.SettingsRequest;
 import org.jds.edgar4j.dto.response.SettingsResponse;
 import org.jds.edgar4j.model.AppSettings;
+import org.jds.edgar4j.properties.MarketDataProviderProperties;
 import org.jds.edgar4j.repository.AppSettingsRepository;
 import org.jds.edgar4j.service.SettingsService;
+import org.jds.edgar4j.service.provider.MarketDataProviderSettingsResolver;
+import org.jds.edgar4j.service.provider.MarketDataProviders;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.stereotype.Service;
@@ -19,16 +25,18 @@ import lombok.extern.slf4j.Slf4j;
 public class SettingsServiceImpl implements SettingsService {
 
     private static final String DEFAULT_SETTINGS_ID = "default";
-    private static final String DEFAULT_MARKET_DATA_PROVIDER = "NONE";
     private static final String DEFAULT_TIINGO_BASE_URL = "https://api.tiingo.com";
     private static final String DEFAULT_REALTIME_SYNC_FORMS = "4";
     private static final int DEFAULT_REALTIME_SYNC_LOOKBACK_HOURS = 1;
     private static final int DEFAULT_REALTIME_SYNC_MAX_PAGES = 10;
     private static final int DEFAULT_REALTIME_SYNC_PAGE_SIZE = 100;
+    private static final String MASKED_SECRET_VALUE = "********";
 
     private final AppSettingsRepository appSettingsRepository;
     private final MongoTemplate mongoTemplate;
     private final TiingoEnvProperties tiingoEnvProperties;
+    private final MarketDataProviderProperties marketDataProviderProperties;
+    private final MarketDataProviderSettingsResolver marketDataProviderSettingsResolver;
 
     @Value("${edgar4j.urls.baseSecUrl}")
     private String baseSecUrl;
@@ -47,18 +55,23 @@ public class SettingsServiceImpl implements SettingsService {
 
     @Override
     public SettingsResponse getSettings() {
-        AppSettings settings = getOrCreateDefaultSettings();
-        return toSettingsResponse(settings);
+        return toSettingsResponse(getOrCreateDefaultSettings());
     }
 
     @Override
     public SettingsResponse updateSettings(SettingsRequest request) {
-        log.info("Updating settings: {}", request);
-
-        validateEmailNotificationSettings(request);
-        validateMarketDataSettings(request);
-
         AppSettings settings = getOrCreateDefaultSettings();
+        log.info("Updating settings: {}", summarizeRequest(request));
+
+        String selectedMarketDataProvider = normalizeMarketDataProvider(request.getMarketDataProvider());
+        AppSettings.MarketDataProvidersSettings marketDataProviders = mergeMarketDataProviders(
+                request,
+                settings,
+                selectedMarketDataProvider);
+
+        validateEmailNotificationSettings(request, settings);
+        validateMarketDataSettings(buildMarketDataPreview(settings, selectedMarketDataProvider, marketDataProviders));
+
         settings.setUserAgent(request.getUserAgent());
         settings.setAutoRefresh(request.isAutoRefresh());
         settings.setRefreshInterval(request.getRefreshInterval());
@@ -69,11 +82,19 @@ public class SettingsServiceImpl implements SettingsService {
         settings.setSmtpHost(trimToNull(request.getSmtpHost()));
         settings.setSmtpPort(request.getSmtpPort() > 0 ? request.getSmtpPort() : 587);
         settings.setSmtpUsername(trimToNull(request.getSmtpUsername()));
-        settings.setSmtpPassword(trimToNull(request.getSmtpPassword()));
+        settings.setSmtpPassword(resolveSecretValue(
+                request.getSmtpPassword(),
+                settings.getSmtpPassword(),
+                request.getClearSmtpPassword()));
         settings.setSmtpStartTlsEnabled(request.isSmtpStartTlsEnabled());
-        settings.setMarketDataProvider(normalizeMarketDataProvider(request.getMarketDataProvider()));
-        settings.setMarketDataBaseUrl(normalizeMarketDataBaseUrl(request.getMarketDataBaseUrl()));
-        settings.setMarketDataApiKey(trimToNull(request.getMarketDataApiKey()));
+        settings.setMarketDataProvider(selectedMarketDataProvider);
+        settings.setMarketDataProviders(marketDataProviders);
+        syncLegacySelectedMarketDataFields(settings);
+        settings.setInsiderPurchaseLookbackDays(
+                request.getInsiderPurchaseLookbackDays() > 0 ? request.getInsiderPurchaseLookbackDays() : 30);
+        settings.setInsiderPurchaseMinMarketCap(request.getInsiderPurchaseMinMarketCap());
+        settings.setInsiderPurchaseSp500Only(request.isInsiderPurchaseSp500Only());
+        settings.setInsiderPurchaseMinTransactionValue(request.getInsiderPurchaseMinTransactionValue());
         settings.setRealtimeSyncEnabled(request.getRealtimeSyncEnabled() != null
                 ? request.getRealtimeSyncEnabled()
                 : resolveRealtimeSyncEnabled(settings));
@@ -90,8 +111,7 @@ public class SettingsServiceImpl implements SettingsService {
                 request.getRealtimeSyncPageSize(),
                 resolveRealtimeSyncPageSize(settings)));
 
-        settings = appSettingsRepository.save(settings);
-        return toSettingsResponse(settings);
+        return toSettingsResponse(appSettingsRepository.save(settings));
     }
 
     @Override
@@ -138,12 +158,14 @@ public class SettingsServiceImpl implements SettingsService {
                     if (configuredUserAgent != null && !configuredUserAgent.isBlank()) {
                         builder.userAgent(configuredUserAgent);
                     }
-                    AppSettings newSettings = builder.build();
-                    return appSettingsRepository.save(newSettings);
+                    return appSettingsRepository.save(builder.build());
                 });
     }
 
     private SettingsResponse toSettingsResponse(AppSettings settings) {
+        String selectedProvider = resolveSelectedMarketDataProvider(settings);
+        MarketDataProviderSettingsResolver.ResolvedProviderConfig selectedConfig = resolveSelectedProviderConfig(settings);
+
         return SettingsResponse.builder()
                 .userAgent(settings.getUserAgent())
                 .autoRefresh(settings.isAutoRefresh())
@@ -155,12 +177,20 @@ public class SettingsServiceImpl implements SettingsService {
                 .smtpHost(settings.getSmtpHost())
                 .smtpPort(settings.getSmtpPort())
                 .smtpUsername(settings.getSmtpUsername())
-                .smtpPassword(settings.getSmtpPassword())
+                .smtpPassword(null)
+                .smtpPasswordConfigured(trimToNull(settings.getSmtpPassword()) != null)
                 .smtpStartTlsEnabled(settings.isSmtpStartTlsEnabled())
-                .marketDataProvider(resolveEffectiveMarketDataProvider(settings))
-                .marketDataBaseUrl(resolveEffectiveMarketDataBaseUrl(settings))
-                .marketDataApiKey(settings.getMarketDataApiKey())
-                .marketDataConfigured(isMarketDataConfigured(settings))
+                .marketDataProvider(selectedProvider)
+                .marketDataBaseUrl(selectedConfig != null ? selectedConfig.baseUrl() : null)
+                .marketDataApiKey(null)
+                .marketDataApiKeyConfigured(selectedConfig != null && selectedConfig.apiKeyConfigured())
+                .marketDataConfigured(selectedConfig != null && selectedConfig.operational())
+                .marketDataProviders(toMarketDataProvidersResponse(settings))
+                .insiderPurchaseLookbackDays(settings.getInsiderPurchaseLookbackDays() > 0
+                        ? settings.getInsiderPurchaseLookbackDays() : 30)
+                .insiderPurchaseMinMarketCap(settings.getInsiderPurchaseMinMarketCap())
+                .insiderPurchaseSp500Only(settings.isInsiderPurchaseSp500Only())
+                .insiderPurchaseMinTransactionValue(settings.getInsiderPurchaseMinTransactionValue())
                 .realtimeSyncEnabled(resolveRealtimeSyncEnabled(settings))
                 .realtimeSyncForms(resolveRealtimeSyncForms(settings))
                 .realtimeSyncLookbackHours(resolveRealtimeSyncLookbackHours(settings))
@@ -177,7 +207,27 @@ public class SettingsServiceImpl implements SettingsService {
                 .build();
     }
 
-    private void validateEmailNotificationSettings(SettingsRequest request) {
+    private SettingsResponse.MarketDataProvidersResponse toMarketDataProvidersResponse(AppSettings settings) {
+        return SettingsResponse.MarketDataProvidersResponse.builder()
+                .tiingo(toProviderResponse(marketDataProviderSettingsResolver.resolve(MarketDataProviders.TIINGO, settings)))
+                .yahooFinance(toProviderResponse(marketDataProviderSettingsResolver.resolve(MarketDataProviders.YAHOO_FINANCE, settings)))
+                .finnhub(toProviderResponse(marketDataProviderSettingsResolver.resolve(MarketDataProviders.FINNHUB, settings)))
+                .alphaVantage(toProviderResponse(marketDataProviderSettingsResolver.resolve(MarketDataProviders.ALPHA_VANTAGE, settings)))
+                .build();
+    }
+
+    private SettingsResponse.ProviderResponse toProviderResponse(
+            MarketDataProviderSettingsResolver.ResolvedProviderConfig providerConfig) {
+        return SettingsResponse.ProviderResponse.builder()
+                .enabled(providerConfig.enabled())
+                .baseUrl(providerConfig.baseUrl())
+                .apiKey(null)
+                .apiKeyConfigured(providerConfig.apiKeyConfigured())
+                .configured(providerConfig.operational())
+                .build();
+    }
+
+    private void validateEmailNotificationSettings(SettingsRequest request, AppSettings existingSettings) {
         if (!request.isEmailNotifications()) {
             return;
         }
@@ -186,47 +236,238 @@ public class SettingsServiceImpl implements SettingsService {
         requireNonBlank(request.getNotificationEmailFrom(), "Notification sender email is required when email notifications are enabled");
         requireNonBlank(request.getSmtpHost(), "SMTP host is required when email notifications are enabled");
         requireNonBlank(request.getSmtpUsername(), "SMTP username is required when email notifications are enabled");
-        requireNonBlank(request.getSmtpPassword(), "SMTP password is required when email notifications are enabled");
+        if (resolveSecretValue(request.getSmtpPassword(), existingSettings.getSmtpPassword(), request.getClearSmtpPassword()) == null) {
+            throw new IllegalArgumentException("SMTP password is required when email notifications are enabled");
+        }
 
         if (request.getSmtpPort() <= 0) {
             throw new IllegalArgumentException("SMTP port must be greater than 0 when email notifications are enabled");
         }
     }
 
-    private void validateMarketDataSettings(SettingsRequest request) {
-        String provider = normalizeMarketDataProvider(request.getMarketDataProvider());
-
-        if (!"NONE".equals(provider) && !"TIINGO".equals(provider)) {
-            throw new IllegalArgumentException("Unsupported market data provider: " + provider);
+    private void validateMarketDataSettings(AppSettings previewSettings) {
+        String selectedProvider = resolveSelectedMarketDataProvider(previewSettings);
+        if (!MarketDataProviders.isSupported(selectedProvider)) {
+            throw new IllegalArgumentException("Unsupported market data provider: " + selectedProvider);
         }
 
-        if ("TIINGO".equals(provider) && !hasEffectiveMarketDataApiKey(request)) {
-            requireNonBlank(request.getMarketDataApiKey(),
-                    "Tiingo API key is required when Tiingo market data is enabled");
+        for (String providerName : new String[] {
+                MarketDataProviders.TIINGO,
+                MarketDataProviders.YAHOO_FINANCE,
+                MarketDataProviders.FINNHUB,
+                MarketDataProviders.ALPHA_VANTAGE }) {
+            MarketDataProviderSettingsResolver.ResolvedProviderConfig providerConfig =
+                    marketDataProviderSettingsResolver.resolve(providerName, previewSettings);
+            if (providerConfig.enabled() && providerConfig.baseUrl() == null) {
+                throw new IllegalArgumentException(providerName + " base URL is required when the provider is enabled");
+            }
+            if (providerConfig.enabled() && !providerConfig.operational()) {
+                throw new IllegalArgumentException(providerName + " is enabled but not fully configured");
+            }
         }
+
+        if (MarketDataProviders.NONE.equals(selectedProvider)) {
+            return;
+        }
+
+        MarketDataProviderSettingsResolver.ResolvedProviderConfig selectedConfig =
+                marketDataProviderSettingsResolver.resolve(selectedProvider, previewSettings);
+        if (!selectedConfig.enabled()) {
+            throw new IllegalArgumentException("Selected market data provider is disabled");
+        }
+        if (!selectedConfig.operational()) {
+            throw new IllegalArgumentException("Selected market data provider is not configured");
+        }
+    }
+
+    private AppSettings.MarketDataProvidersSettings mergeMarketDataProviders(
+            SettingsRequest request,
+            AppSettings existingSettings,
+            String selectedProvider) {
+        SettingsRequest.MarketDataProvidersRequest requestedProviders = request.getMarketDataProviders();
+
+        return AppSettings.MarketDataProvidersSettings.builder()
+                .tiingo(mergeProviderSettings(
+                        MarketDataProviders.TIINGO,
+                        existingSettings,
+                        requestedProviders != null ? requestedProviders.getTiingo() : null,
+                        MarketDataProviders.TIINGO.equals(selectedProvider),
+                        request.getMarketDataBaseUrl(),
+                        request.getMarketDataApiKey(),
+                        request.getClearMarketDataApiKey()))
+                .yahooFinance(mergeProviderSettings(
+                        MarketDataProviders.YAHOO_FINANCE,
+                        existingSettings,
+                        requestedProviders != null ? requestedProviders.getYahooFinance() : null,
+                        MarketDataProviders.YAHOO_FINANCE.equals(selectedProvider),
+                        request.getMarketDataBaseUrl(),
+                        request.getMarketDataApiKey(),
+                        request.getClearMarketDataApiKey()))
+                .finnhub(mergeProviderSettings(
+                        MarketDataProviders.FINNHUB,
+                        existingSettings,
+                        requestedProviders != null ? requestedProviders.getFinnhub() : null,
+                        MarketDataProviders.FINNHUB.equals(selectedProvider),
+                        request.getMarketDataBaseUrl(),
+                        request.getMarketDataApiKey(),
+                        request.getClearMarketDataApiKey()))
+                .alphaVantage(mergeProviderSettings(
+                        MarketDataProviders.ALPHA_VANTAGE,
+                        existingSettings,
+                        requestedProviders != null ? requestedProviders.getAlphaVantage() : null,
+                        MarketDataProviders.ALPHA_VANTAGE.equals(selectedProvider),
+                        request.getMarketDataBaseUrl(),
+                        request.getMarketDataApiKey(),
+                        request.getClearMarketDataApiKey()))
+                .build();
+    }
+
+    private AppSettings.ProviderSettings mergeProviderSettings(
+            String providerName,
+            AppSettings existingSettings,
+            SettingsRequest.ProviderRequest requestSettings,
+            boolean selectedProvider,
+            String legacyBaseUrl,
+            String legacyApiKey,
+            Boolean clearLegacyApiKey) {
+        AppSettings.ProviderSettings effectiveExisting = resolvePersistedProviderSettings(providerName, existingSettings);
+
+        Boolean enabled = requestSettings != null && requestSettings.getEnabled() != null
+                ? requestSettings.getEnabled()
+                : selectedProvider ? Boolean.TRUE : effectiveExisting.getEnabled();
+
+        String requestedBaseUrl = requestSettings != null && requestSettings.getBaseUrl() != null
+                ? requestSettings.getBaseUrl()
+                : selectedProvider ? legacyBaseUrl : null;
+        String baseUrl = requestedBaseUrl != null
+                ? normalizeMarketDataBaseUrl(providerName, requestedBaseUrl)
+                : normalizeMarketDataBaseUrl(providerName, effectiveExisting.getBaseUrl());
+
+        String requestedApiKey = requestSettings != null && requestSettings.getApiKey() != null
+                ? requestSettings.getApiKey()
+                : selectedProvider ? legacyApiKey : null;
+        Boolean clearApiKey = requestSettings != null && requestSettings.getClearApiKey() != null
+                ? requestSettings.getClearApiKey()
+                : selectedProvider ? clearLegacyApiKey : Boolean.FALSE;
+        String apiKey = resolveSecretValue(requestedApiKey, effectiveExisting.getApiKey(), clearApiKey);
+
+        return AppSettings.ProviderSettings.builder()
+                .enabled(enabled)
+                .baseUrl(baseUrl)
+                .apiKey(apiKey)
+                .build();
+    }
+
+    private AppSettings.ProviderSettings defaultProviderSettings(String providerName) {
+        return switch (providerName) {
+            case MarketDataProviders.TIINGO -> AppSettings.ProviderSettings.builder()
+                    .enabled(Boolean.FALSE)
+                    .baseUrl(DEFAULT_TIINGO_BASE_URL)
+                    .build();
+            case MarketDataProviders.YAHOO_FINANCE -> AppSettings.ProviderSettings.builder()
+                    .enabled(marketDataProviderProperties.getYahooFinance().isEnabled())
+                    .baseUrl(trimTrailingSlashes(marketDataProviderProperties.getYahooFinance().getBaseUrl()))
+                    .build();
+            case MarketDataProviders.FINNHUB -> AppSettings.ProviderSettings.builder()
+                    .enabled(marketDataProviderProperties.getFinnhub().isEnabled())
+                    .baseUrl(trimTrailingSlashes(marketDataProviderProperties.getFinnhub().getBaseUrl()))
+                    .build();
+            case MarketDataProviders.ALPHA_VANTAGE -> AppSettings.ProviderSettings.builder()
+                    .enabled(marketDataProviderProperties.getAlphaVantage().isEnabled())
+                    .baseUrl(trimTrailingSlashes(marketDataProviderProperties.getAlphaVantage().getBaseUrl()))
+                    .build();
+            default -> AppSettings.ProviderSettings.builder().build();
+        };
+    }
+
+    private AppSettings.ProviderSettings resolvePersistedProviderSettings(
+            String providerName,
+            AppSettings settings) {
+        AppSettings.ProviderSettings defaults = defaultProviderSettings(providerName);
+        AppSettings.ProviderSettings storedProviderSettings = getStoredProviderSettings(settings, providerName);
+        boolean providerSelectedInStoredSettings = providerName.equals(normalizeMarketDataProvider(
+                settings != null ? settings.getMarketDataProvider() : null));
+
+        Boolean enabled = storedProviderSettings != null && storedProviderSettings.getEnabled() != null
+                ? storedProviderSettings.getEnabled()
+                : defaults.getEnabled();
+        String baseUrl = firstNonBlank(
+                trimToNull(storedProviderSettings != null ? storedProviderSettings.getBaseUrl() : null),
+                resolveLegacyStoredBaseUrl(providerName, settings, providerSelectedInStoredSettings),
+                defaults.getBaseUrl());
+        String apiKey = firstNonBlank(
+                trimToNull(storedProviderSettings != null ? storedProviderSettings.getApiKey() : null),
+                resolveLegacyStoredApiKey(providerName, settings, providerSelectedInStoredSettings));
+
+        return AppSettings.ProviderSettings.builder()
+                .enabled(enabled)
+                .baseUrl(baseUrl)
+                .apiKey(apiKey)
+                .build();
+    }
+
+    private AppSettings buildMarketDataPreview(
+            AppSettings existingSettings,
+            String selectedProvider,
+            AppSettings.MarketDataProvidersSettings providerSettings) {
+        return AppSettings.builder()
+                .id(existingSettings.getId())
+                .marketDataProvider(selectedProvider)
+                .marketDataProviders(providerSettings)
+                .build();
+    }
+
+    private void syncLegacySelectedMarketDataFields(AppSettings settings) {
+        MarketDataProviderSettingsResolver.ResolvedProviderConfig selectedConfig = resolveSelectedProviderConfig(settings);
+        if (selectedConfig == null) {
+            settings.setMarketDataBaseUrl(null);
+            settings.setMarketDataApiKey(null);
+            return;
+        }
+
+        settings.setMarketDataBaseUrl(selectedConfig.baseUrl());
+        AppSettings.ProviderSettings storedProviderSettings = getStoredProviderSettings(settings, selectedConfig.providerName());
+        settings.setMarketDataApiKey(trimToNull(storedProviderSettings != null ? storedProviderSettings.getApiKey() : null));
     }
 
     private String normalizeMarketDataProvider(String provider) {
-        if (provider == null || provider.isBlank()) {
-            return DEFAULT_MARKET_DATA_PROVIDER;
-        }
-
-        return provider.trim().toUpperCase();
+        return MarketDataProviders.normalize(provider);
     }
 
-    private String normalizeMarketDataBaseUrl(String baseUrl) {
+    private String normalizeMarketDataBaseUrl(String provider, String baseUrl) {
         if (baseUrl == null || baseUrl.isBlank()) {
-            return DEFAULT_TIINGO_BASE_URL;
+            return defaultMarketDataBaseUrl(provider);
         }
 
-        String normalized = baseUrl.trim().replaceAll("/+$", "");
-        if (normalized.endsWith("/api/test")) {
+        String normalized = trimTrailingSlashes(baseUrl.trim());
+        if (MarketDataProviders.TIINGO.equals(provider) && normalized.endsWith("/api/test")) {
             normalized = normalized.substring(0, normalized.length() - "/api/test".length());
-        } else if (normalized.endsWith("/api")) {
+        } else if (MarketDataProviders.TIINGO.equals(provider) && normalized.endsWith("/api")) {
             normalized = normalized.substring(0, normalized.length() - "/api".length());
         }
 
-        return normalized.replaceAll("/+$", "");
+        URI parsedUri = URI.create(normalized);
+        String scheme = parsedUri.getScheme();
+        if (scheme == null || (!"http".equalsIgnoreCase(scheme) && !"https".equalsIgnoreCase(scheme))) {
+            throw new IllegalArgumentException("Market data base URL must use HTTP or HTTPS");
+        }
+        if (parsedUri.getHost() == null || parsedUri.getHost().isBlank()) {
+            throw new IllegalArgumentException("Market data base URL must include a host");
+        }
+        if (parsedUri.getRawQuery() != null || parsedUri.getRawFragment() != null) {
+            throw new IllegalArgumentException("Market data base URL must not include a query string or fragment");
+        }
+
+        return trimTrailingSlashes(parsedUri.toString());
+    }
+
+    private String defaultMarketDataBaseUrl(String provider) {
+        return switch (provider) {
+            case MarketDataProviders.YAHOO_FINANCE -> trimTrailingSlashes(marketDataProviderProperties.getYahooFinance().getBaseUrl());
+            case MarketDataProviders.FINNHUB -> trimTrailingSlashes(marketDataProviderProperties.getFinnhub().getBaseUrl());
+            case MarketDataProviders.ALPHA_VANTAGE -> trimTrailingSlashes(marketDataProviderProperties.getAlphaVantage().getBaseUrl());
+            default -> DEFAULT_TIINGO_BASE_URL;
+        };
     }
 
     private String normalizeRealtimeSyncForms(String forms) {
@@ -237,7 +478,7 @@ public class SettingsServiceImpl implements SettingsService {
         String normalized = java.util.Arrays.stream(forms.split(","))
                 .map(String::trim)
                 .filter(value -> !value.isEmpty())
-                .map(value -> value.replaceAll("\\s+", " ").toUpperCase())
+                .map(value -> value.replaceAll("\\s+", " ").toUpperCase(Locale.ROOT))
                 .distinct()
                 .reduce((left, right) -> left + "," + right)
                 .orElse(DEFAULT_REALTIME_SYNC_FORMS);
@@ -245,43 +486,15 @@ public class SettingsServiceImpl implements SettingsService {
         return normalized.isBlank() ? DEFAULT_REALTIME_SYNC_FORMS : normalized;
     }
 
-    private boolean isMarketDataConfigured(AppSettings settings) {
-        return "TIINGO".equals(resolveEffectiveMarketDataProvider(settings))
-                && resolveEffectiveMarketDataApiKey(settings) != null;
+    private String resolveSelectedMarketDataProvider(AppSettings settings) {
+        return marketDataProviderSettingsResolver.resolveSelectedProvider(settings);
     }
 
-    private String resolveEffectiveMarketDataProvider(AppSettings settings) {
-        String provider = normalizeMarketDataProvider(settings.getMarketDataProvider());
-        if ("NONE".equals(provider) && tiingoEnvProperties.hasApiToken()) {
-            return "TIINGO";
-        }
-        return provider;
-    }
-
-    private boolean hasEffectiveMarketDataApiKey(SettingsRequest request) {
-        return trimToNull(request.getMarketDataApiKey()) != null || tiingoEnvProperties.hasApiToken();
-    }
-
-    private String resolveEffectiveMarketDataApiKey(AppSettings settings) {
-        String explicitKey = trimToNull(settings.getMarketDataApiKey());
-        if (explicitKey != null) {
-            return explicitKey;
-        }
-        return tiingoEnvProperties.getApiToken().orElse(null);
-    }
-
-    private String resolveEffectiveMarketDataBaseUrl(AppSettings settings) {
-        String explicitBaseUrl = trimToNull(settings.getMarketDataBaseUrl());
-        if (explicitBaseUrl != null) {
-            String normalizedExplicitBaseUrl = normalizeMarketDataBaseUrl(explicitBaseUrl);
-            if (!DEFAULT_TIINGO_BASE_URL.equals(normalizedExplicitBaseUrl)) {
-                return normalizedExplicitBaseUrl;
-            }
-        }
-
-        return tiingoEnvProperties.getBaseUrl()
-                .map(this::normalizeMarketDataBaseUrl)
-                .orElseGet(() -> normalizeMarketDataBaseUrl(explicitBaseUrl));
+    private MarketDataProviderSettingsResolver.ResolvedProviderConfig resolveSelectedProviderConfig(AppSettings settings) {
+        String selectedProvider = resolveSelectedMarketDataProvider(settings);
+        return MarketDataProviders.NONE.equals(selectedProvider)
+                ? null
+                : marketDataProviderSettingsResolver.resolve(selectedProvider, settings);
     }
 
     private boolean resolveRealtimeSyncEnabled(AppSettings settings) {
@@ -317,6 +530,31 @@ public class SettingsServiceImpl implements SettingsService {
         return requestedValue > 0 ? requestedValue : fallbackValue;
     }
 
+    private String summarizeRequest(SettingsRequest request) {
+        return String.format(
+                "userAgent=%s, emailNotifications=%s, marketDataProvider=%s, realtimeSyncEnabled=%s, realtimeSyncForms=%s",
+                trimToNull(request.getUserAgent()),
+                request.isEmailNotifications(),
+                normalizeMarketDataProvider(request.getMarketDataProvider()),
+                request.getRealtimeSyncEnabled(),
+                trimToNull(request.getRealtimeSyncForms()));
+    }
+
+    private String resolveSecretValue(String requestedValue, String existingValue, Boolean clearSecret) {
+        if (Boolean.TRUE.equals(clearSecret)) {
+            return null;
+        }
+
+        String normalizedRequestedValue = trimToNull(requestedValue);
+        if (MASKED_SECRET_VALUE.equals(normalizedRequestedValue)) {
+            return existingValue;
+        }
+        if (normalizedRequestedValue != null) {
+            return normalizedRequestedValue;
+        }
+        return existingValue;
+    }
+
     private void requireNonBlank(String value, String message) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(message);
@@ -331,5 +569,62 @@ public class SettingsServiceImpl implements SettingsService {
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
     }
-}
 
+    private String trimTrailingSlashes(String value) {
+        String trimmed = trimToNull(value);
+        if (trimmed == null) {
+            return null;
+        }
+        return trimmed.replaceAll("/+$", "");
+    }
+
+    private String resolveLegacyStoredBaseUrl(String providerName, AppSettings settings, boolean providerSelectedInStoredSettings) {
+        if (!providerSelectedInStoredSettings || settings == null) {
+            return null;
+        }
+
+        String legacyBaseUrl = trimToNull(settings.getMarketDataBaseUrl());
+        if (legacyBaseUrl == null) {
+            return null;
+        }
+
+        if (!MarketDataProviders.TIINGO.equals(providerName)
+                && DEFAULT_TIINGO_BASE_URL.equals(trimTrailingSlashes(legacyBaseUrl))
+                && resolveLegacyStoredApiKey(providerName, settings, true) == null) {
+            return null;
+        }
+
+        return legacyBaseUrl;
+    }
+
+    private String resolveLegacyStoredApiKey(String providerName, AppSettings settings, boolean providerSelectedInStoredSettings) {
+        if (!providerSelectedInStoredSettings || settings == null) {
+            return null;
+        }
+        return trimToNull(settings.getMarketDataApiKey());
+    }
+
+    private AppSettings.ProviderSettings getStoredProviderSettings(AppSettings settings, String providerName) {
+        if (settings == null || settings.getMarketDataProviders() == null) {
+            return null;
+        }
+
+        return switch (providerName) {
+            case MarketDataProviders.TIINGO -> settings.getMarketDataProviders().getTiingo();
+            case MarketDataProviders.YAHOO_FINANCE -> settings.getMarketDataProviders().getYahooFinance();
+            case MarketDataProviders.FINNHUB -> settings.getMarketDataProviders().getFinnhub();
+            case MarketDataProviders.ALPHA_VANTAGE -> settings.getMarketDataProviders().getAlphaVantage();
+            default -> null;
+        };
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            String trimmed = trimToNull(value);
+            if (trimmed != null) {
+                return trimmed;
+            }
+        }
+        return null;
+    }
+}

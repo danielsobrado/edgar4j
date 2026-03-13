@@ -63,7 +63,7 @@ public class InsiderPurchaseServiceImpl implements InsiderPurchaseService {
         Double normalizedMinTransactionValue = normalizeThreshold(minTransactionValue);
 
         LocalDate since = LocalDate.now().minusDays(sanitizedLookbackDays);
-        List<PurchaseCandidate> candidates = extractOpenMarketPurchases(form4Repository.findRecentAcquisitions(since));
+        List<PurchaseCandidate> candidates = extractOpenMarketPurchases(form4Repository.findRecentAcquisitions(since), since);
         Set<String> sp500Tickers = loadSp500Tickers();
         Map<String, Optional<CompanyMarketData>> marketDataCache = new HashMap<>();
 
@@ -103,7 +103,7 @@ public class InsiderPurchaseServiceImpl implements InsiderPurchaseService {
     @Override
     public InsiderPurchaseSummary getSummary(int lookbackDays) {
         LocalDate since = LocalDate.now().minusDays(sanitizeLookbackDays(lookbackDays));
-        List<PurchaseCandidate> candidates = extractOpenMarketPurchases(form4Repository.findRecentAcquisitions(since));
+        List<PurchaseCandidate> candidates = extractOpenMarketPurchases(form4Repository.findRecentAcquisitions(since), since);
         Set<String> sp500Tickers = loadSp500Tickers();
         Map<String, Optional<CompanyMarketData>> marketDataCache = new HashMap<>();
 
@@ -230,20 +230,20 @@ public class InsiderPurchaseServiceImpl implements InsiderPurchaseService {
                 .build();
     }
 
-    private List<PurchaseCandidate> extractOpenMarketPurchases(List<Form4> acquisitions) {
+    private List<PurchaseCandidate> extractOpenMarketPurchases(List<Form4> acquisitions, LocalDate since) {
         if (acquisitions == null || acquisitions.isEmpty()) {
             return List.of();
         }
 
         return acquisitions.stream()
                 .filter(Objects::nonNull)
-                .flatMap(this::toPurchaseCandidates)
+                .flatMap(form4 -> toPurchaseCandidates(form4, since))
                 .toList();
     }
 
-    private Stream<PurchaseCandidate> toPurchaseCandidates(Form4 form4) {
+    private Stream<PurchaseCandidate> toPurchaseCandidates(Form4 form4, LocalDate since) {
         if (form4.getTransactions() == null || form4.getTransactions().isEmpty()) {
-            return isFallbackPurchase(form4)
+            return isFallbackPurchase(form4) && isWithinLookback(form4.getTransactionDate(), since)
                     ? Stream.of(new PurchaseCandidate(form4, null))
                     : Stream.empty();
         }
@@ -251,6 +251,7 @@ public class InsiderPurchaseServiceImpl implements InsiderPurchaseService {
         return form4.getTransactions().stream()
                 .filter(Objects::nonNull)
                 .filter(this::isOpenMarketPurchase)
+                .filter(transaction -> isWithinLookback(transaction.getTransactionDate(), since))
                 .map(transaction -> new PurchaseCandidate(form4, transaction));
     }
 
@@ -262,6 +263,10 @@ public class InsiderPurchaseServiceImpl implements InsiderPurchaseService {
 
     private boolean isFallbackPurchase(Form4 form4) {
         return "A".equalsIgnoreCase(form4.getAcquiredDisposedCode());
+    }
+
+    private boolean isWithinLookback(LocalDate transactionDate, LocalDate since) {
+        return transactionDate != null && !transactionDate.isBefore(since);
     }
 
     private Set<String> loadSp500Tickers() {

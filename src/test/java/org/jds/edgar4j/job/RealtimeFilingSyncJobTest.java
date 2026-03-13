@@ -4,11 +4,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import java.time.LocalDateTime;
 import java.time.LocalDate;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -238,6 +241,38 @@ class RealtimeFilingSyncJobTest {
         verify(form4Service, never()).downloadAndParseForm4(any(), any(), any());
         assertEquals(0, job.getLastSyncNewCount());
         assertEquals(2, job.getLastSyncTotalScanned());
+    }
+
+    @Test
+    @DisplayName("syncRecentFilings should use an hour-based start date instead of rounding the lookback to full days")
+    void syncRecentFilingsShouldUseHourBasedStartDate() {
+        RealtimeFilingSyncJob job = spy(createJob());
+        doReturn(LocalDateTime.of(2026, 3, 12, 15, 30)).when(job).currentDateTime();
+        when(appSettingsRepository.findById("default")).thenReturn(Optional.of(
+                AppSettings.builder()
+                        .realtimeSyncEnabled(Boolean.TRUE)
+                        .realtimeSyncForms("4")
+                        .realtimeSyncLookbackHours(1)
+                        .realtimeSyncMaxPages(1)
+                        .realtimeSyncPageSize(10)
+                        .build()));
+        when(secApiClient.fetchEftsSearch(
+                eq("4"),
+                eq(LocalDate.of(2026, 3, 12)),
+                eq(LocalDate.of(2026, 3, 12)),
+                eq(0),
+                eq(10)))
+                .thenReturn("{\"hits\":{\"total\":{\"value\":0,\"relation\":\"eq\"},\"hits\":[]}}");
+
+        job.syncRecentFilings();
+
+        verify(secApiClient).fetchEftsSearch(
+                "4",
+                LocalDate.of(2026, 3, 12),
+                LocalDate.of(2026, 3, 12),
+                0,
+                10);
+        assertEquals(0, job.getLastSyncTotalScanned());
     }
 
     private RealtimeFilingSyncJob createJob() {

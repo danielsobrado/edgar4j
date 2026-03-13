@@ -107,12 +107,13 @@ public class RealtimeFilingSyncJob {
 
         try {
             long startTime = System.currentTimeMillis();
-            LocalDate endDate = LocalDate.now();
-            LocalDate startDate = endDate.minusDays(calculateLookbackDays(config.lookbackHours()));
+            LocalDateTime syncStartedAt = currentDateTime();
+            LocalDate endDate = syncStartedAt.toLocalDate();
+            LocalDate startDate = syncStartedAt.minusHours(config.lookbackHours()).toLocalDate();
 
             log.info(
                     "Starting realtime filing sync at {} with forms={}, lookback={}h, maxPages={}, pageSize={}",
-                    LocalDateTime.now(),
+                    syncStartedAt,
                     config.forms(),
                     config.lookbackHours(),
                     config.maxPages(),
@@ -571,8 +572,8 @@ public class RealtimeFilingSyncJob {
         return value != null && value > 0 ? value : fallback;
     }
 
-    private int calculateLookbackDays(int lookbackHours) {
-        return Math.max(1, (lookbackHours + 23) / 24);
+    LocalDateTime currentDateTime() {
+        return LocalDateTime.now();
     }
 
     private String normalizeFormType(String formType) {

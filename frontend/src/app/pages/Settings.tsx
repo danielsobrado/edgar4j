@@ -7,6 +7,16 @@ import { LoadingSpinner, LoadingPage } from '../components/common/LoadingSpinner
 import { ErrorMessage } from '../components/common/ErrorMessage';
 import { useSettingsStore } from '../store';
 import { MarketDataProvider } from '../api';
+import { MarketDataSettingsSection } from './settings/MarketDataSettingsSection';
+import {
+  buildLegacySelectedMarketDataFields,
+  buildMarketDataProvidersRequest,
+  createMarketDataProviderFormState,
+  getMarketDataProviderDefinition,
+  MarketDataProviderFormState,
+  MarketDataProviderKey,
+  normalizeMarketDataProvider,
+} from './settings/marketDataSettings';
 
 export function Settings() {
   const {
@@ -34,10 +44,24 @@ export function Settings() {
   const [smtpPassword, setSmtpPassword] = React.useState('');
   const [smtpStartTlsEnabled, setSmtpStartTlsEnabled] = React.useState(true);
   const [marketDataProvider, setMarketDataProvider] = React.useState<MarketDataProvider>('NONE');
-  const [marketDataBaseUrl, setMarketDataBaseUrl] = React.useState('https://api.tiingo.com');
-  const [marketDataApiKey, setMarketDataApiKey] = React.useState('');
+  const [marketDataProviders, setMarketDataProviders] = React.useState<MarketDataProviderFormState>(
+    () => createMarketDataProviderFormState(),
+  );
   const [connectionStatus, setConnectionStatus] = React.useState<'unknown' | 'testing' | 'connected' | 'failed'>('unknown');
   const [saved, setSaved] = React.useState(false);
+
+  // Insider Purchases Dashboard defaults
+  const [insiderLookbackDays, setInsiderLookbackDays] = React.useState(30);
+  const [insiderMinMarketCap, setInsiderMinMarketCap] = React.useState(0);
+  const [insiderSp500Only, setInsiderSp500Only] = React.useState(false);
+  const [insiderMinTxValue, setInsiderMinTxValue] = React.useState(0);
+
+  // Real-time Filing Sync
+  const [realtimeSyncEnabled, setRealtimeSyncEnabled] = React.useState(true);
+  const [realtimeSyncForms, setRealtimeSyncForms] = React.useState('4');
+  const [realtimeSyncLookbackHours, setRealtimeSyncLookbackHours] = React.useState(1);
+  const [realtimeSyncMaxPages, setRealtimeSyncMaxPages] = React.useState(10);
+  const [realtimeSyncPageSize, setRealtimeSyncPageSize] = React.useState(100);
 
   // Load settings on mount
   useEffect(() => {
@@ -60,15 +84,58 @@ export function Settings() {
       setSmtpUsername(settings.smtpUsername || '');
       setSmtpPassword(settings.smtpPassword || '');
       setSmtpStartTlsEnabled(settings.smtpStartTlsEnabled ?? true);
-      setMarketDataProvider(settings.marketDataProvider || 'NONE');
-      setMarketDataBaseUrl(settings.marketDataBaseUrl || 'https://api.tiingo.com');
-      setMarketDataApiKey(settings.marketDataApiKey || '');
+      setMarketDataProvider(normalizeMarketDataProvider(settings.marketDataProvider));
+      setMarketDataProviders(createMarketDataProviderFormState(settings));
       setDarkMode(settings.darkMode ?? false);
       setConnectionStatus(settings.mongoDbStatus?.connected ? 'connected' : 'unknown');
+
+      // Insider Purchases
+      setInsiderLookbackDays(settings.insiderPurchaseLookbackDays ?? 30);
+      setInsiderMinMarketCap(settings.insiderPurchaseMinMarketCap ?? 0);
+      setInsiderSp500Only(settings.insiderPurchaseSp500Only ?? false);
+      setInsiderMinTxValue(settings.insiderPurchaseMinTransactionValue ?? 0);
+
+      // Real-time Sync
+      setRealtimeSyncEnabled(settings.realtimeSyncEnabled ?? true);
+      setRealtimeSyncForms(settings.realtimeSyncForms ?? '4');
+      setRealtimeSyncLookbackHours(settings.realtimeSyncLookbackHours ?? 1);
+      setRealtimeSyncMaxPages(settings.realtimeSyncMaxPages ?? 10);
+      setRealtimeSyncPageSize(settings.realtimeSyncPageSize ?? 100);
     }
   }, [settings, setDarkMode]);
 
+  const handleMarketDataProviderChange = (provider: MarketDataProvider) => {
+    setMarketDataProvider(provider);
+    if (provider === 'NONE') {
+      return;
+    }
+
+    const definition = getMarketDataProviderDefinition(provider);
+    setMarketDataProviders((current) => ({
+      ...current,
+      [definition.key]: {
+        ...current[definition.key],
+        enabled: true,
+      },
+    }));
+  };
+
+  const handleMarketDataProviderSettingsChange = (
+    key: MarketDataProviderKey,
+    patch: Partial<MarketDataProviderFormState[MarketDataProviderKey]>,
+  ) => {
+    setMarketDataProviders((current) => ({
+      ...current,
+      [key]: {
+        ...current[key],
+        ...patch,
+      },
+    }));
+  };
+
   const handleSave = async () => {
+    const legacyMarketDataFields = buildLegacySelectedMarketDataFields(marketDataProvider, marketDataProviders);
+
     await updateSettings({
       userAgent,
       autoRefresh,
@@ -82,9 +149,20 @@ export function Settings() {
       smtpPassword,
       smtpStartTlsEnabled,
       marketDataProvider,
-      marketDataBaseUrl,
-      marketDataApiKey,
+      marketDataBaseUrl: legacyMarketDataFields.marketDataBaseUrl,
+      marketDataApiKey: legacyMarketDataFields.marketDataApiKey,
+      clearMarketDataApiKey: legacyMarketDataFields.clearMarketDataApiKey,
+      marketDataProviders: buildMarketDataProvidersRequest(marketDataProviders),
       darkMode,
+      insiderPurchaseLookbackDays: insiderLookbackDays,
+      insiderPurchaseMinMarketCap: insiderMinMarketCap,
+      insiderPurchaseSp500Only: insiderSp500Only,
+      insiderPurchaseMinTransactionValue: insiderMinTxValue,
+      realtimeSyncEnabled,
+      realtimeSyncForms,
+      realtimeSyncLookbackHours,
+      realtimeSyncMaxPages,
+      realtimeSyncPageSize,
     });
     setSaved(true);
     window.setTimeout(() => setSaved(false), 3000);
@@ -140,64 +218,13 @@ export function Settings() {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm p-6">
-        <h2 className="mb-4">Market Data For Filing Charts</h2>
-        <p className="text-sm text-gray-600 mb-4">
-          Configure a market data provider so Form 4 filing pages can draw insider transactions on top of the stock price.
-          The first chart view triggers an on-demand download for the required symbol and caches the daily candles locally.
-        </p>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm mb-2">Provider</label>
-            <select
-              value={marketDataProvider}
-              onChange={(e) => setMarketDataProvider(e.target.value as MarketDataProvider)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            >
-              <option value="NONE">Disabled</option>
-              <option value="TIINGO">Tiingo</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm mb-2">Base URL</label>
-            <input
-              type="text"
-              value={marketDataBaseUrl}
-              onChange={(e) => setMarketDataBaseUrl(e.target.value)}
-              placeholder="https://api.tiingo.com"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            />
-          </div>
-        </div>
-
-        {marketDataProvider === 'TIINGO' && (
-          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm mb-2">Tiingo API Key</label>
-              <input
-                type="password"
-                value={marketDataApiKey}
-                onChange={(e) => setMarketDataApiKey(e.target.value)}
-                placeholder="Your Tiingo token"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              />
-              {settings?.marketDataConfigured && !settings.marketDataApiKey && (
-                <p className="mt-2 text-xs text-gray-500">
-                  Using `tiingo.env` from the repo root as the active Tiingo credential source.
-                </p>
-              )}
-            </div>
-            <div className="rounded-lg bg-gray-50 p-4 text-sm text-gray-600">
-              <p className="font-medium text-gray-900 mb-1">Used by Form 4 detail pages</p>
-              <p>
-                When a filing chart needs a symbol that is not cached yet, the backend downloads the requested daily range,
-                stores it under `data/market-data/tiingo/edgar4j/prices_1d`, and then renders the chart from that local cache.
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
+      <MarketDataSettingsSection
+        settings={settings}
+        marketDataProvider={marketDataProvider}
+        marketDataProviders={marketDataProviders}
+        onMarketDataProviderChange={handleMarketDataProviderChange}
+        onProviderChange={handleMarketDataProviderSettingsChange}
+      />
 
       {/* API Endpoints */}
       <div className="bg-white rounded-lg shadow-sm p-6">
@@ -451,6 +478,151 @@ export function Settings() {
               </div>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Real-time Filing Sync */}
+      <div className="bg-white rounded-lg shadow-sm p-6">
+        <h2 className="mb-1">Real-time Filing Sync</h2>
+        <p className="text-sm text-gray-500 mb-4">
+          Configure which SEC forms to poll and how aggressively to sync.
+          The cron schedule requires a restart, but all other parameters take effect on the next poll.
+        </p>
+
+        <div className="space-y-4">
+          <div className="flex items-center justify-between max-w-md">
+            <div>
+              <p>Enable Real-time Sync</p>
+              <p className="text-sm text-gray-600">Master on/off for EFTS polling</p>
+            </div>
+            <Switch.Root
+              checked={realtimeSyncEnabled}
+              onCheckedChange={setRealtimeSyncEnabled}
+              className="w-11 h-6 bg-gray-200 rounded-full relative data-[state=checked]:bg-blue-500 transition-colors"
+            >
+              <Switch.Thumb className="block w-5 h-5 bg-white rounded-full transition-transform translate-x-0.5 data-[state=checked]:translate-x-[22px]" />
+            </Switch.Root>
+          </div>
+
+          <div>
+            <label className="block text-sm mb-2">Forms to Sync</label>
+            <input
+              type="text"
+              value={realtimeSyncForms}
+              onChange={(e) => setRealtimeSyncForms(e.target.value)}
+              placeholder="4,3,5,8-K,13F-HR"
+              className="w-full max-w-md px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              Comma-separated SEC form types. Examples: &quot;4&quot; (insider), &quot;4,3,5&quot; (all insider forms), &quot;4,8-K,13F-HR&quot;
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm mb-2">Lookback (hours)</label>
+              <input
+                type="number"
+                min={1}
+                max={72}
+                value={realtimeSyncLookbackHours}
+                onChange={(e) => setRealtimeSyncLookbackHours(Number(e.target.value))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm mb-2">Max Pages per Poll</label>
+              <input
+                type="number"
+                min={1}
+                max={50}
+                value={realtimeSyncMaxPages}
+                onChange={(e) => setRealtimeSyncMaxPages(Number(e.target.value))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm mb-2">Results per Page</label>
+              <select
+                value={realtimeSyncPageSize}
+                onChange={(e) => setRealtimeSyncPageSize(Number(e.target.value))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+                <option value={200}>200</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Insider Purchases Dashboard Defaults */}
+      <div className="bg-white rounded-lg shadow-sm p-6">
+        <h2 className="mb-1">Insider Purchases Dashboard</h2>
+        <p className="text-sm text-gray-500 mb-4">
+          Default filters applied when opening the Insider Purchases page
+        </p>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm mb-2">Default Lookback Period</label>
+            <select
+              value={insiderLookbackDays}
+              onChange={(e) => setInsiderLookbackDays(Number(e.target.value))}
+              className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value={7}>7 days</option>
+              <option value={14}>14 days</option>
+              <option value={30}>30 days</option>
+              <option value={60}>60 days</option>
+              <option value={90}>90 days</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm mb-2">Minimum Market Cap</label>
+            <select
+              value={insiderMinMarketCap}
+              onChange={(e) => setInsiderMinMarketCap(Number(e.target.value))}
+              className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value={0}>Any</option>
+              <option value={100000000}>$100M+</option>
+              <option value={500000000}>$500M+</option>
+              <option value={1000000000}>$1B+</option>
+              <option value={10000000000}>$10B+</option>
+              <option value={50000000000}>$50B+</option>
+            </select>
+          </div>
+
+          <div className="flex items-center justify-between max-w-xs">
+            <p>S&P 500 Only</p>
+            <Switch.Root
+              checked={insiderSp500Only}
+              onCheckedChange={setInsiderSp500Only}
+              className="w-11 h-6 bg-gray-200 rounded-full relative data-[state=checked]:bg-blue-500 transition-colors"
+            >
+              <Switch.Thumb className="block w-5 h-5 bg-white rounded-full transition-transform translate-x-0.5 data-[state=checked]:translate-x-[22px]" />
+            </Switch.Root>
+          </div>
+
+          <div>
+            <label className="block text-sm mb-2">Minimum Transaction Value</label>
+            <select
+              value={insiderMinTxValue}
+              onChange={(e) => setInsiderMinTxValue(Number(e.target.value))}
+              className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value={0}>Any</option>
+              <option value={10000}>$10K+</option>
+              <option value={50000}>$50K+</option>
+              <option value={100000}>$100K+</option>
+              <option value={500000}>$500K+</option>
+              <option value={1000000}>$1M+</option>
+            </select>
+          </div>
         </div>
       </div>
 

@@ -243,11 +243,25 @@ export interface Settings {
   smtpPort: number;
   smtpUsername?: string;
   smtpPassword?: string;
+  smtpPasswordConfigured?: boolean;
   smtpStartTlsEnabled: boolean;
   marketDataProvider?: MarketDataProvider;
   marketDataBaseUrl?: string;
   marketDataApiKey?: string;
+  marketDataApiKeyConfigured?: boolean;
   marketDataConfigured?: boolean;
+  marketDataProviders?: MarketDataProvidersSettings;
+  // Insider Purchases Dashboard defaults
+  insiderPurchaseLookbackDays?: number;
+  insiderPurchaseMinMarketCap?: number;
+  insiderPurchaseSp500Only?: boolean;
+  insiderPurchaseMinTransactionValue?: number;
+  // Real-time Filing Sync
+  realtimeSyncEnabled?: boolean;
+  realtimeSyncForms?: string;
+  realtimeSyncLookbackHours?: number;
+  realtimeSyncMaxPages?: number;
+  realtimeSyncPageSize?: number;
   apiEndpoints?: ApiEndpointsInfo;
   mongoDbStatus?: ConnectionStatus;
   elasticsearchStatus?: ConnectionStatus;
@@ -278,13 +292,56 @@ export interface SettingsRequest {
   smtpPort: number;
   smtpUsername?: string;
   smtpPassword?: string;
+  clearSmtpPassword?: boolean;
   smtpStartTlsEnabled: boolean;
   marketDataProvider?: MarketDataProvider;
   marketDataBaseUrl?: string;
   marketDataApiKey?: string;
+  clearMarketDataApiKey?: boolean;
+  marketDataProviders?: MarketDataProvidersRequest;
+  // Insider Purchases Dashboard defaults
+  insiderPurchaseLookbackDays?: number;
+  insiderPurchaseMinMarketCap?: number;
+  insiderPurchaseSp500Only?: boolean;
+  insiderPurchaseMinTransactionValue?: number;
+  // Real-time Filing Sync
+  realtimeSyncEnabled?: boolean;
+  realtimeSyncForms?: string;
+  realtimeSyncLookbackHours?: number;
+  realtimeSyncMaxPages?: number;
+  realtimeSyncPageSize?: number;
 }
 
-export type MarketDataProvider = 'NONE' | 'TIINGO';
+export type MarketDataProvider = 'NONE' | 'TIINGO' | 'YAHOOFINANCE' | 'FINNHUB' | 'ALPHAVANTAGE';
+
+export interface MarketDataProviderSettings {
+  enabled: boolean;
+  baseUrl?: string;
+  apiKey?: string;
+  apiKeyConfigured?: boolean;
+  configured?: boolean;
+}
+
+export interface MarketDataProvidersSettings {
+  tiingo?: MarketDataProviderSettings;
+  yahooFinance?: MarketDataProviderSettings;
+  finnhub?: MarketDataProviderSettings;
+  alphaVantage?: MarketDataProviderSettings;
+}
+
+export interface MarketDataProviderRequest {
+  enabled?: boolean;
+  baseUrl?: string;
+  apiKey?: string;
+  clearApiKey?: boolean;
+}
+
+export interface MarketDataProvidersRequest {
+  tiingo?: MarketDataProviderRequest;
+  yahooFinance?: MarketDataProviderRequest;
+  finnhub?: MarketDataProviderRequest;
+  alphaVantage?: MarketDataProviderRequest;
+}
 
 export interface MarketPriceBar {
   date: string;
@@ -744,3 +801,44 @@ export const FORM_8K_ITEMS: Record<string, string> = {
   '8.01': 'Other Events',
   '9.01': 'Financial Statements and Exhibits',
 };
+
+// ========== Insider Purchases Types ==========
+
+export interface InsiderPurchase {
+  ticker: string;
+  companyName: string | null;
+  cik: string | null;
+  insiderName: string | null;
+  insiderTitle: string | null;
+  ownerType: string | null;
+  transactionDate: string | null;
+  purchasePrice: number | null;
+  transactionShares: number | null;
+  transactionValue: number | null;
+  currentPrice: number | null;
+  percentChange: number | null;
+  marketCap: number | null;
+  sp500: boolean;
+  accessionNumber: string;
+  transactionCode: string | null;
+}
+
+export interface InsiderPurchaseSummary {
+  totalPurchases: number;
+  uniqueCompanies: number;
+  totalPurchaseValue: number;
+  averagePercentChange: number;
+  positiveChangeCount: number;
+  negativeChangeCount: number;
+}
+
+export interface InsiderPurchaseFilter {
+  lookbackDays?: number;
+  minMarketCap?: number;
+  sp500Only?: boolean;
+  minTransactionValue?: number;
+  sortBy?: string;
+  sortDir?: string;
+  page?: number;
+  size?: number;
+}

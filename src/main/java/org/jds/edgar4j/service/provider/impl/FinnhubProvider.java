@@ -1,42 +1,42 @@
 package org.jds.edgar4j.service.provider.impl;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.jds.edgar4j.properties.MarketDataProviderProperties;
-import org.jds.edgar4j.service.provider.MarketDataProvider;
-import org.springframework.stereotype.Service;
-
 import java.math.BigDecimal;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-/**
- * Finnhub market data provider implementation
- * 
- * @author J. Daniel Sobrado
- * @version 1.0
- * @since 2025-01-01
- */
+import org.jds.edgar4j.service.provider.MarketDataProvider;
+import org.jds.edgar4j.service.provider.MarketDataProviderSettingsResolver;
+import org.jds.edgar4j.service.provider.MarketDataProviders;
+import org.springframework.stereotype.Service;
+import org.springframework.web.util.UriComponentsBuilder;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class FinnhubProvider implements MarketDataProvider {
 
-    private final MarketDataProviderProperties properties;
-    private final ObjectMapper objectMapper = new ObjectMapper();
-    private final HttpClient httpClient = HttpClient.newHttpClient();
-    private final AtomicBoolean available = new AtomicBoolean(true);
+    private final ObjectMapper objectMapper;
+    private final MarketDataProviderSettingsResolver settingsResolver;
+    private final HttpClient httpClient = HttpClient.newBuilder()
+            .followRedirects(HttpClient.Redirect.NORMAL)
+            .build();
+    private final AtomicLong unavailableUntilEpochMillis = new AtomicLong(0);
     private final AtomicLong lastRequestTime = new AtomicLong(0);
 
     private static final String USER_AGENT = "Edgar4J/1.0 Finnhub Client";
@@ -48,45 +48,47 @@ public class FinnhubProvider implements MarketDataProvider {
 
     @Override
     public int getPriority() {
-        return properties.getFinnhub().getPriority();
+        return config().priority();
     }
 
     @Override
     public boolean isAvailable() {
-        return available.get() && 
-               properties.getFinnhub().isEnabled() && 
-               properties.getFinnhub().getApiKey() != null;
+        return config().operational()
+                && System.currentTimeMillis() >= unavailableUntilEpochMillis.get();
     }
 
     @Override
     public CompletableFuture<StockPrice> getCurrentPrice(String symbol) {
+        MarketDataProviderSettingsResolver.ResolvedProviderConfig config = config();
+        if (!config.operational()) {
+            return CompletableFuture.completedFuture(null);
+        }
+
         return CompletableFuture.supplyAsync(() -> {
             try {
                 log.debug("Getting current price for symbol: {} from Finnhub", symbol);
-                
-                enforceRateLimit();
-                
-                String url = buildQuoteUrl(symbol);
+
+                enforceRateLimit(config);
                 HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .header("User-Agent", USER_AGENT)
-                    .header("X-Finnhub-Token", properties.getFinnhub().getApiKey())
-                    .timeout(properties.getFinnhub().getTimeout())
-                    .build();
+                        .uri(buildQuoteUri(config.baseUrl(), symbol))
+                        .header("User-Agent", USER_AGENT)
+                        .header("X-Finnhub-Token", config.apiKey())
+                        .timeout(config.timeout())
+                        .build();
 
                 HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-                
+
                 if (response.statusCode() == 200) {
+                    markAvailable();
                     return parseCurrentPrice(response.body(), symbol);
-                } else {
-                    log.warn("Finnhub API returned status: {} for symbol: {}", response.statusCode(), symbol);
-                    available.set(false);
-                    return null;
                 }
-                
+
+                log.warn("Finnhub API returned status: {} for symbol: {}", response.statusCode(), symbol);
+                markTemporarilyUnavailable(config.retryDelay());
+                return null;
             } catch (Exception e) {
                 log.error("Error getting current price from Finnhub for symbol: {}", symbol, e);
-                available.set(false);
+                markTemporarilyUnavailable(config.retryDelay());
                 return null;
             }
         });
@@ -94,67 +96,73 @@ public class FinnhubProvider implements MarketDataProvider {
 
     @Override
     public CompletableFuture<List<StockPrice>> getHistoricalPrices(String symbol, LocalDate startDate, LocalDate endDate) {
+        MarketDataProviderSettingsResolver.ResolvedProviderConfig config = config();
+        if (!config.operational()) {
+            return CompletableFuture.completedFuture(List.of());
+        }
+
         return CompletableFuture.supplyAsync(() -> {
             try {
                 log.debug("Getting historical prices for symbol: {} from {} to {}", symbol, startDate, endDate);
-                
-                enforceRateLimit();
-                
-                String url = buildCandlesUrl(symbol, startDate, endDate);
+
+                enforceRateLimit(config);
                 HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .header("User-Agent", USER_AGENT)
-                    .header("X-Finnhub-Token", properties.getFinnhub().getApiKey())
-                    .timeout(properties.getFinnhub().getTimeout())
-                    .build();
+                        .uri(buildCandlesUri(config.baseUrl(), symbol, startDate, endDate))
+                        .header("User-Agent", USER_AGENT)
+                        .header("X-Finnhub-Token", config.apiKey())
+                        .timeout(config.timeout())
+                        .build();
 
                 HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-                
+
                 if (response.statusCode() == 200) {
+                    markAvailable();
                     return parseHistoricalPrices(response.body(), symbol);
-                } else {
-                    log.warn("Finnhub API returned status: {} for symbol: {}", response.statusCode(), symbol);
-                    available.set(false);
-                    return new ArrayList<>();
                 }
-                
+
+                log.warn("Finnhub API returned status: {} for symbol: {}", response.statusCode(), symbol);
+                markTemporarilyUnavailable(config.retryDelay());
+                return List.of();
             } catch (Exception e) {
                 log.error("Error getting historical prices from Finnhub for symbol: {}", symbol, e);
-                available.set(false);
-                return new ArrayList<>();
+                markTemporarilyUnavailable(config.retryDelay());
+                return List.of();
             }
         });
     }
 
     @Override
     public CompletableFuture<CompanyProfile> getCompanyProfile(String symbol) {
+        MarketDataProviderSettingsResolver.ResolvedProviderConfig config = config();
+        if (!config.operational()) {
+            return CompletableFuture.completedFuture(null);
+        }
+
         return CompletableFuture.supplyAsync(() -> {
             try {
                 log.debug("Getting company profile for symbol: {} from Finnhub", symbol);
-                
-                enforceRateLimit();
-                
-                String url = buildProfileUrl(symbol);
+
+                enforceRateLimit(config);
                 HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .header("User-Agent", USER_AGENT)
-                    .header("X-Finnhub-Token", properties.getFinnhub().getApiKey())
-                    .timeout(properties.getFinnhub().getTimeout())
-                    .build();
+                        .uri(buildProfileUri(config.baseUrl(), symbol))
+                        .header("User-Agent", USER_AGENT)
+                        .header("X-Finnhub-Token", config.apiKey())
+                        .timeout(config.timeout())
+                        .build();
 
                 HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-                
+
                 if (response.statusCode() == 200) {
+                    markAvailable();
                     return parseCompanyProfile(response.body(), symbol);
-                } else {
-                    log.warn("Finnhub API returned status: {} for symbol: {}", response.statusCode(), symbol);
-                    available.set(false);
-                    return null;
                 }
-                
+
+                log.warn("Finnhub API returned status: {} for symbol: {}", response.statusCode(), symbol);
+                markTemporarilyUnavailable(config.retryDelay());
+                return null;
             } catch (Exception e) {
                 log.error("Error getting company profile from Finnhub for symbol: {}", symbol, e);
-                available.set(false);
+                markTemporarilyUnavailable(config.retryDelay());
                 return null;
             }
         });
@@ -162,44 +170,63 @@ public class FinnhubProvider implements MarketDataProvider {
 
     @Override
     public CompletableFuture<FinancialMetrics> getFinancialMetrics(String symbol) {
+        MarketDataProviderSettingsResolver.ResolvedProviderConfig config = config();
+        if (!config.operational()) {
+            return CompletableFuture.completedFuture(null);
+        }
+
         return CompletableFuture.supplyAsync(() -> {
             try {
                 log.debug("Getting financial metrics for symbol: {} from Finnhub", symbol);
-                
-                enforceRateLimit();
-                
-                String url = buildMetricsUrl(symbol);
+
+                enforceRateLimit(config);
                 HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .header("User-Agent", USER_AGENT)
-                    .header("X-Finnhub-Token", properties.getFinnhub().getApiKey())
-                    .timeout(properties.getFinnhub().getTimeout())
-                    .build();
+                        .uri(buildMetricsUri(config.baseUrl(), symbol))
+                        .header("User-Agent", USER_AGENT)
+                        .header("X-Finnhub-Token", config.apiKey())
+                        .timeout(config.timeout())
+                        .build();
 
                 HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-                
+
                 if (response.statusCode() == 200) {
+                    markAvailable();
                     return parseFinancialMetrics(response.body(), symbol);
-                } else {
-                    log.warn("Finnhub API returned status: {} for symbol: {}", response.statusCode(), symbol);
-                    available.set(false);
-                    return null;
                 }
-                
+
+                log.warn("Finnhub API returned status: {} for symbol: {}", response.statusCode(), symbol);
+                markTemporarilyUnavailable(config.retryDelay());
+                return null;
             } catch (Exception e) {
                 log.error("Error getting financial metrics from Finnhub for symbol: {}", symbol, e);
-                available.set(false);
+                markTemporarilyUnavailable(config.retryDelay());
                 return null;
             }
         });
     }
 
-    private void enforceRateLimit() {
+    private MarketDataProviderSettingsResolver.ResolvedProviderConfig config() {
+        return settingsResolver.resolve(MarketDataProviders.FINNHUB);
+    }
+
+    private void markAvailable() {
+        unavailableUntilEpochMillis.set(0);
+    }
+
+    private void markTemporarilyUnavailable(Duration retryDelay) {
+        long cooldownMillis = retryDelay != null ? Math.max(0L, retryDelay.toMillis()) : 0L;
+        unavailableUntilEpochMillis.set(System.currentTimeMillis() + cooldownMillis);
+    }
+
+    private void enforceRateLimit(MarketDataProviderSettingsResolver.ResolvedProviderConfig config) {
         long now = System.currentTimeMillis();
         long timeSinceLastRequest = now - lastRequestTime.get();
-        long minInterval = properties.getFinnhub().getRateLimit().getPeriod().toMillis() / 
-                          properties.getFinnhub().getRateLimit().getRequests();
-        
+        long requests = config.rateLimit() != null ? Math.max(1, config.rateLimit().getRequests()) : 1;
+        long periodMillis = config.rateLimit() != null && config.rateLimit().getPeriod() != null
+                ? Math.max(1L, config.rateLimit().getPeriod().toMillis())
+                : 1L;
+        long minInterval = Math.max(1L, periodMillis / requests);
+
         if (timeSinceLastRequest < minInterval) {
             try {
                 Thread.sleep(minInterval - timeSinceLastRequest);
@@ -207,31 +234,51 @@ public class FinnhubProvider implements MarketDataProvider {
                 Thread.currentThread().interrupt();
             }
         }
-        
+
         lastRequestTime.set(System.currentTimeMillis());
     }
 
-    private String buildQuoteUrl(String symbol) {
-        return String.format("%s/quote?symbol=%s", 
-            properties.getFinnhub().getBaseUrl(), symbol);
+    private URI buildQuoteUri(String baseUrl, String symbol) {
+        return UriComponentsBuilder.fromUriString(baseUrl)
+                .pathSegment("quote")
+                .queryParam("symbol", symbol)
+                .build()
+                .encode()
+                .toUri();
     }
 
-    private String buildCandlesUrl(String symbol, LocalDate startDate, LocalDate endDate) {
+    private URI buildCandlesUri(String baseUrl, String symbol, LocalDate startDate, LocalDate endDate) {
         long startTimestamp = startDate.atStartOfDay().toEpochSecond(ZoneOffset.UTC);
-        long endTimestamp = endDate.atStartOfDay().toEpochSecond(ZoneOffset.UTC);
-        
-        return String.format("%s/stock/candle?symbol=%s&resolution=D&from=%d&to=%d",
-            properties.getFinnhub().getBaseUrl(), symbol, startTimestamp, endTimestamp);
+        long endTimestamp = endDate.plusDays(1).atStartOfDay().minusSeconds(1).toEpochSecond(ZoneOffset.UTC);
+
+        return UriComponentsBuilder.fromUriString(baseUrl)
+                .pathSegment("stock", "candle")
+                .queryParam("symbol", symbol)
+                .queryParam("resolution", "D")
+                .queryParam("from", startTimestamp)
+                .queryParam("to", endTimestamp)
+                .build()
+                .encode()
+                .toUri();
     }
 
-    private String buildProfileUrl(String symbol) {
-        return String.format("%s/stock/profile2?symbol=%s", 
-            properties.getFinnhub().getBaseUrl(), symbol);
+    private URI buildProfileUri(String baseUrl, String symbol) {
+        return UriComponentsBuilder.fromUriString(baseUrl)
+                .pathSegment("stock", "profile2")
+                .queryParam("symbol", symbol)
+                .build()
+                .encode()
+                .toUri();
     }
 
-    private String buildMetricsUrl(String symbol) {
-        return String.format("%s/stock/metric?symbol=%s&metric=all", 
-            properties.getFinnhub().getBaseUrl(), symbol);
+    private URI buildMetricsUri(String baseUrl, String symbol) {
+        return UriComponentsBuilder.fromUriString(baseUrl)
+                .pathSegment("stock", "metric")
+                .queryParam("symbol", symbol)
+                .queryParam("metric", "all")
+                .build()
+                .encode()
+                .toUri();
     }
 
     private StockPrice parseCurrentPrice(String jsonResponse, String symbol) {
@@ -265,11 +312,11 @@ public class FinnhubProvider implements MarketDataProvider {
 
     private List<StockPrice> parseHistoricalPrices(String jsonResponse, String symbol) {
         List<StockPrice> prices = new ArrayList<>();
-        
+
         try {
             JsonNode rootNode = objectMapper.readTree(jsonResponse);
-            
-            if (!rootNode.path("s").asText().equals("ok")) {
+
+            if (!"ok".equals(rootNode.path("s").asText())) {
                 log.warn("No historical data found in Finnhub response for symbol: {}", symbol);
                 return prices;
             }
@@ -280,13 +327,13 @@ public class FinnhubProvider implements MarketDataProvider {
             JsonNode lows = rootNode.path("l");
             JsonNode closes = rootNode.path("c");
             JsonNode volumes = rootNode.path("v");
-            
+
             if (timestamps.isArray() && opens.isArray()) {
                 for (int i = 0; i < timestamps.size(); i++) {
                     try {
                         long timestamp = timestamps.get(i).asLong();
-                        LocalDate date = LocalDate.ofEpochDay(timestamp / 86400); // Convert seconds to days
-                        
+                        LocalDate date = Instant.ofEpochSecond(timestamp).atOffset(ZoneOffset.UTC).toLocalDate();
+
                         StockPrice stockPrice = new StockPrice();
                         stockPrice.setSymbol(symbol);
                         stockPrice.setDate(date);
@@ -298,19 +345,22 @@ public class FinnhubProvider implements MarketDataProvider {
                         stockPrice.setVolume(volumes.get(i).asLong());
                         stockPrice.setCurrency("USD");
                         stockPrice.setExchange("US");
-                        
+
                         prices.add(stockPrice);
                     } catch (Exception e) {
                         log.warn("Error parsing historical price entry for symbol: {}", symbol, e);
                     }
                 }
             }
-            
+
         } catch (Exception e) {
             log.error("Error parsing historical prices response from Finnhub", e);
         }
-        
-        return prices;
+
+        return prices.stream()
+                .filter(price -> price.getDate() != null)
+                .sorted(java.util.Comparator.comparing(StockPrice::getDate))
+                .toList();
     }
 
     private CompanyProfile parseCompanyProfile(String jsonResponse, String symbol) {

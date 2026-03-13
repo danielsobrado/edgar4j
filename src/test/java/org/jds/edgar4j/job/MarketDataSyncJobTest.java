@@ -15,6 +15,7 @@ import java.util.Set;
 
 import org.jds.edgar4j.model.CompanyMarketData;
 import org.jds.edgar4j.model.Form4;
+import org.jds.edgar4j.model.Form4Transaction;
 import org.jds.edgar4j.repository.Form4Repository;
 import org.jds.edgar4j.service.CompanyMarketDataService;
 import org.jds.edgar4j.service.Sp500Service;
@@ -58,10 +59,22 @@ class MarketDataSyncJobTest {
         ReflectionTestUtils.setField(job, "batchSize", 2);
 
         when(sp500Service.getAllTickers()).thenReturn(Set.of("AAPL", "MSFT"));
-        when(form4Repository.findByTransactionDateBetween(any(LocalDate.class), any(LocalDate.class))).thenReturn(List.of(
-                Form4.builder().tradingSymbol("TSLA").build(),
-                Form4.builder().tradingSymbol("aapl").build(),
-                Form4.builder().tradingSymbol(" ").build()));
+        when(form4Repository.findRecentAcquisitions(any(LocalDate.class))).thenReturn(List.of(
+                Form4.builder()
+                        .tradingSymbol("TSLA")
+                        .transactionDate(LocalDate.now().minusDays(60))
+                        .transactions(List.of(Form4Transaction.builder()
+                                .transactionCode("P")
+                                .acquiredDisposedCode("A")
+                                .transactionDate(LocalDate.now().minusDays(2))
+                                .build()))
+                        .build(),
+                Form4.builder()
+                        .tradingSymbol("aapl")
+                        .transactionDate(LocalDate.now().minusDays(1))
+                        .acquiredDisposedCode("A")
+                        .build(),
+                Form4.builder().tradingSymbol(" ").transactionDate(LocalDate.now().minusDays(1)).build()));
         when(companyMarketDataService.fetchAndSaveQuotesBatch(any(List.class))).thenReturn(List.of(
                 CompanyMarketData.builder().ticker("AAPL").build()));
 

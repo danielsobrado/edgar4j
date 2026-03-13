@@ -1,42 +1,41 @@
 package org.jds.edgar4j.service.provider.impl;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.jds.edgar4j.properties.MarketDataProviderProperties;
-import org.jds.edgar4j.service.provider.MarketDataProvider;
-import org.springframework.stereotype.Service;
-
 import java.math.BigDecimal;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-/**
- * Alpha Vantage market data provider implementation
- * 
- * @author J. Daniel Sobrado
- * @version 1.0
- * @since 2025-01-01
- */
+import org.jds.edgar4j.service.provider.MarketDataProvider;
+import org.jds.edgar4j.service.provider.MarketDataProviderSettingsResolver;
+import org.jds.edgar4j.service.provider.MarketDataProviders;
+import org.springframework.stereotype.Service;
+import org.springframework.web.util.UriComponentsBuilder;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class AlphaVantageProvider implements MarketDataProvider {
 
-    private final MarketDataProviderProperties properties;
-    private final ObjectMapper objectMapper = new ObjectMapper();
-    private final HttpClient httpClient = HttpClient.newHttpClient();
-    private final AtomicBoolean available = new AtomicBoolean(true);
+    private final ObjectMapper objectMapper;
+    private final MarketDataProviderSettingsResolver settingsResolver;
+    private final HttpClient httpClient = HttpClient.newBuilder()
+            .followRedirects(HttpClient.Redirect.NORMAL)
+            .build();
+    private final AtomicLong unavailableUntilEpochMillis = new AtomicLong(0);
     private final AtomicLong lastRequestTime = new AtomicLong(0);
 
     private static final String USER_AGENT = "Edgar4J/1.0 AlphaVantage Client";
@@ -48,44 +47,46 @@ public class AlphaVantageProvider implements MarketDataProvider {
 
     @Override
     public int getPriority() {
-        return properties.getAlphaVantage().getPriority();
+        return config().priority();
     }
 
     @Override
     public boolean isAvailable() {
-        return available.get() && 
-               properties.getAlphaVantage().isEnabled() && 
-               properties.getAlphaVantage().getApiKey() != null;
+        return config().operational()
+                && System.currentTimeMillis() >= unavailableUntilEpochMillis.get();
     }
 
     @Override
     public CompletableFuture<StockPrice> getCurrentPrice(String symbol) {
+        MarketDataProviderSettingsResolver.ResolvedProviderConfig config = config();
+        if (!config.operational()) {
+            return CompletableFuture.completedFuture(null);
+        }
+
         return CompletableFuture.supplyAsync(() -> {
             try {
                 log.debug("Getting current price for symbol: {} from Alpha Vantage", symbol);
-                
-                enforceRateLimit();
-                
-                String url = buildQuoteUrl(symbol);
+
+                enforceRateLimit(config);
                 HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .header("User-Agent", USER_AGENT)
-                    .timeout(properties.getAlphaVantage().getTimeout())
-                    .build();
+                        .uri(buildQuoteUri(config.baseUrl(), symbol, config.apiKey()))
+                        .header("User-Agent", USER_AGENT)
+                        .timeout(config.timeout())
+                        .build();
 
                 HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-                
+
                 if (response.statusCode() == 200) {
+                    markAvailable();
                     return parseCurrentPrice(response.body(), symbol);
-                } else {
-                    log.warn("Alpha Vantage API returned status: {} for symbol: {}", response.statusCode(), symbol);
-                    available.set(false);
-                    return null;
                 }
-                
+
+                log.warn("Alpha Vantage API returned status: {} for symbol: {}", response.statusCode(), symbol);
+                markTemporarilyUnavailable(config.retryDelay());
+                return null;
             } catch (Exception e) {
                 log.error("Error getting current price from Alpha Vantage for symbol: {}", symbol, e);
-                available.set(false);
+                markTemporarilyUnavailable(config.retryDelay());
                 return null;
             }
         });
@@ -93,65 +94,71 @@ public class AlphaVantageProvider implements MarketDataProvider {
 
     @Override
     public CompletableFuture<List<StockPrice>> getHistoricalPrices(String symbol, LocalDate startDate, LocalDate endDate) {
+        MarketDataProviderSettingsResolver.ResolvedProviderConfig config = config();
+        if (!config.operational()) {
+            return CompletableFuture.completedFuture(List.of());
+        }
+
         return CompletableFuture.supplyAsync(() -> {
             try {
                 log.debug("Getting historical prices for symbol: {} from {} to {}", symbol, startDate, endDate);
-                
-                enforceRateLimit();
-                
-                String url = buildDailyUrl(symbol);
+
+                enforceRateLimit(config);
                 HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .header("User-Agent", USER_AGENT)
-                    .timeout(properties.getAlphaVantage().getTimeout())
-                    .build();
+                        .uri(buildDailyUri(config.baseUrl(), symbol, config.apiKey()))
+                        .header("User-Agent", USER_AGENT)
+                        .timeout(config.timeout())
+                        .build();
 
                 HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-                
+
                 if (response.statusCode() == 200) {
+                    markAvailable();
                     return parseHistoricalPrices(response.body(), symbol, startDate, endDate);
-                } else {
-                    log.warn("Alpha Vantage API returned status: {} for symbol: {}", response.statusCode(), symbol);
-                    available.set(false);
-                    return new ArrayList<>();
                 }
-                
+
+                log.warn("Alpha Vantage API returned status: {} for symbol: {}", response.statusCode(), symbol);
+                markTemporarilyUnavailable(config.retryDelay());
+                return List.of();
             } catch (Exception e) {
                 log.error("Error getting historical prices from Alpha Vantage for symbol: {}", symbol, e);
-                available.set(false);
-                return new ArrayList<>();
+                markTemporarilyUnavailable(config.retryDelay());
+                return List.of();
             }
         });
     }
 
     @Override
     public CompletableFuture<CompanyProfile> getCompanyProfile(String symbol) {
+        MarketDataProviderSettingsResolver.ResolvedProviderConfig config = config();
+        if (!config.operational()) {
+            return CompletableFuture.completedFuture(null);
+        }
+
         return CompletableFuture.supplyAsync(() -> {
             try {
                 log.debug("Getting company profile for symbol: {} from Alpha Vantage", symbol);
-                
-                enforceRateLimit();
-                
-                String url = buildOverviewUrl(symbol);
+
+                enforceRateLimit(config);
                 HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .header("User-Agent", USER_AGENT)
-                    .timeout(properties.getAlphaVantage().getTimeout())
-                    .build();
+                        .uri(buildOverviewUri(config.baseUrl(), symbol, config.apiKey()))
+                        .header("User-Agent", USER_AGENT)
+                        .timeout(config.timeout())
+                        .build();
 
                 HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-                
+
                 if (response.statusCode() == 200) {
+                    markAvailable();
                     return parseCompanyProfile(response.body(), symbol);
-                } else {
-                    log.warn("Alpha Vantage API returned status: {} for symbol: {}", response.statusCode(), symbol);
-                    available.set(false);
-                    return null;
                 }
-                
+
+                log.warn("Alpha Vantage API returned status: {} for symbol: {}", response.statusCode(), symbol);
+                markTemporarilyUnavailable(config.retryDelay());
+                return null;
             } catch (Exception e) {
                 log.error("Error getting company profile from Alpha Vantage for symbol: {}", symbol, e);
-                available.set(false);
+                markTemporarilyUnavailable(config.retryDelay());
                 return null;
             }
         });
@@ -159,43 +166,62 @@ public class AlphaVantageProvider implements MarketDataProvider {
 
     @Override
     public CompletableFuture<FinancialMetrics> getFinancialMetrics(String symbol) {
+        MarketDataProviderSettingsResolver.ResolvedProviderConfig config = config();
+        if (!config.operational()) {
+            return CompletableFuture.completedFuture(null);
+        }
+
         return CompletableFuture.supplyAsync(() -> {
             try {
                 log.debug("Getting financial metrics for symbol: {} from Alpha Vantage", symbol);
-                
-                enforceRateLimit();
-                
-                String url = buildOverviewUrl(symbol);
+
+                enforceRateLimit(config);
                 HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .header("User-Agent", USER_AGENT)
-                    .timeout(properties.getAlphaVantage().getTimeout())
-                    .build();
+                        .uri(buildOverviewUri(config.baseUrl(), symbol, config.apiKey()))
+                        .header("User-Agent", USER_AGENT)
+                        .timeout(config.timeout())
+                        .build();
 
                 HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-                
+
                 if (response.statusCode() == 200) {
+                    markAvailable();
                     return parseFinancialMetrics(response.body(), symbol);
-                } else {
-                    log.warn("Alpha Vantage API returned status: {} for symbol: {}", response.statusCode(), symbol);
-                    available.set(false);
-                    return null;
                 }
-                
+
+                log.warn("Alpha Vantage API returned status: {} for symbol: {}", response.statusCode(), symbol);
+                markTemporarilyUnavailable(config.retryDelay());
+                return null;
             } catch (Exception e) {
                 log.error("Error getting financial metrics from Alpha Vantage for symbol: {}", symbol, e);
-                available.set(false);
+                markTemporarilyUnavailable(config.retryDelay());
                 return null;
             }
         });
     }
 
-    private void enforceRateLimit() {
+    private MarketDataProviderSettingsResolver.ResolvedProviderConfig config() {
+        return settingsResolver.resolve(MarketDataProviders.ALPHA_VANTAGE);
+    }
+
+    private void markAvailable() {
+        unavailableUntilEpochMillis.set(0);
+    }
+
+    private void markTemporarilyUnavailable(Duration retryDelay) {
+        long cooldownMillis = retryDelay != null ? Math.max(0L, retryDelay.toMillis()) : 0L;
+        unavailableUntilEpochMillis.set(System.currentTimeMillis() + cooldownMillis);
+    }
+
+    private void enforceRateLimit(MarketDataProviderSettingsResolver.ResolvedProviderConfig config) {
         long now = System.currentTimeMillis();
         long timeSinceLastRequest = now - lastRequestTime.get();
-        long minInterval = properties.getAlphaVantage().getRateLimit().getPeriod().toMillis() / 
-                          properties.getAlphaVantage().getRateLimit().getRequests();
-        
+        long requests = config.rateLimit() != null ? Math.max(1, config.rateLimit().getRequests()) : 1;
+        long periodMillis = config.rateLimit() != null && config.rateLimit().getPeriod() != null
+                ? Math.max(1L, config.rateLimit().getPeriod().toMillis())
+                : 1L;
+        long minInterval = Math.max(1L, periodMillis / requests);
+
         if (timeSinceLastRequest < minInterval) {
             try {
                 Thread.sleep(minInterval - timeSinceLastRequest);
@@ -203,29 +229,39 @@ public class AlphaVantageProvider implements MarketDataProvider {
                 Thread.currentThread().interrupt();
             }
         }
-        
+
         lastRequestTime.set(System.currentTimeMillis());
     }
 
-    private String buildQuoteUrl(String symbol) {
-        return String.format("%s?function=GLOBAL_QUOTE&symbol=%s&apikey=%s",
-            properties.getAlphaVantage().getBaseUrl(),
-            symbol,
-            properties.getAlphaVantage().getApiKey());
+    private URI buildQuoteUri(String baseUrl, String symbol, String apiKey) {
+        return UriComponentsBuilder.fromUriString(baseUrl)
+                .queryParam("function", "GLOBAL_QUOTE")
+                .queryParam("symbol", symbol)
+                .queryParam("apikey", apiKey)
+                .build()
+                .encode()
+                .toUri();
     }
 
-    private String buildDailyUrl(String symbol) {
-        return String.format("%s?function=TIME_SERIES_DAILY&symbol=%s&outputsize=compact&apikey=%s",
-            properties.getAlphaVantage().getBaseUrl(),
-            symbol,
-            properties.getAlphaVantage().getApiKey());
+    private URI buildDailyUri(String baseUrl, String symbol, String apiKey) {
+        return UriComponentsBuilder.fromUriString(baseUrl)
+                .queryParam("function", "TIME_SERIES_DAILY")
+                .queryParam("symbol", symbol)
+                .queryParam("outputsize", "compact")
+                .queryParam("apikey", apiKey)
+                .build()
+                .encode()
+                .toUri();
     }
 
-    private String buildOverviewUrl(String symbol) {
-        return String.format("%s?function=OVERVIEW&symbol=%s&apikey=%s",
-            properties.getAlphaVantage().getBaseUrl(),
-            symbol,
-            properties.getAlphaVantage().getApiKey());
+    private URI buildOverviewUri(String baseUrl, String symbol, String apiKey) {
+        return UriComponentsBuilder.fromUriString(baseUrl)
+                .queryParam("function", "OVERVIEW")
+                .queryParam("symbol", symbol)
+                .queryParam("apikey", apiKey)
+                .build()
+                .encode()
+                .toUri();
     }
 
     private StockPrice parseCurrentPrice(String jsonResponse, String symbol) {
@@ -261,25 +297,25 @@ public class AlphaVantageProvider implements MarketDataProvider {
 
     private List<StockPrice> parseHistoricalPrices(String jsonResponse, String symbol, LocalDate startDate, LocalDate endDate) {
         List<StockPrice> prices = new ArrayList<>();
-        
+
         try {
             JsonNode rootNode = objectMapper.readTree(jsonResponse);
             JsonNode timeSeriesNode = rootNode.path("Time Series (Daily)");
-            
+
             if (timeSeriesNode.isMissingNode()) {
                 log.warn("No time series data found in Alpha Vantage response for symbol: {}", symbol);
                 return prices;
             }
 
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-            
+
             timeSeriesNode.fields().forEachRemaining(entry -> {
                 try {
                     LocalDate date = LocalDate.parse(entry.getKey(), formatter);
-                    
+
                     if (!date.isBefore(startDate) && !date.isAfter(endDate)) {
                         JsonNode dayData = entry.getValue();
-                        
+
                         StockPrice stockPrice = new StockPrice();
                         stockPrice.setSymbol(symbol);
                         stockPrice.setDate(date);
@@ -287,23 +323,26 @@ public class AlphaVantageProvider implements MarketDataProvider {
                         stockPrice.setHigh(parseBigDecimal(dayData.path("2. high").asText()));
                         stockPrice.setLow(parseBigDecimal(dayData.path("3. low").asText()));
                         stockPrice.setClose(parseBigDecimal(dayData.path("4. close").asText()));
-                        stockPrice.setPrice(stockPrice.getClose()); // Use close as current price
+                        stockPrice.setPrice(stockPrice.getClose());
                         stockPrice.setVolume(parseLong(dayData.path("5. volume").asText()));
                         stockPrice.setCurrency("USD");
                         stockPrice.setExchange("US");
-                        
+
                         prices.add(stockPrice);
                     }
                 } catch (Exception e) {
                     log.warn("Error parsing historical price entry for symbol: {}", symbol, e);
                 }
             });
-            
+
         } catch (Exception e) {
             log.error("Error parsing historical prices response from Alpha Vantage", e);
         }
-        
-        return prices;
+
+        return prices.stream()
+                .filter(price -> price.getDate() != null)
+                .sorted(java.util.Comparator.comparing(StockPrice::getDate))
+                .toList();
     }
 
     private CompanyProfile parseCompanyProfile(String jsonResponse, String symbol) {
