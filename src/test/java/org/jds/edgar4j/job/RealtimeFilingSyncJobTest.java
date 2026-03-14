@@ -46,7 +46,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -119,7 +118,7 @@ class RealtimeFilingSyncJobTest {
         when(secApiClient.fetchEftsSearch(eq("4,8-K"), any(LocalDate.class), any(LocalDate.class), eq(0), eq(50)))
                 .thenReturn("""
                         {"hits":{"total":{"value":2,"relation":"eq"},"hits":[
-                          {"_id":"000032019324000001","_source":{"form_type":"4","entity_id":["320193"]}},
+                          {"_id":"000032019324000001","_source":{"form_type":"4","entity_id":["320193"],"file_num":["001-12345"]}},
                           {"_id":"000078901924000002","_source":{"form_type":"8-K","entity_id":["789019"]}}
                         ]}}
                         """);
@@ -302,7 +301,7 @@ class RealtimeFilingSyncJobTest {
     }
 
     private RealtimeFilingSyncJob createJob() {
-        RealtimeFilingSyncJob job = new RealtimeFilingSyncJob(
+                return new RealtimeFilingSyncJob(
                 secApiClient,
                 downloadSubmissionsService,
                 fillingRepository,
@@ -315,13 +314,12 @@ class RealtimeFilingSyncJobTest {
                 form13DGService,
                 form13FService,
                 form20FService,
-                new ObjectMapper());
-        ReflectionTestUtils.setField(job, "enabledFallback", true);
-        ReflectionTestUtils.setField(job, "formsFallback", "4");
-        ReflectionTestUtils.setField(job, "lookbackHoursFallback", 1);
-        ReflectionTestUtils.setField(job, "maxPagesFallback", 10);
-        ReflectionTestUtils.setField(job, "pageSizeFallback", 100);
-        ReflectionTestUtils.setField(job, "secBlockCooldownMinutes", 10);
-        return job;
+                                new ObjectMapper(),
+                                true,
+                                "4",
+                                1,
+                                10,
+                                100,
+                                10);
     }
 }

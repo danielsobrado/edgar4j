@@ -62,6 +62,10 @@ public class SecApiConfig {
         return submissionsCIKUrl + formatCik(cik) + ".json";
     }
 
+    public String getCompanyFactsUrl(String cik) {
+        return String.format("%s/api/xbrl/companyfacts/CIK%s.json", baseDataSecUrl, formatCik(cik));
+    }
+
     public String getForm4Url(String cik, String accessionNumber, String primaryDocument) {
         String cleanedAccession = accessionNumber.replace("-", "");
         return String.format("%s/%s/%s/%s",

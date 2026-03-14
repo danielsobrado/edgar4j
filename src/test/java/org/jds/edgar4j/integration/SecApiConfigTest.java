@@ -44,4 +44,15 @@ class SecApiConfigTest {
         assertTrue(uri.getRawQuery().contains("from=100"));
         assertTrue(uri.getRawQuery().contains("size=50"));
     }
+
+    @Test
+    @DisplayName("companyfacts URLs should use the zero-padded CIK on data.sec.gov")
+    void companyFactsUrlShouldUsePaddedCik() {
+        SecApiConfig config = new SecApiConfig();
+        ReflectionTestUtils.setField(config, "baseDataSecUrl", "https://data.sec.gov");
+
+        assertEquals(
+                "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json",
+                config.getCompanyFactsUrl("320193"));
+    }
 }

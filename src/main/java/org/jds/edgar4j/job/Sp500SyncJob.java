@@ -4,23 +4,28 @@ import java.time.LocalDateTime;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.jds.edgar4j.service.Sp500Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class Sp500SyncJob {
 
     private final Sp500Service sp500Service;
+    private final boolean enabled;
     private final AtomicBoolean isRunning = new AtomicBoolean(false);
 
-    @Value("${edgar4j.jobs.sp500-sync.enabled:true}")
-    private boolean enabled;
+    @Autowired
+    public Sp500SyncJob(
+            Sp500Service sp500Service,
+            @Value("${edgar4j.jobs.sp500-sync.enabled:true}") boolean enabled) {
+        this.sp500Service = sp500Service;
+        this.enabled = enabled;
+    }
 
     @Scheduled(cron = "${edgar4j.jobs.sp500-sync.cron:0 0 3 * * SUN}")
     public void syncSp500() {

@@ -82,7 +82,9 @@ public class AlphaVantageProvider implements MarketDataProvider {
                 }
 
                 log.warn("Alpha Vantage API returned status: {} for symbol: {}", response.statusCode(), symbol);
-                markTemporarilyUnavailable(config.retryDelay());
+                if (shouldMarkTemporarilyUnavailable(response.statusCode())) {
+                    markTemporarilyUnavailable(config.retryDelay());
+                }
                 return null;
             } catch (Exception e) {
                 log.error("Error getting current price from Alpha Vantage for symbol: {}", symbol, e);
@@ -118,7 +120,9 @@ public class AlphaVantageProvider implements MarketDataProvider {
                 }
 
                 log.warn("Alpha Vantage API returned status: {} for symbol: {}", response.statusCode(), symbol);
-                markTemporarilyUnavailable(config.retryDelay());
+                if (shouldMarkTemporarilyUnavailable(response.statusCode())) {
+                    markTemporarilyUnavailable(config.retryDelay());
+                }
                 return List.of();
             } catch (Exception e) {
                 log.error("Error getting historical prices from Alpha Vantage for symbol: {}", symbol, e);
@@ -154,7 +158,9 @@ public class AlphaVantageProvider implements MarketDataProvider {
                 }
 
                 log.warn("Alpha Vantage API returned status: {} for symbol: {}", response.statusCode(), symbol);
-                markTemporarilyUnavailable(config.retryDelay());
+                if (shouldMarkTemporarilyUnavailable(response.statusCode())) {
+                    markTemporarilyUnavailable(config.retryDelay());
+                }
                 return null;
             } catch (Exception e) {
                 log.error("Error getting company profile from Alpha Vantage for symbol: {}", symbol, e);
@@ -190,7 +196,9 @@ public class AlphaVantageProvider implements MarketDataProvider {
                 }
 
                 log.warn("Alpha Vantage API returned status: {} for symbol: {}", response.statusCode(), symbol);
-                markTemporarilyUnavailable(config.retryDelay());
+                if (shouldMarkTemporarilyUnavailable(response.statusCode())) {
+                    markTemporarilyUnavailable(config.retryDelay());
+                }
                 return null;
             } catch (Exception e) {
                 log.error("Error getting financial metrics from Alpha Vantage for symbol: {}", symbol, e);
@@ -214,23 +222,34 @@ public class AlphaVantageProvider implements MarketDataProvider {
     }
 
     private void enforceRateLimit(MarketDataProviderSettingsResolver.ResolvedProviderConfig config) {
-        long now = System.currentTimeMillis();
-        long timeSinceLastRequest = now - lastRequestTime.get();
         long requests = config.rateLimit() != null ? Math.max(1, config.rateLimit().getRequests()) : 1;
         long periodMillis = config.rateLimit() != null && config.rateLimit().getPeriod() != null
                 ? Math.max(1L, config.rateLimit().getPeriod().toMillis())
                 : 1L;
         long minInterval = Math.max(1L, periodMillis / requests);
 
-        if (timeSinceLastRequest < minInterval) {
-            try {
-                Thread.sleep(minInterval - timeSinceLastRequest);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
+        while (true) {
+            long previousRequestTime = lastRequestTime.get();
+            long now = System.currentTimeMillis();
+            long nextAllowedTime = previousRequestTime + minInterval;
+            if (nextAllowedTime > now) {
+                try {
+                    Thread.sleep(nextAllowedTime - now);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+                continue;
+            }
+
+            if (lastRequestTime.compareAndSet(previousRequestTime, now)) {
+                return;
             }
         }
+    }
 
-        lastRequestTime.set(System.currentTimeMillis());
+    private boolean shouldMarkTemporarilyUnavailable(int statusCode) {
+        return statusCode == 401 || statusCode == 403 || statusCode == 429 || statusCode >= 500;
     }
 
     private URI buildQuoteUri(String baseUrl, String symbol, String apiKey) {

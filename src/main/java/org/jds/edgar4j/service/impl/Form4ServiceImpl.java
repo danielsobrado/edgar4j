@@ -1,10 +1,12 @@
 package org.jds.edgar4j.service.impl;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.time.Duration;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -17,26 +19,23 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.stream.Collectors;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.InflaterInputStream;
 
 import org.jds.edgar4j.exception.SecApiException;
 import org.jds.edgar4j.integration.Form4Parser;
 import org.jds.edgar4j.integration.SecAccessDiagnostics;
 import org.jds.edgar4j.integration.SecApiClient;
-import org.jds.edgar4j.model.Company;
 import org.jds.edgar4j.model.Filling;
 import org.jds.edgar4j.model.Form4;
-import org.jds.edgar4j.model.Submissions;
 import org.jds.edgar4j.storage.DownloadedResourceStore;
 import org.jds.edgar4j.model.Ticker;
 import org.jds.edgar4j.repository.FillingRepository;
 import org.jds.edgar4j.repository.Form4Repository;
 import org.jds.edgar4j.repository.TickerRepository;
-import org.jds.edgar4j.service.CompanyService;
 import org.jds.edgar4j.service.Form4Service;
 import org.jds.edgar4j.service.SettingsService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -64,23 +63,18 @@ public class Form4ServiceImpl implements Form4Service {
     private final Form4Parser form4Parser;
     private final SettingsService settingsService;
     private final SecApiClient secApiClient;
-    private final CompanyService companyService;
     private final TickerRepository tickerRepository;
     private final FillingRepository fillingRepository;
     private final DownloadedResourceStore downloadedResourceStore;
+    private final HttpClient httpClient;
 
     @Value("${edgar4j.urls.edgarDataArchivesUrl}")
     private String edgarDataArchivesUrl;
 
-    private final HttpClient httpClient = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(30))
-            .followRedirects(HttpClient.Redirect.NORMAL)
-            .build();
-
     @Override
     public CompletableFuture<String> downloadForm4(String cik, String accessionNumber, String primaryDocument) {
         String formUrl = buildFormUrl(cik, accessionNumber, primaryDocument);
-        String cached = downloadedResourceStore.readText(CACHE_NAMESPACE, formUrl, java.nio.charset.StandardCharsets.UTF_8)
+        String cached = downloadedResourceStore.readText(CACHE_NAMESPACE, formUrl, StandardCharsets.UTF_8)
                 .orElse(null);
         if (cached != null) {
             log.debug("Using cached Form 4 for {}", accessionNumber);
@@ -97,16 +91,16 @@ public class Form4ServiceImpl implements Form4Service {
                 .GET()
                 .build();
 
-        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofInputStream())
                 .thenApply(response -> {
-                    String body = response.body();
+                    String body = readResponseBody(response);
                     validateDownloadResponse(formUrl, response.statusCode(), body);
                     if (body != null && !body.isBlank()) {
                         downloadedResourceStore.writeText(
                                 CACHE_NAMESPACE,
                                 formUrl,
                                 body,
-                                java.nio.charset.StandardCharsets.UTF_8);
+                                StandardCharsets.UTF_8);
                     }
                     return body;
                 })
@@ -168,13 +162,11 @@ public class Form4ServiceImpl implements Form4Service {
         }
 
         // Check for existing record by accession number
-        Optional<Form4> existing = form4Repository.findByAccessionNumber(form4.getAccessionNumber());
-        if (existing.isPresent()) {
-            Form4 existingForm4 = existing.get();
+        form4Repository.findByAccessionNumber(form4.getAccessionNumber()).ifPresent(existingForm4 -> {
             form4.setId(existingForm4.getId());
             form4.setCreatedAt(existingForm4.getCreatedAt());
             log.debug("Updating existing Form 4: {}", form4.getAccessionNumber());
-        }
+        });
 
         form4.setUpdatedAt(Instant.now());
 
@@ -303,7 +295,7 @@ public class Form4ServiceImpl implements Form4Service {
 
     @Override
     public boolean existsByAccessionNumber(String accessionNumber) {
-        return form4Repository.findByAccessionNumber(accessionNumber).isPresent();
+        return form4Repository.existsByAccessionNumber(accessionNumber);
     }
 
     @Override
@@ -526,6 +518,7 @@ public class Form4ServiceImpl implements Form4Service {
      * Fetches Form 4 filings directly from SEC API when local database is empty.
      * This provides a fallback mechanism for real-time data.
      */
+    @Override
     public List<Form4> fetchFromSecApi(String symbol, LocalDate startDate, LocalDate endDate, int limit) {
         log.info("Fetching Form 4 filings from SEC API for symbol: {} (fallback mode)", symbol);
         List<Form4> form4List = new ArrayList<>();
@@ -533,10 +526,10 @@ public class Form4ServiceImpl implements Form4Service {
         
         try {
             // First, try to get CIK from local ticker database
-            String cik = null;
-            var tickerOpt = tickerRepository.findByCode(symbol.toUpperCase());
-            if (tickerOpt.isPresent()) {
-                cik = tickerOpt.get().getCik();
+            String cik = tickerRepository.findByCode(symbol.toUpperCase())
+                    .map(Ticker::getCik)
+                    .orElse(null);
+            if (cik != null) {
                 log.debug("Found CIK {} for symbol {} in local ticker database", cik, symbol);
             }
             
@@ -648,6 +641,7 @@ public class Form4ServiceImpl implements Form4Service {
     /**
      * Fetches recent Form 4 filings from SEC API when local database is empty.
      */
+    @Override
     public List<Form4> fetchRecentFromSecApi(int limit) {
         log.info("Fetching recent Form 4 filings from SEC API (fallback mode)");
         List<Form4> form4List = new ArrayList<>();
@@ -755,6 +749,26 @@ public class Form4ServiceImpl implements Form4Service {
         if (body == null || body.isBlank()) {
             throw new SecApiException("SEC Form 4 response was empty for URL: " + formUrl);
         }
+    }
+
+    private String readResponseBody(HttpResponse<InputStream> response) {
+        String encoding = response.headers().firstValue("Content-Encoding").orElse("");
+        try (InputStream rawStream = response.body();
+             InputStream decodedStream = wrapStream(rawStream, encoding)) {
+            return new String(decodedStream.readAllBytes(), StandardCharsets.UTF_8);
+        } catch (IOException exception) {
+            throw new SecApiException("Failed to read SEC Form 4 response body", exception);
+        }
+    }
+
+    private InputStream wrapStream(InputStream inputStream, String encoding) throws IOException {
+        if ("gzip".equalsIgnoreCase(encoding)) {
+            return new GZIPInputStream(inputStream);
+        }
+        if ("deflate".equalsIgnoreCase(encoding)) {
+            return new InflaterInputStream(inputStream);
+        }
+        return inputStream;
     }
 
     private Throwable unwrap(Throwable throwable) {

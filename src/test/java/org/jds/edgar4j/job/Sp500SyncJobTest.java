@@ -13,7 +13,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class Sp500SyncJobTest {
@@ -24,8 +23,7 @@ class Sp500SyncJobTest {
     @Test
     @DisplayName("syncSp500 should skip execution when the job is disabled")
     void syncSp500ShouldSkipWhenDisabled() {
-        Sp500SyncJob job = new Sp500SyncJob(sp500Service);
-        ReflectionTestUtils.setField(job, "enabled", false);
+        Sp500SyncJob job = new Sp500SyncJob(sp500Service, false);
 
         job.syncSp500();
 
@@ -36,8 +34,7 @@ class Sp500SyncJobTest {
     @Test
     @DisplayName("syncSp500 should invoke the service when enabled")
     void syncSp500ShouldInvokeServiceWhenEnabled() {
-        Sp500SyncJob job = new Sp500SyncJob(sp500Service);
-        ReflectionTestUtils.setField(job, "enabled", true);
+        Sp500SyncJob job = new Sp500SyncJob(sp500Service, true);
         when(sp500Service.syncFromWikipedia()).thenReturn(List.of());
 
         job.syncSp500();

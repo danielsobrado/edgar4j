@@ -12,17 +12,14 @@ import org.jds.edgar4j.model.CompanyMarketData;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.MethodOrderer.OrderAnnotation;
-import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestMethodOrder;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
 @SpringBootTest
 @ActiveProfiles("test")
-@TestMethodOrder(OrderAnnotation.class)
 class CompanyMarketDataRepositoryTest {
 
     @Autowired
@@ -69,14 +66,12 @@ class CompanyMarketDataRepositoryTest {
     }
 
     @Test
-    @Order(1)
     @DisplayName("Should save and count company market data")
     void shouldSaveAndCount() {
         assertEquals(3, companyMarketDataRepository.count());
     }
 
     @Test
-    @Order(2)
     @DisplayName("Should find market data by ticker ignoring case")
     void shouldFindByTickerIgnoreCase() {
         var result = companyMarketDataRepository.findByTickerIgnoreCase("msft");
@@ -87,7 +82,6 @@ class CompanyMarketDataRepositoryTest {
     }
 
     @Test
-    @Order(3)
     @DisplayName("Should find a batch of market data by ticker list")
     void shouldFindByTickerIn() {
         List<CompanyMarketData> result = companyMarketDataRepository.findByTickerIn(List.of("AAPL", "MSFT"));
@@ -98,7 +92,6 @@ class CompanyMarketDataRepositoryTest {
     }
 
     @Test
-    @Order(4)
     @DisplayName("Should find companies at or above a market-cap threshold")
     void shouldFindByMarketCapGreaterThanEqual() {
         List<CompanyMarketData> result = companyMarketDataRepository.findByMarketCapGreaterThanEqual(1_000_000_000_000d);
@@ -108,7 +101,6 @@ class CompanyMarketDataRepositoryTest {
     }
 
     @Test
-    @Order(5)
     @DisplayName("Should report market data existence by ticker ignoring case")
     void shouldCheckExistsByTickerIgnoreCase() {
         assertTrue(companyMarketDataRepository.existsByTickerIgnoreCase("aapl"));
@@ -116,7 +108,6 @@ class CompanyMarketDataRepositoryTest {
     }
 
     @Test
-    @Order(6)
     @DisplayName("Should reject duplicate ticker symbols")
     void shouldRejectDuplicateTicker() {
         CompanyMarketData duplicate = CompanyMarketData.builder()
@@ -129,6 +120,6 @@ class CompanyMarketDataRepositoryTest {
                 .lastUpdated(Instant.now())
                 .build();
 
-        assertThrows(Exception.class, () -> companyMarketDataRepository.save(duplicate));
+        assertThrows(DuplicateKeyException.class, () -> companyMarketDataRepository.save(duplicate));
     }
 }

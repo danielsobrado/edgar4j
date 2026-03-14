@@ -9,33 +9,43 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.jds.edgar4j.dto.response.MarketCapBackfillResponse;
 import org.jds.edgar4j.model.Form4;
 import org.jds.edgar4j.model.Form4Transaction;
 import org.jds.edgar4j.repository.Form4Repository;
 import org.jds.edgar4j.service.CompanyMarketDataService;
 import org.jds.edgar4j.service.Sp500Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class MarketDataSyncJob {
 
     private final CompanyMarketDataService companyMarketDataService;
     private final Sp500Service sp500Service;
     private final Form4Repository form4Repository;
+    private final boolean enabled;
+    private final int batchSize;
     private final AtomicBoolean isRunning = new AtomicBoolean(false);
 
-    @Value("${edgar4j.jobs.market-data-sync.enabled:true}")
-    private boolean enabled;
-
-    @Value("${edgar4j.jobs.market-data-sync.batch-size:50}")
-    private int batchSize;
+    @Autowired
+    public MarketDataSyncJob(
+            CompanyMarketDataService companyMarketDataService,
+            Sp500Service sp500Service,
+            Form4Repository form4Repository,
+            @Value("${edgar4j.jobs.market-data-sync.enabled:true}") boolean enabled,
+            @Value("${edgar4j.jobs.market-data-sync.batch-size:50}") int batchSize) {
+        this.companyMarketDataService = companyMarketDataService;
+        this.sp500Service = sp500Service;
+        this.form4Repository = form4Repository;
+        this.enabled = enabled;
+        this.batchSize = batchSize;
+    }
 
     @Scheduled(cron = "${edgar4j.jobs.market-data-sync.cron:0 0 */2 * * MON-FRI}")
     public void syncMarketData() {
@@ -91,6 +101,40 @@ public class MarketDataSyncJob {
         syncMarketData();
     }
 
+    public MarketCapBackfillResponse triggerMarketCapBackfill(int maxTickers, int lookbackDays) {
+        log.info("Manual market-cap backfill triggered");
+
+        if (!isRunning.compareAndSet(false, true)) {
+            throw new IllegalStateException("Market data sync job is already running");
+        }
+
+        try {
+            LocalDate since = LocalDate.now().minusDays(Math.max(1, lookbackDays));
+            Set<String> trackedTickers = loadTrackedTickers(since);
+            List<String> orderedTickers = trackedTickers.stream()
+                    .sorted(String.CASE_INSENSITIVE_ORDER)
+                    .toList();
+
+            log.info("Starting market-cap backfill at {} for {} tracked tickers (lookbackDays={}, maxTickers={})",
+                    LocalDateTime.now(), orderedTickers.size(), lookbackDays, maxTickers);
+
+            MarketCapBackfillResponse response = companyMarketDataService.backfillMissingMarketCaps(
+                    orderedTickers,
+                    batchSize,
+                    maxTickers);
+
+            log.info("Market-cap backfill completed: processed={} updated={} unresolved={} deferred={}",
+                    response.getProcessedTickers(),
+                    response.getUpdatedTickers(),
+                    response.getUnresolvedTickersCount(),
+                    response.getDeferredTickers());
+
+            return response;
+        } finally {
+            isRunning.set(false);
+        }
+    }
+
     public boolean isRunning() {
         return isRunning.get();
     }
@@ -124,6 +168,12 @@ public class MarketDataSyncJob {
         return form4.getTransactions().stream()
                 .filter(Objects::nonNull)
                 .anyMatch(transaction -> isRecentOpenMarketPurchase(transaction, since));
+    }
+
+    private Set<String> loadTrackedTickers(LocalDate since) {
+        Set<String> trackedTickers = new LinkedHashSet<>(sp500Service.getAllTickers());
+        trackedTickers.addAll(loadRecentInsiderTickers(since));
+        return trackedTickers;
     }
 
     private boolean isRecentOpenMarketPurchase(Form4Transaction transaction, LocalDate since) {

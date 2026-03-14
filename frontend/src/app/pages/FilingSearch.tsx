@@ -11,29 +11,72 @@ import { Pagination } from '../components/common/Pagination';
 import { useSearchStore } from '../store';
 import { FilingSearchRequest, remoteEdgarApi, RemoteFilingSearchResult } from '../api';
 
+type SearchState = {
+  searchTerm: string;
+  selectedFormType: string;
+  dateFrom: string;
+  dateTo: string;
+  keywords: string[];
+  keywordInput: string;
+  currentPage: number;
+  pageSize: number;
+  sortField: 'filingDate' | 'wordHits';
+  sortDirection: 'asc' | 'desc';
+  searchMode: 'company' | 'ticker' | 'cik';
+  includeRemote: boolean;
+  remoteMaxForms: number;
+};
+
+const DEFAULT_SEARCH_STATE: SearchState = {
+  searchTerm: '',
+  selectedFormType: '',
+  dateFrom: '',
+  dateTo: '',
+  keywords: [],
+  keywordInput: '',
+  currentPage: 0,
+  pageSize: 25,
+  sortField: 'filingDate',
+  sortDirection: 'desc',
+  searchMode: 'company',
+  includeRemote: false,
+  remoteMaxForms: 25,
+};
+
 export function FilingSearch() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { addSearch } = useSearchStore();
 
-  // Search state
-  const [searchTerm, setSearchTerm] = React.useState('');
-  const [selectedFormType, setSelectedFormType] = React.useState('');
-  const [dateFrom, setDateFrom] = React.useState('');
-  const [dateTo, setDateTo] = React.useState('');
-  const [keywords, setKeywords] = React.useState<string[]>([]);
-  const [keywordInput, setKeywordInput] = React.useState('');
-  const [currentPage, setCurrentPage] = React.useState(0);
-  const [pageSize, setPageSize] = React.useState(25);
-  const [sortField, setSortField] = React.useState<'filingDate' | 'wordHits'>('filingDate');
-  const [sortDirection, setSortDirection] = React.useState<'asc' | 'desc'>('desc');
+  const [searchState, setSearchState] = React.useState<SearchState>(DEFAULT_SEARCH_STATE);
   const [hasSearched, setHasSearched] = React.useState(false);
-  const [searchMode, setSearchMode] = React.useState<'company' | 'ticker' | 'cik'>('company');
-  const [includeRemote, setIncludeRemote] = React.useState(false);
-  const [remoteMaxForms, setRemoteMaxForms] = React.useState(25);
   const [remoteLoading, setRemoteLoading] = React.useState(false);
   const [remoteError, setRemoteError] = React.useState<string | null>(null);
   const [remoteSearchResult, setRemoteSearchResult] = React.useState<RemoteFilingSearchResult | null>(null);
+
+  const {
+    searchTerm,
+    selectedFormType,
+    dateFrom,
+    dateTo,
+    keywords,
+    keywordInput,
+    currentPage,
+    pageSize,
+    sortField,
+    sortDirection,
+    searchMode,
+    includeRemote,
+    remoteMaxForms,
+  } = searchState;
+
+  const updateSearchState = useCallback((updates: Partial<SearchState>) => {
+    setSearchState((prev) => ({ ...prev, ...updates }));
+  }, []);
+
+  const isAbortError = useCallback((error: unknown) => {
+    return error instanceof Error && (error.name === 'CanceledError' || error.name === 'AbortError');
+  }, []);
 
   const resolveSearchInput = useCallback((value: string) => {
     const trimmedValue = value.trim();
@@ -96,7 +139,7 @@ export function FilingSearch() {
     return message;
   }, []);
 
-  const searchRemote = useCallback(async () => {
+  const searchRemote = useCallback(async (signal?: AbortSignal) => {
     if (!includeRemote) {
       setRemoteLoading(false);
       setRemoteError(null);
@@ -115,17 +158,22 @@ export function FilingSearch() {
     setRemoteError(null);
     setRemoteSearchResult(null);
     try {
-      const data = await remoteEdgarApi.searchFilings(request);
+      const data = await remoteEdgarApi.searchFilings(request, signal ? { signal } : undefined);
       setRemoteSearchResult(data);
     } catch (err) {
+      if (isAbortError(err)) {
+        return;
+      }
       setRemoteError(normalizeRemoteSearchError(err));
     } finally {
-      setRemoteLoading(false);
+      if (!signal?.aborted) {
+        setRemoteLoading(false);
+      }
     }
-  }, [includeRemote, buildRemoteSearchRequest, normalizeRemoteSearchError]);
+  }, [includeRemote, buildRemoteSearchRequest, isAbortError, normalizeRemoteSearchError]);
 
   // API hooks
-  const { filings, loading, error, totalElements, totalPages, search, refresh } = useFilings();
+  const { filings, loading, error, totalElements, totalPages, search } = useFilings();
   const { formTypes, loading: formTypesLoading } = useFormTypes();
   const { exportToCsv, exportToJson, loading: exportLoading } = useExport();
 
@@ -147,25 +195,27 @@ export function FilingSearch() {
       ? Math.max(1, Math.min(500, nextRemoteMaxFormsRaw))
       : 25;
 
-    setSearchTerm(resolvedSearch.value);
-    setSearchMode(tickerParam ? 'ticker' : cikParam ? 'cik' : resolvedSearch.mode);
-    setSelectedFormType(nextFormType);
-    setDateFrom(nextDateFrom);
-    setDateTo(nextDateTo);
-    setKeywords(nextKeywords);
-    setIncludeRemote(nextIncludeRemote);
-    setRemoteMaxForms(nextRemoteMaxForms);
+    setSearchState({
+      ...DEFAULT_SEARCH_STATE,
+      searchTerm: resolvedSearch.value,
+      searchMode: tickerParam ? 'ticker' : cikParam ? 'cik' : resolvedSearch.mode,
+      selectedFormType: nextFormType,
+      dateFrom: nextDateFrom,
+      dateTo: nextDateTo,
+      keywords: nextKeywords,
+      includeRemote: nextIncludeRemote,
+      remoteMaxForms: nextRemoteMaxForms,
+      pageSize,
+    });
     setRemoteError(null);
     setRemoteSearchResult(null);
-    setKeywordInput('');
-    setCurrentPage(0);
-    setSortField('filingDate');
-    setSortDirection('desc');
 
     const shouldAutoSearch = searchParams.get('autoSearch') === '1';
     const hasIncomingFilters = Boolean(rawValue || nextFormType || nextDateFrom || nextDateTo || nextKeywords.length > 0);
 
     if (shouldAutoSearch && hasIncomingFilters) {
+      const localAbortController = new AbortController();
+      const remoteAbortController = new AbortController();
       setHasSearched(true);
       const localRequest = {
         companyName: resolvedSearch.value && !tickerParam && !cikParam && resolvedSearch.mode === 'company' ? resolvedSearch.value : undefined,
@@ -180,7 +230,7 @@ export function FilingSearch() {
         sortBy: 'filingDate',
         sortDir: 'desc',
       };
-      search(localRequest);
+      void search(localRequest, localAbortController.signal);
       if (nextIncludeRemote && nextFormType) {
         setRemoteLoading(true);
         void remoteEdgarApi.searchFilings({
@@ -191,33 +241,45 @@ export function FilingSearch() {
           dateFrom: nextDateFrom || undefined,
           dateTo: nextDateTo || undefined,
           limit: nextDateFrom && nextDateTo ? 100 : nextRemoteMaxForms,
-        })
+        }, { signal: remoteAbortController.signal })
           .then((data) => {
             setRemoteSearchResult(data);
             setRemoteError(null);
           })
           .catch((err) => {
+            if (isAbortError(err)) {
+              return;
+            }
             setRemoteError(normalizeRemoteSearchError(err));
             setRemoteSearchResult(null);
           })
           .finally(() => {
-            setRemoteLoading(false);
+            if (!remoteAbortController.signal.aborted) {
+              setRemoteLoading(false);
+            }
           });
       }
+
+      return () => {
+        localAbortController.abort();
+        remoteAbortController.abort();
+      };
     } else if (!hasIncomingFilters) {
       setHasSearched(false);
     }
-  }, [searchParams, resolveSearchInput, search, pageSize, normalizeRemoteSearchError]);
+  }, [searchParams, resolveSearchInput, search, pageSize, normalizeRemoteSearchError, isAbortError]);
 
   // Trigger search when page or sort changes after initial search
   useEffect(() => {
     if (hasSearched) {
-      search(buildSearchRequest());
+      const abortController = new AbortController();
+      void search(buildSearchRequest(), abortController.signal);
+      return () => abortController.abort();
     }
   }, [currentPage, pageSize, sortField, sortDirection, hasSearched, search, buildSearchRequest]);
 
   const handleSearch = async () => {
-    setCurrentPage(0);
+    updateSearchState({ currentPage: 0 });
     setHasSearched(true);
     const request = buildSearchRequest({ page: 0 });
 
@@ -233,24 +295,16 @@ export function FilingSearch() {
 
   const addKeyword = () => {
     if (keywordInput && !keywords.includes(keywordInput)) {
-      setKeywords([...keywords, keywordInput]);
-      setKeywordInput('');
+      updateSearchState({ keywords: [...keywords, keywordInput], keywordInput: '' });
     }
   };
 
   const removeKeyword = (keyword: string) => {
-    setKeywords(keywords.filter(k => k !== keyword));
+    updateSearchState({ keywords: keywords.filter(k => k !== keyword) });
   };
 
   const clearFilters = () => {
-    setSearchTerm('');
-    setSearchMode('company');
-    setSelectedFormType('');
-    setDateFrom('');
-    setDateTo('');
-    setKeywords([]);
-    setIncludeRemote(false);
-    setRemoteMaxForms(25);
+    setSearchState(DEFAULT_SEARCH_STATE);
     setRemoteError(null);
     setRemoteSearchResult(null);
     setHasSearched(false);
@@ -258,10 +312,9 @@ export function FilingSearch() {
 
   const handleSort = (field: 'filingDate' | 'wordHits') => {
     if (sortField === field) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+      updateSearchState({ sortDirection: sortDirection === 'asc' ? 'desc' : 'asc' });
     } else {
-      setSortField(field);
-      setSortDirection('desc');
+      updateSearchState({ sortField: field, sortDirection: 'desc' });
     }
   };
 
@@ -303,8 +356,7 @@ export function FilingSearch() {
               value={searchTerm}
               onChange={(e) => {
                 const resolved = resolveSearchInput(e.target.value);
-                setSearchTerm(resolved.value);
-                setSearchMode(resolved.mode);
+                updateSearchState({ searchTerm: resolved.value, searchMode: resolved.mode });
               }}
               onKeyPress={(e) => e.key === 'Enter' && void handleSearch()}
               placeholder="e.g., Apple, AAPL, 0000320193"
@@ -317,7 +369,7 @@ export function FilingSearch() {
             <label className="block text-sm mb-2">Form Type</label>
             <select
               value={selectedFormType}
-              onChange={(e) => setSelectedFormType(e.target.value)}
+              onChange={(e) => updateSearchState({ selectedFormType: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               disabled={formTypesLoading}
             >
@@ -334,7 +386,7 @@ export function FilingSearch() {
             <input
               type="date"
               value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
+              onChange={(e) => updateSearchState({ dateFrom: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -344,7 +396,7 @@ export function FilingSearch() {
             <input
               type="date"
               value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
+              onChange={(e) => updateSearchState({ dateTo: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -364,7 +416,7 @@ export function FilingSearch() {
               <input
                 type="text"
                 value={keywordInput}
-                onChange={(e) => setKeywordInput(e.target.value)}
+                onChange={(e) => updateSearchState({ keywordInput: e.target.value })}
                 onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addKeyword())}
                 placeholder="e.g., revenue, acquisition, merger"
                 className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -398,7 +450,7 @@ export function FilingSearch() {
                 type="checkbox"
                 checked={includeRemote}
                 onChange={(e) => {
-                  setIncludeRemote(e.target.checked);
+                  updateSearchState({ includeRemote: e.target.checked });
                   if (!e.target.checked) {
                     setRemoteError(null);
                     setRemoteSearchResult(null);
@@ -424,7 +476,7 @@ export function FilingSearch() {
                   min={1}
                   max={500}
                   value={remoteMaxForms}
-                  onChange={(e) => setRemoteMaxForms(Number(e.target.value || 25))}
+                  onChange={(e) => updateSearchState({ remoteMaxForms: Number(e.target.value || 25) })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 <p className="mt-1 text-xs text-gray-500">
@@ -613,10 +665,9 @@ export function FilingSearch() {
                 totalPages={totalPages}
                 totalElements={totalElements}
                 size={pageSize}
-                onPageChange={setCurrentPage}
+                onPageChange={(page) => updateSearchState({ currentPage: page })}
                 onPageSizeChange={(size) => {
-                  setPageSize(size);
-                  setCurrentPage(0);
+                  updateSearchState({ pageSize: size, currentPage: 0 });
                 }}
               />
             </>

@@ -1,3 +1,4 @@
+import type { AxiosRequestConfig } from 'axios';
 import { apiClient } from '../client';
 import { RemoteFilingSearchResult, RemoteSubmission, RemoteTicker } from '../types';
 
@@ -27,8 +28,8 @@ export const remoteEdgarApi = {
     dateFrom?: string;
     dateTo?: string;
     limit?: number;
-  }): Promise<RemoteFilingSearchResult> => {
-    return apiClient.post<RemoteFilingSearchResult>('/remote-edgar/filings/search', request);
+  }, config?: AxiosRequestConfig): Promise<RemoteFilingSearchResult> => {
+    return apiClient.post<RemoteFilingSearchResult>('/remote-edgar/filings/search', request, config);
   },
 };
 

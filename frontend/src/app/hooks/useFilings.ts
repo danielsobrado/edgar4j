@@ -1,3 +1,4 @@
+import axios from 'axios';
 import { useState, useEffect, useCallback } from 'react';
 import { filingsApi, Filing, FilingDetail, FilingSearchRequest, PaginatedResponse } from '../api';
 
@@ -130,26 +131,27 @@ export function useFilings() {
   const [totalElements, setTotalElements] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
 
-  const search = useCallback(async (request: FilingSearchRequest) => {
+  const search = useCallback(async (request: FilingSearchRequest, signal?: AbortSignal) => {
     setLoading(true);
     setError(null);
     try {
-      const data = await filingsApi.searchFilings(request);
+      const data = await filingsApi.searchFilings(request, signal ? { signal } : undefined);
       setFilings(data.content);
       setTotalElements(data.totalElements);
       setTotalPages(data.totalPages);
     } catch (err) {
+      if (axios.isCancel(err) || (err instanceof Error && err.name === 'CanceledError')) {
+        return;
+      }
       setError(err instanceof Error ? err.message : 'Failed to search filings');
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) {
+        setLoading(false);
+      }
     }
   }, []);
 
-  const refresh = useCallback(() => {
-    // Refresh with current state - caller handles request
-  }, []);
-
-  return { filings, loading, error, totalElements, totalPages, search, refresh };
+  return { filings, loading, error, totalElements, totalPages, search };
 }
 
 // Form types for dropdown

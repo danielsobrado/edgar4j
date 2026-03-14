@@ -58,16 +58,32 @@ public class SecApiClient {
         return executeRequest(config.getCompanyTickersMFsUrl());
     }
 
+    public String fetchCompanyFacts(String cik) {
+        return executeRequest(config.getCompanyFactsUrl(cik));
+    }
+
     public String fetchForm4(String cik, String accessionNumber, String primaryDocument) {
         String url = config.getForm4Url(cik, accessionNumber, primaryDocument);
         return executeRequest(url);
     }
 
     public Optional<String> fetchDailyMasterIndex(LocalDate date) {
-        for (String url : config.getDailyMasterIndexUrls(date)) {
-            Optional<String> response = executeRequestOptional(url);
-            if (response.isPresent()) {
-                return response;
+        java.util.List<String> candidateUrls = config.getDailyMasterIndexUrls(date);
+        for (int index = 0; index < candidateUrls.size(); index++) {
+            String url = candidateUrls.get(index);
+            boolean hasMoreCandidates = index < candidateUrls.size() - 1;
+            try {
+                return Optional.of(executeRequest(url));
+            } catch (SecApiException e) {
+                if (shouldTreatDailyIndexAsUnavailable(e, hasMoreCandidates)) {
+                    log.debug("Daily master index unavailable for {} after checking {}", date, url);
+                    return Optional.empty();
+                }
+                if (shouldContinueDailyIndexFallback(e, hasMoreCandidates)) {
+                    log.debug("Daily master index unavailable at {}, trying next candidate", url);
+                    continue;
+                }
+                throw e;
             }
         }
         return Optional.empty();
@@ -182,6 +198,42 @@ public class SecApiClient {
                         return body;
                     });
         });
+    }
+
+    private boolean shouldContinueDailyIndexFallback(SecApiException exception, boolean hasMoreCandidates) {
+        if (!hasMoreCandidates) {
+            return false;
+        }
+
+        String message = exception.getMessage();
+        if (message == null || message.isBlank()) {
+            return false;
+        }
+
+        if (SecAccessDiagnostics.isUndeclaredAutomationBlock(message)) {
+            return false;
+        }
+
+        return message.startsWith("Resource not found:")
+                || message.contains("HTTP 403");
+    }
+
+    private boolean shouldTreatDailyIndexAsUnavailable(SecApiException exception, boolean hasMoreCandidates) {
+        if (hasMoreCandidates) {
+            return false;
+        }
+
+        String message = exception.getMessage();
+        if (message == null || message.isBlank()) {
+            return false;
+        }
+
+        if (SecAccessDiagnostics.isUndeclaredAutomationBlock(message)) {
+            return false;
+        }
+
+        return message.startsWith("Resource not found:")
+                || message.contains("HTTP 403");
     }
 
     private String executeRequestNoCache(String url) {

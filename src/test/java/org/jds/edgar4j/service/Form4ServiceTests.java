@@ -2,6 +2,7 @@ package org.jds.edgar4j.service;
 
 import org.jds.edgar4j.integration.Form4Parser;
 import org.jds.edgar4j.integration.SecApiClient;
+import org.jds.edgar4j.exception.SecApiException;
 import org.jds.edgar4j.model.Form4;
 import org.jds.edgar4j.repository.Form4Repository;
 import org.jds.edgar4j.repository.TickerRepository;
@@ -99,36 +100,32 @@ class Form4ServiceTests {
     @Test
     void testDownloadAndParseForm4_SuccessfulResponse() throws Exception {
         // Given
-        HttpResponse<String> response = mock(HttpResponse.class);
         Form4 parsedForm4 = new Form4();
         Form4ServiceImpl spyService = spy(form4Service);
+        String xml = "<xml><form4>test</form4></xml>";
 
-        doReturn(CompletableFuture.completedFuture(response))
+        doReturn(CompletableFuture.completedFuture(xml))
                 .when(spyService)
                 .downloadForm4("789019", "0001626431-16-000118", "edgar.xml");
-        when(response.statusCode()).thenReturn(200);
-        when(response.body()).thenReturn("<xml><form4>test</form4></xml>");
-        doReturn(parsedForm4).when(spyService).parseForm4("<xml><form4>test</form4></xml>", "0001626431-16-000118");
+        doReturn(parsedForm4).when(spyService).parseForm4(xml, "0001626431-16-000118");
 
         // When
         Form4 result = spyService.downloadAndParseForm4("789019", "0001626431-16-000118", "edgar.xml").get();
 
         // Then
         assertSame(parsedForm4, result);
-        verify(spyService).parseForm4("<xml><form4>test</form4></xml>", "0001626431-16-000118");
+        verify(spyService).parseForm4(xml, "0001626431-16-000118");
     }
 
     @DisplayName("Should return null when download returns a non-200 status")
     @Test
     void testDownloadAndParseForm4_Non200Response() throws Exception {
         // Given
-        HttpResponse<String> response = mock(HttpResponse.class);
         Form4ServiceImpl spyService = spy(form4Service);
 
-        doReturn(CompletableFuture.completedFuture(response))
+        doReturn(CompletableFuture.failedFuture(new SecApiException("HTTP 404 from SEC")))
                 .when(spyService)
                 .downloadForm4(anyString(), anyString(), anyString());
-        when(response.statusCode()).thenReturn(404);
 
         // When
         Form4 result = spyService.downloadAndParseForm4("789019", "0001626431-16-000118", "edgar.xml").get();

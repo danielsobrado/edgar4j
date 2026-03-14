@@ -75,9 +75,19 @@ public interface Form4Service {
     Page<Form4> findBySymbolAndDateRange(String symbol, LocalDate startDate, LocalDate endDate, Pageable pageable);
 
     /**
+     * Fetches Form 4 filings directly from SEC when the local store is empty.
+     */
+    List<Form4> fetchFromSecApi(String symbol, LocalDate startDate, LocalDate endDate, int limit);
+
+    /**
      * Finds recent Form 4 filings.
      */
     List<Form4> findRecentFilings(int limit);
+
+    /**
+     * Fetches recent Form 4 filings directly from SEC when the local store is empty.
+     */
+    List<Form4> fetchRecentFromSecApi(int limit);
 
     /**
      * Checks if a Form 4 filing exists.

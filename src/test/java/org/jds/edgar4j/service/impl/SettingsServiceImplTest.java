@@ -17,6 +17,7 @@ import org.jds.edgar4j.config.TiingoEnvProperties;
 import org.jds.edgar4j.dto.request.SettingsRequest;
 import org.jds.edgar4j.dto.response.SettingsResponse;
 import org.jds.edgar4j.model.AppSettings;
+import org.jds.edgar4j.properties.Edgar4JProperties;
 import org.jds.edgar4j.properties.MarketDataProviderProperties;
 import org.jds.edgar4j.repository.AppSettingsRepository;
 import org.jds.edgar4j.service.provider.MarketDataProviderSettingsResolver;
@@ -29,7 +30,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class SettingsServiceImplTest {
@@ -43,12 +43,18 @@ class SettingsServiceImplTest {
     @Mock
     private TiingoEnvProperties tiingoEnvProperties;
 
+    private Edgar4JProperties edgar4JProperties;
     private MarketDataProviderProperties marketDataProviderProperties;
     private MarketDataProviderSettingsResolver marketDataProviderSettingsResolver;
     private SettingsServiceImpl settingsService;
 
     @BeforeEach
     void setUp() {
+        edgar4JProperties = new Edgar4JProperties();
+        edgar4JProperties.getUrls().setBaseSecUrl("https://www.sec.gov");
+        edgar4JProperties.getUrls().setSubmissionsUrl("https://data.sec.gov/submissions");
+        edgar4JProperties.getUrls().setEdgarDataArchivesUrl("https://www.sec.gov/Archives/edgar/data");
+        edgar4JProperties.getUrls().setCompanyTickersUrl("https://www.sec.gov/files/company_tickers.json");
         marketDataProviderProperties = new MarketDataProviderProperties();
         marketDataProviderSettingsResolver = new MarketDataProviderSettingsResolver(
                 appSettingsRepository,
@@ -58,12 +64,9 @@ class SettingsServiceImplTest {
                 appSettingsRepository,
                 mongoTemplate,
                 tiingoEnvProperties,
+                edgar4JProperties,
                 marketDataProviderProperties,
                 marketDataProviderSettingsResolver);
-        ReflectionTestUtils.setField(settingsService, "baseSecUrl", "https://www.sec.gov");
-        ReflectionTestUtils.setField(settingsService, "submissionsUrl", "https://data.sec.gov/submissions");
-        ReflectionTestUtils.setField(settingsService, "edgarArchivesUrl", "https://www.sec.gov/Archives/edgar/data");
-        ReflectionTestUtils.setField(settingsService, "companyTickersUrl", "https://www.sec.gov/files/company_tickers.json");
         when(mongoTemplate.getDb().runCommand(any(Document.class))).thenReturn(new Document("ok", 1));
         lenient().when(tiingoEnvProperties.hasApiToken()).thenReturn(false);
         lenient().when(tiingoEnvProperties.getApiToken()).thenReturn(Optional.empty());

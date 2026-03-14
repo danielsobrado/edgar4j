@@ -17,13 +17,18 @@ interface NotificationState {
   clearNotifications: () => void;
 }
 
-let notificationId = 0;
+function generateNotificationId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
 
 export const useNotificationStore = create<NotificationState>((set) => ({
   notifications: [],
 
   addNotification: (notification) => {
-    const id = `notification-${++notificationId}`;
+    const id = generateNotificationId();
     const newNotification: Notification = {
       ...notification,
       id,

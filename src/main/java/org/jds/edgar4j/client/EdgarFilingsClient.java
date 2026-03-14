@@ -7,6 +7,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.Arrays;
 import java.util.List;
@@ -21,8 +22,12 @@ public class EdgarFilingsClient {
     }
 
     public List<FilingSearch> getFilings(String cikNo, String formType, int filingYear, String userAgent) {
-        // Replace this URL with the appropriate API or data source URL
-        String url = "https://api.example.com/filings?cikNo=" + cikNo + "&formType=" + formType + "&filingYear=" + filingYear;
+        String url = UriComponentsBuilder.fromUriString("https://api.example.com/filings")
+            .queryParam("cikNo", cikNo)
+            .queryParam("formType", formType)
+            .queryParam("filingYear", filingYear)
+            .encode()
+            .toUriString();
 
         HttpHeaders headers = new HttpHeaders();
         headers.set("User-Agent", userAgent);

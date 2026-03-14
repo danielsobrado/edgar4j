@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import * as Switch from '@radix-ui/react-switch';
 import { useInsiderPurchases, useSettings } from '../hooks';
-import type { InsiderPurchaseFilter, InsiderPurchaseSortBy, Settings } from '../api';
+import type { InsiderPurchaseFilter, InsiderPurchaseSortBy, MarketCapSource, Settings } from '../api';
 import { EmptyState } from '../components/common/EmptyState';
 import { ErrorMessage } from '../components/common/ErrorMessage';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
@@ -61,6 +61,22 @@ const DEFAULT_FILTER: InsiderPurchaseFilter = {
   page: 0,
   size: 50,
 };
+
+const MARKET_CAP_SOURCE_LABELS: Record<MarketCapSource, string> = {
+  UNKNOWN: 'Unknown',
+  PROVIDER_MARKET_CAP: 'Provider cap',
+  PROVIDER_SHARES_OUTSTANDING: 'Provider shares',
+  SEC_COMPANYFACTS_SHARES_OUTSTANDING: 'SEC companyfacts',
+  SEC_FILING_XBRL_SHARES_OUTSTANDING: 'SEC filing XBRL',
+};
+
+function getMarketCapSourceLabel(source: MarketCapSource | null | undefined): string | null {
+  if (!source) {
+    return null;
+  }
+
+  return MARKET_CAP_SOURCE_LABELS[source] ?? source;
+}
 
 function buildInitialFilter(settings: Settings | null): InsiderPurchaseFilter {
   return {
@@ -454,7 +470,14 @@ function InsiderPurchasesContent({
                         {formatCompactCurrency(purchase.transactionValue)}
                       </td>
                       <td className="px-4 py-3 text-right font-mono text-gray-600">
-                        {formatCompactCurrency(purchase.marketCap)}
+                        <div>{formatCompactCurrency(purchase.marketCap)}</div>
+                        {purchase.marketCap != null && getMarketCapSourceLabel(purchase.marketCapSource) ? (
+                          <div className="mt-1">
+                            <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700">
+                              {getMarketCapSourceLabel(purchase.marketCapSource)}
+                            </span>
+                          </div>
+                        ) : null}
                       </td>
                     </tr>
                   ))}

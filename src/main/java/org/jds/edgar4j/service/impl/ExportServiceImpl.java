@@ -5,16 +5,24 @@ import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
+import org.jds.edgar4j.config.AppConstants;
 import org.jds.edgar4j.dto.request.ExportRequest;
+import org.jds.edgar4j.dto.request.FilingSearchRequest;
 import org.jds.edgar4j.dto.response.FilingResponse;
+import org.jds.edgar4j.dto.response.PaginatedResponse;
 import org.jds.edgar4j.model.Filling;
 import org.jds.edgar4j.repository.FillingRepository;
 import org.jds.edgar4j.service.ExportService;
 import org.jds.edgar4j.service.FilingService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -31,6 +39,9 @@ public class ExportServiceImpl implements ExportService {
     private final FillingRepository fillingRepository;
     private final FilingService filingService;
     private final ObjectMapper objectMapper;
+
+    @Value("${edgar4j.export.max-records:10000}")
+    private int maxExportRecords;
 
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd");
 
@@ -88,20 +99,76 @@ public class ExportServiceImpl implements ExportService {
 
     private List<Filling> getFillings(ExportRequest request) {
         if (request.getFilingIds() != null && !request.getFilingIds().isEmpty()) {
+            enforceExportLimit(request.getFilingIds().size());
             return StreamSupport.stream(
                     fillingRepository.findAllById(request.getFilingIds()).spliterator(),
                     false
             ).collect(Collectors.toList());
         } else if (request.getSearchCriteria() != null) {
-            var searchResult = filingService.searchFilings(request.getSearchCriteria());
-            return searchResult.getContent().stream()
-                    .map(FilingResponse::getId)
-                    .map(fillingRepository::findById)
-                    .filter(java.util.Optional::isPresent)
-                    .map(java.util.Optional::get)
-                    .collect(Collectors.toList());
+            return loadSearchResultFillings(request.getSearchCriteria());
         }
         return fillingRepository.findTop10ByOrderByFillingDateDesc();
+    }
+
+    private List<Filling> loadSearchResultFillings(FilingSearchRequest searchCriteria) {
+        int exportPageSize = Math.min(maxExportRecords, AppConstants.MAX_PAGE_SIZE);
+        PaginatedResponse<FilingResponse> firstPage = filingService.searchFilings(
+                buildExportSearchRequest(searchCriteria, 0, exportPageSize));
+
+        enforceExportLimit(Math.toIntExact(Math.min(firstPage.getTotalElements(), Integer.MAX_VALUE)));
+
+        LinkedHashSet<String> filingIds = new LinkedHashSet<>();
+        collectFilingIds(firstPage, filingIds);
+
+        for (int page = 1; page < firstPage.getTotalPages(); page++) {
+            PaginatedResponse<FilingResponse> nextPage = filingService.searchFilings(
+                    buildExportSearchRequest(searchCriteria, page, exportPageSize));
+            collectFilingIds(nextPage, filingIds);
+        }
+
+        return loadFillingsByIds(new ArrayList<>(filingIds));
+    }
+
+    private FilingSearchRequest buildExportSearchRequest(FilingSearchRequest searchCriteria, int page, int size) {
+        return FilingSearchRequest.builder()
+                .companyName(searchCriteria.getCompanyName())
+                .ticker(searchCriteria.getTicker())
+                .cik(searchCriteria.getCik())
+                .formTypes(searchCriteria.getFormTypes())
+                .dateFrom(searchCriteria.getDateFrom())
+                .dateTo(searchCriteria.getDateTo())
+                .keywords(searchCriteria.getKeywords())
+                .page(page)
+                .size(size)
+                .sortBy(searchCriteria.getSortBy())
+                .sortDir(searchCriteria.getSortDir())
+                .build();
+    }
+
+    private void collectFilingIds(PaginatedResponse<FilingResponse> searchResult, LinkedHashSet<String> filingIds) {
+        searchResult.getContent().stream()
+                .map(FilingResponse::getId)
+                .forEach(filingIds::add);
+    }
+
+    private List<Filling> loadFillingsByIds(List<String> filingIds) {
+        Map<String, Filling> fillingsById = new LinkedHashMap<>();
+        fillingRepository.findAllById(filingIds).forEach(filling -> fillingsById.put(filling.getId(), filling));
+        List<Filling> fillings = new ArrayList<>();
+        for (String filingId : filingIds) {
+            Filling filling = fillingsById.get(filingId);
+            if (filling != null) {
+                fillings.add(filling);
+            }
+        }
+        return fillings;
+    }
+
+    private void enforceExportLimit(int resultCount) {
+        if (resultCount > maxExportRecords) {
+            throw new IllegalArgumentException(
+                    "Export exceeds configured maximum of " + maxExportRecords + " records");
+        }
     }
 
     private String escapeCSV(String value) {

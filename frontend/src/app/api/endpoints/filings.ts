@@ -1,3 +1,4 @@
+import type { AxiosRequestConfig } from 'axios';
 import { apiClient } from '../client';
 import { Filing, FilingDetail, FilingSearchRequest, PaginatedResponse } from '../types';
 
@@ -26,8 +27,8 @@ export const filingsApi = {
     return apiClient.get<PaginatedResponse<Filing>>(`/filings${query ? `?${query}` : ''}`);
   },
 
-  searchFilings: (request: FilingSearchRequest): Promise<PaginatedResponse<Filing>> => {
-    return apiClient.post<PaginatedResponse<Filing>>('/filings/search', request);
+  searchFilings: (request: FilingSearchRequest, config?: AxiosRequestConfig): Promise<PaginatedResponse<Filing>> => {
+    return apiClient.post<PaginatedResponse<Filing>>('/filings/search', request, config);
   },
 
   getFilingById: (id: string): Promise<FilingDetail> => {

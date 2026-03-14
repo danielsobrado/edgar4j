@@ -2,6 +2,8 @@ package org.jds.edgar4j.dto.response;
 
 import java.time.LocalDate;
 
+import org.jds.edgar4j.model.MarketCapSource;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -26,6 +28,7 @@ public class InsiderPurchaseResponse {
     private Double currentPrice;
     private Double percentChange;
     private Double marketCap;
+    private MarketCapSource marketCapSource;
     private boolean sp500;
     private String accessionNumber;
     private String transactionCode;

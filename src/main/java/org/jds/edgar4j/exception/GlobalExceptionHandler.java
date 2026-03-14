@@ -89,9 +89,9 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleGenericException(
             Exception ex, ServerWebExchange exchange) {
-        log.error("Unexpected error: {}", ex.getMessage(), ex);
+        log.error("Unexpected error processing {}", exchange.getRequest().getPath().value(), ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error("An unexpected error occurred: " + ex.getMessage(),
+                .body(ApiResponse.error("An unexpected error occurred",
                         exchange.getRequest().getPath().value()));
     }
 }

@@ -63,6 +63,9 @@ public interface FillingRepository extends MongoRepository<Filling, String> {
 
     List<Filling> findByIsInlineXBRLTrue();
 
+    @Query("{ 'cik': ?0, '$or': [ { 'isXBRL': true }, { 'isInlineXBRL': true } ] }")
+    Page<Filling> findRecentXbrlFilingsByCik(String cik, Pageable pageable);
+
     Page<Filling> findAllByOrderByFillingDateDesc(Pageable pageable);
 
     long countByFormTypeNumber(String formTypeNumber);

@@ -48,6 +48,7 @@ const mockPurchases = {
       currentPrice: 18.75,
       percentChange: 50,
       marketCap: 2_500_000_000,
+      marketCapSource: 'SEC_FILING_XBRL_SHARES_OUTSTANDING',
       sp500: true,
       accessionNumber: '0001234567-26-000001',
       transactionCode: 'P',
@@ -115,6 +116,7 @@ describe('InsiderPurchasesPage', () => {
     expect(screen.getByText('Acme Corporation')).toBeInTheDocument();
     expect(screen.getByText('S&P 500')).toBeInTheDocument();
     expect(screen.getByText('Purchase value')).toBeInTheDocument();
+    expect(screen.getByText('SEC filing XBRL')).toBeInTheDocument();
   });
 
   it('falls back to built-in defaults when saved settings cannot be loaded', () => {

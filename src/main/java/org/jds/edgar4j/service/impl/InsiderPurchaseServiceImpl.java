@@ -1,11 +1,11 @@
 package org.jds.edgar4j.service.impl;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -20,18 +20,19 @@ import org.jds.edgar4j.dto.response.PaginatedResponse;
 import org.jds.edgar4j.model.CompanyMarketData;
 import org.jds.edgar4j.model.Form4;
 import org.jds.edgar4j.model.Form4Transaction;
+import org.jds.edgar4j.model.MarketCapSource;
 import org.jds.edgar4j.repository.Form4Repository;
 import org.jds.edgar4j.service.CompanyMarketDataService;
 import org.jds.edgar4j.service.InsiderPurchaseService;
 import org.jds.edgar4j.service.Sp500Service;
+import org.jds.edgar4j.util.TickerNormalizer;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class InsiderPurchaseServiceImpl implements InsiderPurchaseService {
 
     private static final int DEFAULT_LOOKBACK_DAYS = 30;
@@ -42,6 +43,26 @@ public class InsiderPurchaseServiceImpl implements InsiderPurchaseService {
     private final Form4Repository form4Repository;
     private final CompanyMarketDataService companyMarketDataService;
     private final Sp500Service sp500Service;
+    private final Clock clock;
+
+    @Autowired
+    public InsiderPurchaseServiceImpl(
+            Form4Repository form4Repository,
+            CompanyMarketDataService companyMarketDataService,
+            Sp500Service sp500Service) {
+        this(form4Repository, companyMarketDataService, sp500Service, Clock.systemDefaultZone());
+    }
+
+    InsiderPurchaseServiceImpl(
+            Form4Repository form4Repository,
+            CompanyMarketDataService companyMarketDataService,
+            Sp500Service sp500Service,
+            Clock clock) {
+        this.form4Repository = form4Repository;
+        this.companyMarketDataService = companyMarketDataService;
+        this.sp500Service = sp500Service;
+        this.clock = clock;
+    }
 
     @Override
     public PaginatedResponse<InsiderPurchaseResponse> getRecentInsiderPurchases(
@@ -60,7 +81,7 @@ public class InsiderPurchaseServiceImpl implements InsiderPurchaseService {
         Double normalizedMinMarketCap = normalizeThreshold(minMarketCap);
         Double normalizedMinTransactionValue = normalizeThreshold(minTransactionValue);
 
-        LocalDate since = LocalDate.now().minusDays(sanitizedLookbackDays);
+        LocalDate since = LocalDate.now(clock).minusDays(sanitizedLookbackDays);
         List<PurchaseCandidate> candidates = extractOpenMarketPurchases(form4Repository.findRecentAcquisitions(since), since);
         Set<String> sp500Tickers = loadSp500Tickers();
         Map<String, Optional<CompanyMarketData>> marketDataCache = new HashMap<>();
@@ -101,7 +122,7 @@ public class InsiderPurchaseServiceImpl implements InsiderPurchaseService {
 
     @Override
     public InsiderPurchaseSummary getSummary(int lookbackDays) {
-        LocalDate since = LocalDate.now().minusDays(sanitizeLookbackDays(lookbackDays));
+        LocalDate since = LocalDate.now(clock).minusDays(sanitizeLookbackDays(lookbackDays));
         List<PurchaseCandidate> candidates = extractOpenMarketPurchases(form4Repository.findRecentAcquisitions(since), since);
         Set<String> sp500Tickers = loadSp500Tickers();
         Map<String, Optional<CompanyMarketData>> marketDataCache = new HashMap<>();
@@ -193,11 +214,14 @@ public class InsiderPurchaseServiceImpl implements InsiderPurchaseService {
             return null;
         }
 
-        Optional<CompanyMarketData> marketData = marketDataCache.computeIfAbsent(ticker, companyMarketDataService::getMarketData);
+        Optional<CompanyMarketData> marketData = marketDataCache.computeIfAbsent(ticker, companyMarketDataService::getStoredMarketData);
         Double currentPrice = marketData.map(CompanyMarketData::getCurrentPrice).orElse(null);
         Double marketCap = marketData.map(CompanyMarketData::getMarketCap).orElse(null);
+        MarketCapSource marketCapSource = marketData
+                .map(this::resolveMarketCapSource)
+                .orElse(null);
 
-        if (minMarketCap != null && (marketCap == null || marketCap < minMarketCap)) {
+        if (minMarketCap != null && !meetsMarketCapFilter(marketCap, minMarketCap, isSp500, sp500Only)) {
             return null;
         }
 
@@ -223,10 +247,23 @@ public class InsiderPurchaseServiceImpl implements InsiderPurchaseService {
                 .currentPrice(currentPrice)
                 .percentChange(calculatePercentChange(currentPrice, purchasePrice))
                 .marketCap(marketCap)
+                .marketCapSource(marketCapSource)
                 .sp500(isSp500)
                 .accessionNumber(form4.getAccessionNumber())
                 .transactionCode(resolveTransactionCode(candidate))
                 .build();
+    }
+
+    private boolean meetsMarketCapFilter(Double marketCap, Double minMarketCap, boolean isSp500, boolean sp500Only) {
+        if (minMarketCap == null) {
+            return true;
+        }
+
+        if (marketCap != null) {
+            return marketCap >= minMarketCap;
+        }
+
+        return sp500Only && isSp500;
     }
 
     private List<PurchaseCandidate> extractOpenMarketPurchases(List<Form4> acquisitions, LocalDate since) {
@@ -434,14 +471,17 @@ public class InsiderPurchaseServiceImpl implements InsiderPurchaseService {
     }
 
     private String normalizeTicker(String ticker) {
-        if (ticker == null) {
+        return TickerNormalizer.normalize(ticker);
+    }
+
+    private MarketCapSource resolveMarketCapSource(CompanyMarketData marketData) {
+        if (marketData == null || marketData.getMarketCap() == null || marketData.getMarketCap() <= 0d) {
             return null;
         }
 
-        String normalized = ticker.trim()
-                .replace('.', '-')
-                .toUpperCase(Locale.ROOT);
-        return normalized.isBlank() ? null : normalized;
+        return marketData.getMarketCapSource() != null
+                ? marketData.getMarketCapSource()
+                : MarketCapSource.UNKNOWN;
     }
 
     private String blankToNull(String value) {

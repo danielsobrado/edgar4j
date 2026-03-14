@@ -84,7 +84,9 @@ public class FinnhubProvider implements MarketDataProvider {
                 }
 
                 log.warn("Finnhub API returned status: {} for symbol: {}", response.statusCode(), symbol);
-                markTemporarilyUnavailable(config.retryDelay());
+                if (shouldMarkTemporarilyUnavailable(response.statusCode())) {
+                    markTemporarilyUnavailable(config.retryDelay());
+                }
                 return null;
             } catch (Exception e) {
                 log.error("Error getting current price from Finnhub for symbol: {}", symbol, e);
@@ -121,7 +123,9 @@ public class FinnhubProvider implements MarketDataProvider {
                 }
 
                 log.warn("Finnhub API returned status: {} for symbol: {}", response.statusCode(), symbol);
-                markTemporarilyUnavailable(config.retryDelay());
+                if (shouldMarkTemporarilyUnavailable(response.statusCode())) {
+                    markTemporarilyUnavailable(config.retryDelay());
+                }
                 return List.of();
             } catch (Exception e) {
                 log.error("Error getting historical prices from Finnhub for symbol: {}", symbol, e);
@@ -158,7 +162,9 @@ public class FinnhubProvider implements MarketDataProvider {
                 }
 
                 log.warn("Finnhub API returned status: {} for symbol: {}", response.statusCode(), symbol);
-                markTemporarilyUnavailable(config.retryDelay());
+                if (shouldMarkTemporarilyUnavailable(response.statusCode())) {
+                    markTemporarilyUnavailable(config.retryDelay());
+                }
                 return null;
             } catch (Exception e) {
                 log.error("Error getting company profile from Finnhub for symbol: {}", symbol, e);
@@ -195,7 +201,9 @@ public class FinnhubProvider implements MarketDataProvider {
                 }
 
                 log.warn("Finnhub API returned status: {} for symbol: {}", response.statusCode(), symbol);
-                markTemporarilyUnavailable(config.retryDelay());
+                if (shouldMarkTemporarilyUnavailable(response.statusCode())) {
+                    markTemporarilyUnavailable(config.retryDelay());
+                }
                 return null;
             } catch (Exception e) {
                 log.error("Error getting financial metrics from Finnhub for symbol: {}", symbol, e);
@@ -236,6 +244,10 @@ public class FinnhubProvider implements MarketDataProvider {
         }
 
         lastRequestTime.set(System.currentTimeMillis());
+    }
+
+    private boolean shouldMarkTemporarilyUnavailable(int statusCode) {
+        return statusCode == 401 || statusCode == 403 || statusCode == 429 || statusCode >= 500;
     }
 
     private URI buildQuoteUri(String baseUrl, String symbol) {

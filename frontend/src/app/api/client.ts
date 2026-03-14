@@ -5,6 +5,15 @@ import { API_CONFIG, ERROR_MESSAGES } from '../config/constants';
 
 const API_BASE_URL = getApiBaseUrl();
 
+function isApiResponse<T>(payload: ApiResponse<T> | T): payload is ApiResponse<T> {
+  return (
+    payload !== null &&
+    typeof payload === 'object' &&
+    'success' in payload &&
+    'data' in payload
+  );
+}
+
 class ApiClient {
   private client: AxiosInstance;
 
@@ -82,13 +91,8 @@ class ApiClient {
   }
 
   private unwrapResponse<T>(payload: ApiResponse<T> | T): T {
-    if (
-      payload !== null &&
-      typeof payload === 'object' &&
-      'success' in payload &&
-      'data' in payload
-    ) {
-      return (payload as ApiResponse<T>).data;
+    if (isApiResponse(payload)) {
+      return payload.data;
     }
     return payload as T;
   }

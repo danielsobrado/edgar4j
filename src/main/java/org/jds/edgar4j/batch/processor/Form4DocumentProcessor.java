@@ -2,6 +2,7 @@ package org.jds.edgar4j.batch.processor;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jds.edgar4j.exception.Form4DocumentProcessingException;
 import org.jds.edgar4j.model.insider.InsiderTransaction;
 import org.jds.edgar4j.service.insider.EdgarApiService;
 import org.jds.edgar4j.service.insider.Form4ParserService;
@@ -51,7 +52,9 @@ public class Form4DocumentProcessor implements ItemProcessor<String, List<Inside
             return transactions;
 
         } catch (Exception e) {
-            log.error("Error processing Form 4 document {}: {}", accessionNumber, e.getMessage(), e);
+            Form4DocumentProcessingException processingException =
+                    new Form4DocumentProcessingException(accessionNumber, e);
+            log.error("Error processing Form 4 document {}", accessionNumber, processingException);
 
             // Return empty list to continue processing other documents
             return List.of();

@@ -33,6 +33,8 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class Form4Controller {
 
+    private static final long MAX_DATE_RANGE_DAYS = 366;
+
     private final Form4Service form4Service;
 
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
@@ -78,25 +80,23 @@ public class Form4Controller {
             try {
                 LocalDate start = startDate != null ? parseDate(startDate) : LocalDate.now().minusYears(1);
                 LocalDate end = endDate != null ? parseDate(endDate) : LocalDate.now();
-                
-                // Cast to implementation to call SEC API fallback
-                if (form4Service instanceof org.jds.edgar4j.service.impl.Form4ServiceImpl) {
-                    org.jds.edgar4j.service.impl.Form4ServiceImpl serviceImpl = 
-                        (org.jds.edgar4j.service.impl.Form4ServiceImpl) form4Service;
-                    List<Form4> secApiResults = serviceImpl.fetchFromSecApi(
-                        symbol.toUpperCase(), start, end, size);
-                    
-                    if (!secApiResults.isEmpty()) {
-                        // Convert to Page
-                        int startIdx = page * size;
-                        int endIdx = Math.min(startIdx + size, secApiResults.size());
-                        List<Form4> pageContent = startIdx < secApiResults.size() 
-                            ? secApiResults.subList(startIdx, endIdx) 
-                            : List.of();
-                        
-                        results = new org.springframework.data.domain.PageImpl<>(
-                            pageContent, pageRequest, secApiResults.size());
-                    }
+
+                if (!isValidDateRange(start, end)) {
+                    return ResponseEntity.badRequest().build();
+                }
+
+                List<Form4> secApiResults = form4Service.fetchFromSecApi(
+                    symbol.toUpperCase(), start, end, size);
+
+                if (!secApiResults.isEmpty()) {
+                    int startIdx = page * size;
+                    int endIdx = Math.min(startIdx + size, secApiResults.size());
+                    List<Form4> pageContent = startIdx < secApiResults.size()
+                        ? secApiResults.subList(startIdx, endIdx)
+                        : List.of();
+
+                    results = new org.springframework.data.domain.PageImpl<>(
+                        pageContent, pageRequest, secApiResults.size());
                 }
             } catch (Exception e) {
                 log.error("SEC API fallback failed for symbol {}: {}", symbol, e.getMessage());
@@ -142,6 +142,9 @@ public class Form4Controller {
         try {
             LocalDate start = parseDate(startDate);
             LocalDate end = parseDate(endDate);
+            if (!isValidDateRange(start, end)) {
+                return ResponseEntity.badRequest().build();
+            }
             PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "transactionDate"));
             Page<Form4> results = form4Service.findByDateRange(start, end, pageRequest);
             return ResponseEntity.ok(results);
@@ -165,6 +168,9 @@ public class Form4Controller {
         try {
             LocalDate start = parseDate(startDate);
             LocalDate end = parseDate(endDate);
+            if (!isValidDateRange(start, end)) {
+                return ResponseEntity.badRequest().build();
+            }
             PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "transactionDate"));
             Page<Form4> results = form4Service.findBySymbolAndDateRange(symbol.toUpperCase(), start, end, pageRequest);
             return ResponseEntity.ok(results);
@@ -187,12 +193,7 @@ public class Form4Controller {
         if (results.isEmpty()) {
             log.info("No local recent Form 4 data, attempting SEC API fallback");
             try {
-                // Cast to implementation to call SEC API fallback
-                if (form4Service instanceof org.jds.edgar4j.service.impl.Form4ServiceImpl) {
-                    org.jds.edgar4j.service.impl.Form4ServiceImpl serviceImpl = 
-                        (org.jds.edgar4j.service.impl.Form4ServiceImpl) form4Service;
-                    results = serviceImpl.fetchRecentFromSecApi(Math.min(limit, 100));
-                }
+                results = form4Service.fetchRecentFromSecApi(Math.min(limit, 100));
             } catch (Exception e) {
                 log.error("SEC API fallback failed for recent filings: {}", e.getMessage());
             }
@@ -213,6 +214,9 @@ public class Form4Controller {
         try {
             LocalDate start = parseDate(startDate);
             LocalDate end = parseDate(endDate);
+            if (!isValidDateRange(start, end)) {
+                return ResponseEntity.badRequest().build();
+            }
             InsiderStats stats = form4Service.getInsiderStats(symbol.toUpperCase(), start, end);
             return ResponseEntity.ok(stats);
         } catch (DateTimeParseException e) {
@@ -277,5 +281,12 @@ public class Form4Controller {
 
     private LocalDate parseDate(String dateStr) {
         return LocalDate.parse(dateStr, DATE_FORMAT);
+    }
+
+    private boolean isValidDateRange(LocalDate start, LocalDate end) {
+        if (start == null || end == null || start.isAfter(end)) {
+            return false;
+        }
+        return java.time.temporal.ChronoUnit.DAYS.between(start, end) <= MAX_DATE_RANGE_DAYS;
     }
 }

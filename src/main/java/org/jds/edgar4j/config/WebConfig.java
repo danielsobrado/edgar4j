@@ -16,7 +16,7 @@ public class WebConfig {
     private final CorsProperties corsProperties;
 
     @Bean
-    public CorsWebFilter corsFilter() {
+    public UrlBasedCorsConfigurationSource corsConfigurationSource() {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         CorsConfiguration config = new CorsConfiguration();
 
@@ -33,6 +33,12 @@ public class WebConfig {
         config.setMaxAge(corsProperties.getMaxAgeSeconds());
 
         source.registerCorsConfiguration("/api/**", config);
-        return new CorsWebFilter(source);
+        source.registerCorsConfiguration("/actuator/**", config);
+        return source;
+    }
+
+    @Bean
+    public CorsWebFilter corsFilter(UrlBasedCorsConfigurationSource corsConfigurationSource) {
+        return new CorsWebFilter(corsConfigurationSource);
     }
 }

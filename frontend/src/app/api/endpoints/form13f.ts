@@ -13,6 +13,17 @@ import {
 const QUARTER_INPUT_PATTERN = /^(\d{4})-Q([1-4])$/i;
 const DATE_INPUT_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
+function buildQueryString(params: Record<string, string | number | undefined>): string {
+  const searchParams = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== '') {
+      searchParams.set(key, String(value));
+    }
+  });
+  const query = searchParams.toString();
+  return query ? `?${query}` : '';
+}
+
 export function normalizeQuarterPeriodInput(period: string): string {
   const trimmed = period.trim();
 
@@ -46,26 +57,26 @@ export const form13fApi = {
 
   // Get by CIK
   getByCik: (cik: string, page = 0, size = 20): Promise<PaginatedResponse<Form13F>> => {
-    return apiClient.get<PaginatedResponse<Form13F>>(`/form13f/cik/${cik}?page=${page}&size=${size}`);
+    return apiClient.get<PaginatedResponse<Form13F>>(`/form13f/cik/${cik}${buildQueryString({ page, size })}`);
   },
 
   // Search by filer name
   searchByFilerName: (name: string, page = 0, size = 20): Promise<PaginatedResponse<Form13F>> => {
-    return apiClient.get<PaginatedResponse<Form13F>>(`/form13f/filer?name=${encodeURIComponent(name)}&page=${page}&size=${size}`);
+    return apiClient.get<PaginatedResponse<Form13F>>(`/form13f/filer${buildQueryString({ name, page, size })}`);
   },
 
   // Get by quarter/report period
   getByQuarter: (period: string, page = 0, size = 20): Promise<PaginatedResponse<Form13F>> => {
     const normalizedPeriod = normalizeQuarterPeriodInput(period);
     return apiClient.get<PaginatedResponse<Form13F>>(
-      `/form13f/quarter?period=${encodeURIComponent(normalizedPeriod)}&page=${page}&size=${size}`
+      `/form13f/quarter${buildQueryString({ period: normalizedPeriod, page, size })}`
     );
   },
 
   // Get by date range
   getByDateRange: (startDate: string, endDate: string, page = 0, size = 20): Promise<PaginatedResponse<Form13F>> => {
     return apiClient.get<PaginatedResponse<Form13F>>(
-      `/form13f/date-range?startDate=${startDate}&endDate=${endDate}&page=${page}&size=${size}`
+      `/form13f/date-range${buildQueryString({ startDate, endDate, page, size })}`
     );
   },
 
@@ -81,22 +92,22 @@ export const form13fApi = {
 
   // Search by CUSIP
   getByCusip: (cusip: string, page = 0, size = 20): Promise<PaginatedResponse<Form13F>> => {
-    return apiClient.get<PaginatedResponse<Form13F>>(`/form13f/cusip/${cusip}?page=${page}&size=${size}`);
+    return apiClient.get<PaginatedResponse<Form13F>>(`/form13f/cusip/${cusip}${buildQueryString({ page, size })}`);
   },
 
   // Search by issuer name
   getByIssuerName: (name: string, page = 0, size = 20): Promise<PaginatedResponse<Form13F>> => {
-    return apiClient.get<PaginatedResponse<Form13F>>(`/form13f/issuer?name=${encodeURIComponent(name)}&page=${page}&size=${size}`);
+    return apiClient.get<PaginatedResponse<Form13F>>(`/form13f/issuer${buildQueryString({ name, page, size })}`);
   },
 
   // Get top filers for a quarter
   getTopFilers: (period: string, limit = 10): Promise<FilerSummary[]> => {
-    return apiClient.get<FilerSummary[]>(`/form13f/top-filers?period=${period}&limit=${limit}`);
+    return apiClient.get<FilerSummary[]>(`/form13f/top-filers${buildQueryString({ period, limit })}`);
   },
 
   // Get top holdings for a quarter
   getTopHoldings: (period: string, limit = 10): Promise<HoldingSummary[]> => {
-    return apiClient.get<HoldingSummary[]>(`/form13f/top-holdings?period=${period}&limit=${limit}`);
+    return apiClient.get<HoldingSummary[]>(`/form13f/top-holdings${buildQueryString({ period, limit })}`);
   },
 
   // Get portfolio history for a CIK
@@ -106,11 +117,11 @@ export const form13fApi = {
 
   // Get institutional ownership for a CUSIP
   getInstitutionalOwnership: (cusip: string, period: string): Promise<InstitutionalOwnershipStats> => {
-    return apiClient.get<InstitutionalOwnershipStats>(`/form13f/cusip/${cusip}/ownership?period=${period}`);
+    return apiClient.get<InstitutionalOwnershipStats>(`/form13f/cusip/${cusip}/ownership${buildQueryString({ period })}`);
   },
 
   // Compare holdings between quarters
   compareHoldings: (cik: string, period1: string, period2: string): Promise<HoldingsComparison> => {
-    return apiClient.get<HoldingsComparison>(`/form13f/cik/${cik}/compare?period1=${period1}&period2=${period2}`);
+    return apiClient.get<HoldingsComparison>(`/form13f/cik/${cik}/compare${buildQueryString({ period1, period2 })}`);
   },
 };

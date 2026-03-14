@@ -821,10 +821,18 @@ export interface InsiderPurchase {
   currentPrice: number | null;
   percentChange: number | null;
   marketCap: number | null;
+  marketCapSource: MarketCapSource | null;
   sp500: boolean;
   accessionNumber: string;
   transactionCode: string | null;
 }
+
+export type MarketCapSource =
+  | 'UNKNOWN'
+  | 'PROVIDER_MARKET_CAP'
+  | 'PROVIDER_SHARES_OUTSTANDING'
+  | 'SEC_COMPANYFACTS_SHARES_OUTSTANDING'
+  | 'SEC_FILING_XBRL_SHARES_OUTSTANDING';
 
 export interface InsiderPurchaseSummary {
   totalPurchases: number;

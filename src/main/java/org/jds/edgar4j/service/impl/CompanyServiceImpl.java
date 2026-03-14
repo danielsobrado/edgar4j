@@ -1,6 +1,7 @@
 package org.jds.edgar4j.service.impl;
 
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.jds.edgar4j.dto.request.CompanySearchRequest;
@@ -25,6 +26,16 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class CompanyServiceImpl implements CompanyService {
 
+    private static final Set<String> ALLOWED_SORT_FIELDS = Set.of(
+            "name",
+            "companyName",
+            "cik",
+            "sic",
+            "stateOfIncorporation",
+            "fillingCount"
+    );
+    private static final String DEFAULT_SORT_FIELD = "name";
+
     private final SubmissionsRepository    submissionsRepository;
     private final CompanyTickerRepository  companyTickerRepository;
 
@@ -35,9 +46,14 @@ public class CompanyServiceImpl implements CompanyService {
         log.info("Searching companies with request: {}", request);
 
         String sortDir = request.getSortDir() != null ? request.getSortDir() : "desc";
+        String requestedSortBy = request.getSortBy() != null ? request.getSortBy().trim() : DEFAULT_SORT_FIELD;
+        String sortBy = ALLOWED_SORT_FIELDS.contains(requestedSortBy) ? requestedSortBy : DEFAULT_SORT_FIELD;
+        if (!sortBy.equals(requestedSortBy)) {
+            log.warn("Invalid company sort field '{}', falling back to '{}'", requestedSortBy, DEFAULT_SORT_FIELD);
+        }
         Sort sort = Sort.by(
                 sortDir.equalsIgnoreCase("desc") ? Sort.Direction.DESC : Sort.Direction.ASC,
-                request.getSortBy()
+            sortBy
         );
         PageRequest pageRequest = PageRequest.of(request.getPage(), request.getSize(), sort);
 

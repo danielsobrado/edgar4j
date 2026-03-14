@@ -15,7 +15,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { path: '/remote-edgar', label: 'Remote', icon: Radio },
   ];
 
-  const formNavItems = [
+  const formNavItems = React.useMemo(() => ([
     { path: '/search', to: '/search?formType=10-K&autoSearch=1', label: '10-K', icon: FileText, isActive: location.pathname === '/search' && searchParams.get('formType') === '10-K' },
     { path: '/search', to: '/search?formType=10-Q&autoSearch=1', label: '10-Q', icon: FileText, isActive: location.pathname === '/search' && searchParams.get('formType') === '10-Q' },
     { path: '/form3', label: 'Form 3', icon: UserPlus },
@@ -26,7 +26,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { path: '/form8k', label: '8-K', icon: FileText },
     { path: '/form13f', label: '13F', icon: Briefcase },
     { path: '/form13dg', label: '13D/G', icon: Users },
-  ];
+  ]), [location.pathname, searchParams]);
 
   const secondaryNavItems = [
     { path: '/alerts', label: 'Alerts', icon: Bell },
@@ -34,7 +34,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { path: '/settings', label: 'Settings', icon: Settings }
   ];
 
-  const isFormActive = formNavItems.some(item => item.isActive ?? location.pathname === item.path);
+  const isFormActive = React.useMemo(
+    () => formNavItems.some(item => item.isActive ?? location.pathname === item.path),
+    [formNavItems, location.pathname]
+  );
   const navItems = [...primaryNavItems, ...secondaryNavItems];
   
   return (

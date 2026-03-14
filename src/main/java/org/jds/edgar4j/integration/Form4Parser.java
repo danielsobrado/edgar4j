@@ -49,8 +49,13 @@ public class Form4Parser {
             this.jaxbContext = JAXBContext.newInstance(OwnershipDocument.class);
             this.documentBuilderFactory = DocumentBuilderFactory.newInstance();
             this.documentBuilderFactory.setNamespaceAware(false);
-            // Security: disable external entities
+            // Security: disable XXE and external entity resolution.
             this.documentBuilderFactory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+            this.documentBuilderFactory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+            this.documentBuilderFactory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+            this.documentBuilderFactory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+            this.documentBuilderFactory.setXIncludeAware(false);
+            this.documentBuilderFactory.setExpandEntityReferences(false);
         } catch (Exception e) {
             log.error("Failed to initialize Form4 parser", e);
             throw new RuntimeException("Failed to initialize Form4 parser", e);

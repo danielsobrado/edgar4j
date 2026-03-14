@@ -30,7 +30,8 @@ public class MarketDataService {
     @Cacheable(
             value = "stockPrices",
             key = "#symbol + '_' + @marketDataProviderSettingsResolver.resolvePreferredProviderName()",
-            condition = "@marketDataProviderProperties.cache.enabled")
+            condition = "@marketDataProviderProperties.cache.enabled",
+            unless = "#result == null")
     public CompletableFuture<MarketDataProvider.StockPrice> getCurrentPrice(String symbol) {
         log.debug("Getting current price for symbol: {}", symbol);
 
@@ -79,7 +80,8 @@ public class MarketDataService {
     @Cacheable(
             value = "companyProfiles",
             key = "#symbol + '_' + @marketDataProviderSettingsResolver.resolvePreferredProviderName()",
-            condition = "@marketDataProviderProperties.cache.enabled")
+            condition = "@marketDataProviderProperties.cache.enabled",
+            unless = "#result == null")
     public CompletableFuture<MarketDataProvider.CompanyProfile> getCompanyProfile(String symbol) {
         log.debug("Getting company profile for symbol: {}", symbol);
 
@@ -98,7 +100,8 @@ public class MarketDataService {
     @Cacheable(
             value = "financialMetrics",
             key = "#symbol + '_' + @marketDataProviderSettingsResolver.resolvePreferredProviderName()",
-            condition = "@marketDataProviderProperties.cache.enabled")
+            condition = "@marketDataProviderProperties.cache.enabled",
+            unless = "#result == null")
     public CompletableFuture<MarketDataProvider.FinancialMetrics> getFinancialMetrics(String symbol) {
         log.debug("Getting financial metrics for symbol: {}", symbol);
 

@@ -8,6 +8,7 @@ import org.jds.edgar4j.dto.request.SettingsRequest;
 import org.jds.edgar4j.dto.response.SettingsResponse;
 import org.jds.edgar4j.integration.SecUserAgentPolicy;
 import org.jds.edgar4j.model.AppSettings;
+import org.jds.edgar4j.properties.Edgar4JProperties;
 import org.jds.edgar4j.properties.MarketDataProviderProperties;
 import org.jds.edgar4j.repository.AppSettingsRepository;
 import org.jds.edgar4j.service.SettingsService;
@@ -36,20 +37,9 @@ public class SettingsServiceImpl implements SettingsService {
     private final AppSettingsRepository appSettingsRepository;
     private final MongoTemplate mongoTemplate;
     private final TiingoEnvProperties tiingoEnvProperties;
+    private final Edgar4JProperties edgar4JProperties;
     private final MarketDataProviderProperties marketDataProviderProperties;
     private final MarketDataProviderSettingsResolver marketDataProviderSettingsResolver;
-
-    @Value("${edgar4j.urls.baseSecUrl}")
-    private String baseSecUrl;
-
-    @Value("${edgar4j.urls.submissionsUrl}")
-    private String submissionsUrl;
-
-    @Value("${edgar4j.urls.edgarDataArchivesUrl}")
-    private String edgarArchivesUrl;
-
-    @Value("${edgar4j.urls.companyTickersUrl}")
-    private String companyTickersUrl;
 
     @Value("${edgar4j.sec.user-agent:}")
     private String configuredUserAgent;
@@ -229,10 +219,10 @@ public class SettingsServiceImpl implements SettingsService {
                 .realtimeSyncMaxPages(resolveRealtimeSyncMaxPages(settings))
                 .realtimeSyncPageSize(resolveRealtimeSyncPageSize(settings))
                 .apiEndpoints(SettingsResponse.ApiEndpointsInfo.builder()
-                        .baseSecUrl(baseSecUrl)
-                        .submissionsUrl(submissionsUrl)
-                        .edgarArchivesUrl(edgarArchivesUrl)
-                        .companyTickersUrl(companyTickersUrl)
+                    .baseSecUrl(edgar4JProperties.getUrls().getBaseSecUrl())
+                    .submissionsUrl(edgar4JProperties.getUrls().getSubmissionsUrl())
+                    .edgarArchivesUrl(edgar4JProperties.getUrls().getEdgarDataArchivesUrl())
+                    .companyTickersUrl(edgar4JProperties.getUrls().getCompanyTickersUrl())
                         .build())
                 .mongoDbStatus(checkMongoDbConnection())
                 .elasticsearchStatus(checkElasticsearchConnection())

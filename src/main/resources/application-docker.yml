@@ -5,7 +5,7 @@
 #   MONGODB_URI - MongoDB connection string (no default for security)
 #
 # Optional Environment Variables:
-#   MONGODB_DATABASE - Database name (default: edgar)
+#   SPRING_MONGODB_URI or MONGO_URL - MongoDB connection string (default: mongodb://mongo:27017/edgar)
 #   SEC_USER_AGENT - User agent for SEC API calls
 
 server:
@@ -17,7 +17,6 @@ spring:
       enabled: false
   mongodb:
     uri: ${SPRING_MONGODB_URI:${MONGO_URL:mongodb://mongo:27017/edgar}}
-    database: ${SPRING_MONGODB_DATABASE:${MONGODB_DATABASE:edgar}}
     auto-index-creation: ${SPRING_DATA_MONGODB_AUTO_INDEX_CREATION:false}
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://postgres:5432/edgar4j}

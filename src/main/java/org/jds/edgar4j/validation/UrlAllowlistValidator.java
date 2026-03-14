@@ -55,7 +55,7 @@ public class UrlAllowlistValidator {
         }
 
         boolean allowed = allowedHosts.stream().anyMatch(allowedHost ->
-                host.equals(allowedHost) || host.endsWith("." + allowedHost));
+            host.equals(allowedHost) || isSubdomainOf(host, allowedHost));
 
         if (!allowed) {
             throw new IllegalArgumentException("url host is not allowed");
@@ -64,5 +64,14 @@ public class UrlAllowlistValidator {
 
     private static boolean isLocalhost(String host) {
         return "localhost".equals(host) || "127.0.0.1".equals(host);
+    }
+
+    private static boolean isSubdomainOf(String host, String allowedHost) {
+        if (host.length() <= allowedHost.length() || !host.endsWith(allowedHost)) {
+            return false;
+        }
+
+        int boundaryIndex = host.length() - allowedHost.length() - 1;
+        return boundaryIndex >= 0 && host.charAt(boundaryIndex) == '.';
     }
 }

@@ -13,17 +13,14 @@ import org.jds.edgar4j.model.Sp500Constituent;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.MethodOrderer.OrderAnnotation;
-import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestMethodOrder;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
 @SpringBootTest
 @ActiveProfiles("test")
-@TestMethodOrder(OrderAnnotation.class)
 class Sp500ConstituentRepositoryTest {
 
     @Autowired
@@ -70,14 +67,12 @@ class Sp500ConstituentRepositoryTest {
     }
 
     @Test
-    @Order(1)
     @DisplayName("Should save and count S&P 500 constituents")
     void shouldSaveAndCount() {
         assertEquals(3, sp500ConstituentRepository.count());
     }
 
     @Test
-    @Order(2)
     @DisplayName("Should find a constituent by ticker ignoring case")
     void shouldFindByTickerIgnoreCase() {
         var result = sp500ConstituentRepository.findByTickerIgnoreCase("brk-b");
@@ -88,7 +83,6 @@ class Sp500ConstituentRepositoryTest {
     }
 
     @Test
-    @Order(3)
     @DisplayName("Should report S&P 500 membership by ticker ignoring case")
     void shouldCheckExistsByTickerIgnoreCase() {
         assertTrue(sp500ConstituentRepository.existsByTickerIgnoreCase("msft"));
@@ -96,7 +90,6 @@ class Sp500ConstituentRepositoryTest {
     }
 
     @Test
-    @Order(4)
     @DisplayName("Should find a constituent by CIK")
     void shouldFindByCik() {
         var result = sp500ConstituentRepository.findByCik("0000320193");
@@ -106,7 +99,6 @@ class Sp500ConstituentRepositoryTest {
     }
 
     @Test
-    @Order(5)
     @DisplayName("Should return all constituents ordered by ticker")
     void shouldFindAllOrderedByTicker() {
         List<Sp500Constituent> constituents = sp500ConstituentRepository.findAllByOrderByTickerAsc();
@@ -116,7 +108,6 @@ class Sp500ConstituentRepositoryTest {
     }
 
     @Test
-    @Order(6)
     @DisplayName("Should find constituents by sector ordered by ticker")
     void shouldFindBySectorOrderedByTicker() {
         List<Sp500Constituent> constituents =
@@ -127,7 +118,6 @@ class Sp500ConstituentRepositoryTest {
     }
 
     @Test
-    @Order(7)
     @DisplayName("Should reject duplicate ticker symbols")
     void shouldRejectDuplicateTicker() {
         Sp500Constituent duplicate = Sp500Constituent.builder()
@@ -139,6 +129,6 @@ class Sp500ConstituentRepositoryTest {
                 .lastUpdated(Instant.now())
                 .build();
 
-        assertThrows(Exception.class, () -> sp500ConstituentRepository.save(duplicate));
+        assertThrows(DuplicateKeyException.class, () -> sp500ConstituentRepository.save(duplicate));
     }
 }

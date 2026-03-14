@@ -39,8 +39,7 @@ Notes:
 
 ### MongoDB
 
-- `MONGODB_URI`: Mongo connection string (default `mongodb://localhost:27017/edgar`).
-- `MONGODB_DATABASE`: Mongo database name (default `edgar`).
+- `SPRING_MONGODB_URI` or `MONGO_URL`: Mongo connection string (default `mongodb://localhost:27017/edgar`).
 - `MONGODB_AUTO_INDEX_CREATION`: Enables Spring Data Mongo index creation on startup (default `true`).
 
 ### Spring Cloud Config (optional)
@@ -138,6 +137,8 @@ docker compose down -v
 ## Staging Readiness
 
 Use [docs/staging-smoke-checklist.md](docs/staging-smoke-checklist.md) as the final pre-release and post-deploy smoke test guide.
+
+For targeted enrichment when insider rows are present but market-cap data is still sparse, use [docs/market-cap-backfill.md](docs/market-cap-backfill.md).
 
 ## Submissions API
 

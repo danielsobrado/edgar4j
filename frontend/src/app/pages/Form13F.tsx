@@ -259,6 +259,7 @@ export function Form13FPage() {
           <button
             onClick={refresh}
             className="p-2 hover:bg-gray-100 rounded-full"
+            aria-label="Refresh Form 13F filings"
             title="Refresh"
           >
             <RefreshCw className="w-5 h-5 text-gray-600" />
@@ -328,6 +329,8 @@ export function Form13FPage() {
                 <button
                   onClick={() => setSelectedFiling(null)}
                   className="text-gray-500 hover:text-gray-700"
+                  aria-label="Close selected Form 13F filing details"
+                  title="Close details"
                 >
                   Close
                 </button>

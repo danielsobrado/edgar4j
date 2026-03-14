@@ -14,10 +14,11 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
+import org.jds.edgar4j.properties.Edgar4JProperties;
 import org.jds.edgar4j.service.SettingsService;
 import org.jds.edgar4j.service.insider.EdgarApiService;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import lombok.RequiredArgsConstructor;
@@ -42,15 +43,7 @@ public class EdgarApiServiceImpl implements EdgarApiService {
         .connectTimeout(Duration.ofSeconds(30))
         .build();
     private final SettingsService settingsService;
-
-    @Value("${edgar4j.urls.submissionsCIKUrl}")
-    private String submissionsCIKUrl;
-
-    @Value("${edgar4j.urls.edgarDataArchivesUrl}")
-    private String edgarDataArchivesUrl;
-
-    @Value("${edgar4j.urls.companyTickersUrl}")
-    private String companyTickersUrl;
+    private final Edgar4JProperties edgar4JProperties;
 
     private static final DecimalFormat CIK_FORMAT = new DecimalFormat("0000000000");
 
@@ -61,7 +54,7 @@ public class EdgarApiServiceImpl implements EdgarApiService {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 String formattedCik = formatCik(cik);
-                String url = submissionsCIKUrl + formattedCik + ".json";
+                String url = edgar4JProperties.getUrls().getSubmissionsCIKUrl() + formattedCik + ".json";
                 
                 HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
@@ -98,7 +91,7 @@ public class EdgarApiServiceImpl implements EdgarApiService {
             try {
                 String cleanAccessionNumber = accessionNumber.replace("-", "");
                 String url = String.format("%s/%s/%s/%s", 
-                    edgarDataArchivesUrl, cik, cleanAccessionNumber, primaryDocument);
+                    edgar4JProperties.getUrls().getEdgarDataArchivesUrl(), cik, cleanAccessionNumber, primaryDocument);
                 
                 HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
@@ -132,7 +125,7 @@ public class EdgarApiServiceImpl implements EdgarApiService {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 String formattedCik = formatCik(cik);
-                String url = submissionsCIKUrl + formattedCik + ".json";
+                String url = edgar4JProperties.getUrls().getSubmissionsCIKUrl() + formattedCik + ".json";
                 
                 HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
@@ -182,7 +175,7 @@ public class EdgarApiServiceImpl implements EdgarApiService {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(companyTickersUrl))
+                    .uri(URI.create(edgar4JProperties.getUrls().getCompanyTickersUrl()))
                     .header("User-Agent", resolveUserAgent())
                     .header("Accept", "application/json")
                     .header("Accept-Encoding", "gzip, deflate")
@@ -274,7 +267,7 @@ public class EdgarApiServiceImpl implements EdgarApiService {
                             String primaryDocument = primaryDocuments.get(i).asText();
                             
                             String documentUrl = String.format("%s/%s/%s/%s", 
-                                edgarDataArchivesUrl, 
+                                edgar4JProperties.getUrls().getEdgarDataArchivesUrl(), 
                                 rootNode.path("cik").asText(), 
                                 accessionNumber.replace("-", ""), 
                                 primaryDocument);
@@ -357,7 +350,7 @@ public class EdgarApiServiceImpl implements EdgarApiService {
             
             if (cik != null) {
                 CompletableFuture<String> future = downloadForm4Document(cik, accessionNumber, primaryDocument);
-                return future.get(); // Blocking call for synchronous method
+                return future.get(30, TimeUnit.SECONDS);
             }
             
             log.warn("Could not determine CIK for accession number: {}", accessionNumber);
@@ -412,7 +405,7 @@ public class EdgarApiServiceImpl implements EdgarApiService {
             
             // SEC daily master index URL format
             String url = String.format("%s/%s/%s/master.%s.idx", 
-                edgarDataArchivesUrl, year, quarter, dateStr);
+                edgar4JProperties.getUrls().getEdgarDataArchivesUrl(), year, quarter, dateStr);
             
             HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
@@ -425,7 +418,7 @@ public class EdgarApiServiceImpl implements EdgarApiService {
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             
             if (response.statusCode() == 200) {
-                accessionNumbers = parseDailyMasterIndex(response.body());
+                accessionNumbers = EdgarForm4ParsingUtils.parseDailyMasterIndex(response.body());
                 log.debug("Found {} Form 4 filings in daily index for {}", accessionNumbers.size(), date);
             } else {
                 log.debug("Daily master index not available for date: {} (Status: {})", date, response.statusCode());
@@ -441,76 +434,8 @@ public class EdgarApiServiceImpl implements EdgarApiService {
     /**
      * Parse daily master index to extract Form 4 accession numbers
      */
-    private List<String> parseDailyMasterIndex(String indexContent) {
-        List<String> accessionNumbers = new ArrayList<>();
-        
-        try {
-            String[] lines = indexContent.split("\\n");
-            boolean dataSection = false;
-            
-            for (String line : lines) {
-                // Skip header until we reach the data section
-                if (line.startsWith("CIK|Company Name|Form Type|Date Filed|Filename")) {
-                    dataSection = true;
-                    continue;
-                }
-                
-                if (dataSection && line.trim().length() > 0) {
-                    String[] fields = line.split("\\|");
-                    
-                    if (fields.length >= 5) {
-                        String formType = fields[2].trim();
-                        
-                        if ("4".equals(formType)) {
-                            String filename = fields[4].trim();
-                            String accessionNumber = extractAccessionFromFilename(filename);
-                            
-                            if (accessionNumber != null) {
-                                accessionNumbers.add(accessionNumber);
-                            }
-                        }
-                    }
-                }
-            }
-            
-        } catch (Exception e) {
-            log.warn("Error parsing daily master index: {}", e.getMessage());
-        }
-        
-        return accessionNumbers;
-    }
-    
-    /**
-     * Extract accession number from filename
-     */
-    private String extractAccessionFromFilename(String filename) {
-        try {
-            // Filename format: edgar/data/CIK/ACCESSION-NUMBER/PRIMARY-DOCUMENT
-            String[] parts = filename.split("/");
-            if (parts.length >= 4) {
-                return parts[3]; // ACCESSION-NUMBER part
-            }
-        } catch (Exception e) {
-            log.warn("Error extracting accession number from filename: {}", filename);
-        }
-        return null;
-    }
-    
-    /**
-     * Extract CIK from accession number (simplified implementation)
-     */
     private String extractCikFromAccessionNumber(String accessionNumber) {
-        try {
-            // SEC accession number format: NNNNNNNNNN-NN-NNNNNN
-            // First 10 digits are typically the CIK
-            if (accessionNumber != null && accessionNumber.matches("\\d{10}-\\d{2}-\\d{6}")) {
-                String cikPart = accessionNumber.substring(0, 10);
-                return formatCik(cikPart);
-            }
-        } catch (Exception e) {
-            log.warn("Error extracting CIK from accession number: {}", accessionNumber);
-        }
-        return null;
+        return EdgarForm4ParsingUtils.extractCikFromAccessionNumber(accessionNumber);
     }
 
     private String resolveUserAgent() {

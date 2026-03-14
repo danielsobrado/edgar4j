@@ -10,6 +10,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -176,18 +177,22 @@ class InsiderTransactionServiceTest {
         transaction.setSharesOwnedBefore(new BigDecimal("10000"));
         transaction.setSharesOwnedAfter(new BigDecimal("11000"));
 
-        InsiderTransaction savedTransaction = createValidTransaction();
-        savedTransaction.setId(1L);
-        savedTransaction.setOwnershipPercentageBefore(new BigDecimal("1.000000"));
-        savedTransaction.setOwnershipPercentageAfter(new BigDecimal("1.100000"));
-
-        when(transactionRepository.save(any(InsiderTransaction.class))).thenReturn(savedTransaction);
+        when(transactionRepository.save(any(InsiderTransaction.class))).thenAnswer(invocation -> {
+            InsiderTransaction saved = invocation.getArgument(0);
+            saved.setId(1L);
+            return saved;
+        });
 
         // When
         InsiderTransaction result = insiderTransactionService.save(transaction);
+        ArgumentCaptor<InsiderTransaction> transactionCaptor = ArgumentCaptor.forClass(InsiderTransaction.class);
+        verify(transactionRepository).save(transactionCaptor.capture());
+        InsiderTransaction persistedTransaction = transactionCaptor.getValue();
 
         // Then
         assertNotNull(result);
+        assertEquals(new BigDecimal("1.000000"), persistedTransaction.getOwnershipPercentageBefore());
+        assertEquals(new BigDecimal("1.100000"), persistedTransaction.getOwnershipPercentageAfter());
         assertEquals(new BigDecimal("1.000000"), result.getOwnershipPercentageBefore());
         assertEquals(new BigDecimal("1.100000"), result.getOwnershipPercentageAfter());
     }

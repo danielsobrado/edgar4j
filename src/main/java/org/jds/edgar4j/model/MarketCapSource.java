@@ -1,0 +1,9 @@
+package org.jds.edgar4j.model;
+
+public enum MarketCapSource {
+    UNKNOWN,
+    PROVIDER_MARKET_CAP,
+    PROVIDER_SHARES_OUTSTANDING,
+    SEC_COMPANYFACTS_SHARES_OUTSTANDING,
+    SEC_FILING_XBRL_SHARES_OUTSTANDING
+}

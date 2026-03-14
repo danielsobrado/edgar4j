@@ -78,9 +78,8 @@ README_PHASE2.md
 README_PHASE3.md
 WORK_PROGRESS.md
 
-.env
 *.env
 target/
 build.log
 start_log*.txt
-docs/
+staging-logs/

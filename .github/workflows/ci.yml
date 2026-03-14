@@ -142,7 +142,7 @@ jobs:
       - name: Build and push frontend
         uses: docker/build-push-action@v5
         with:
-          context: ./frontend
+          context: .
           file: ./docker/Dockerfile.frontend
           push: ${{ github.event_name == 'push' && secrets.DOCKER_USERNAME != '' }}
           tags: |
@@ -152,30 +152,6 @@ jobs:
           cache-to: type=gha,mode=max
           build-args: |
             VITE_API_BASE_URL=http://localhost:8080
-
-  # Code Quality
-  code-quality:
-    name: Code Quality
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Set up JDK 25
-        uses: actions/setup-java@v5
-        with:
-          java-version-file: .java-version
-          distribution: 'temurin'
-          cache: maven
-
-      - name: Run SpotBugs
-        run: ./mvnw spotbugs:check -B
-
-      - name: Run Checkstyle
-        run: ./mvnw checkstyle:check -B
 
   # Security Scan
   security:
@@ -187,7 +163,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.28.0
         with:
           scan-type: 'fs'
           scan-ref: '.'

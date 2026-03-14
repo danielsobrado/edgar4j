@@ -14,15 +14,18 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.core.userdetails.ReactiveUserDetailsService;
 import org.springframework.security.web.server.context.NoOpServerSecurityContextRepository;
 import org.springframework.security.web.server.SecurityWebFilterChain;
+import org.springframework.web.cors.reactive.CorsConfigurationSource;
 
 @Configuration
 @EnableWebFluxSecurity
 public class SecurityConfig {
 
     private final SecurityProperties securityProperties;
+    private final CorsConfigurationSource corsConfigurationSource;
 
-    public SecurityConfig(SecurityProperties securityProperties) {
+    public SecurityConfig(SecurityProperties securityProperties, CorsConfigurationSource corsConfigurationSource) {
         this.securityProperties = securityProperties;
+        this.corsConfigurationSource = corsConfigurationSource;
     }
 
     @Bean
@@ -30,7 +33,7 @@ public class SecurityConfig {
         ServerHttpSecurity configured = http
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .securityContextRepository(NoOpServerSecurityContextRepository.getInstance())
-                .cors(Customizer.withDefaults());
+            .cors(cors -> cors.configurationSource(corsConfigurationSource));
 
         if (!securityProperties.isEnabled()) {
             return configured
@@ -41,7 +44,8 @@ public class SecurityConfig {
         return configured
                 .authorizeExchange(auth -> auth
                         .pathMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
-                        .pathMatchers("/api/**", "/actuator/**", "/swagger-ui/**", "/v3/api-docs/**").authenticated()
+                    .pathMatchers("/actuator/**").hasRole("ADMIN")
+                    .pathMatchers("/api/**", "/swagger-ui/**", "/v3/api-docs/**").authenticated()
                         .anyExchange().permitAll()
                 )
                 .httpBasic(Customizer.withDefaults())

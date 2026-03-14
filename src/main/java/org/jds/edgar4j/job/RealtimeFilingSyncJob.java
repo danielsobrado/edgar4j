@@ -42,6 +42,7 @@ import org.jds.edgar4j.service.Form4Service;
 import org.jds.edgar4j.service.Form5Service;
 import org.jds.edgar4j.service.Form6KService;
 import org.jds.edgar4j.service.Form8KService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -49,12 +50,10 @@ import org.springframework.stereotype.Component;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class RealtimeFilingSyncJob {
 
     private static final String DEFAULT_SETTINGS_ID = "default";
@@ -76,29 +75,59 @@ public class RealtimeFilingSyncJob {
     private final Form13FService form13FService;
     private final Form20FService form20FService;
     private final ObjectMapper objectMapper;
+    private final boolean enabledFallback;
+    private final String formsFallback;
+    private final int lookbackHoursFallback;
+    private final int maxPagesFallback;
+    private final int pageSizeFallback;
+    private final int secBlockCooldownMinutes;
 
     private final AtomicBoolean isRunning = new AtomicBoolean(false);
     private final AtomicInteger lastSyncNewCount = new AtomicInteger(0);
     private final AtomicInteger lastSyncTotalScanned = new AtomicInteger(0);
     private final AtomicReference<Instant> secBlockCooldownUntil = new AtomicReference<>();
 
-    @Value("${edgar4j.jobs.realtime-filing-sync.enabled:true}")
-    private boolean enabledFallback;
-
-    @Value("${edgar4j.jobs.realtime-filing-sync.forms:4}")
-    private String formsFallback;
-
-    @Value("${edgar4j.jobs.realtime-filing-sync.lookback-hours:1}")
-    private int lookbackHoursFallback;
-
-    @Value("${edgar4j.jobs.realtime-filing-sync.max-pages:10}")
-    private int maxPagesFallback;
-
-    @Value("${edgar4j.jobs.realtime-filing-sync.page-size:100}")
-    private int pageSizeFallback;
-
-    @Value("${edgar4j.jobs.realtime-filing-sync.sec-block-cooldown-minutes:10}")
-    private int secBlockCooldownMinutes;
+    @Autowired
+    public RealtimeFilingSyncJob(
+            SecApiClient secApiClient,
+            DownloadSubmissionsService downloadSubmissionsService,
+            FillingRepository fillingRepository,
+            AppSettingsRepository appSettingsRepository,
+            Form3Service form3Service,
+            Form4Service form4Service,
+            Form5Service form5Service,
+            Form6KService form6KService,
+            Form8KService form8KService,
+            Form13DGService form13DGService,
+            Form13FService form13FService,
+            Form20FService form20FService,
+            ObjectMapper objectMapper,
+            @Value("${edgar4j.jobs.realtime-filing-sync.enabled:true}") boolean enabledFallback,
+            @Value("${edgar4j.jobs.realtime-filing-sync.forms:4}") String formsFallback,
+            @Value("${edgar4j.jobs.realtime-filing-sync.lookback-hours:1}") int lookbackHoursFallback,
+            @Value("${edgar4j.jobs.realtime-filing-sync.max-pages:10}") int maxPagesFallback,
+            @Value("${edgar4j.jobs.realtime-filing-sync.page-size:100}") int pageSizeFallback,
+            @Value("${edgar4j.jobs.realtime-filing-sync.sec-block-cooldown-minutes:10}") int secBlockCooldownMinutes) {
+        this.secApiClient = secApiClient;
+        this.downloadSubmissionsService = downloadSubmissionsService;
+        this.fillingRepository = fillingRepository;
+        this.appSettingsRepository = appSettingsRepository;
+        this.form3Service = form3Service;
+        this.form4Service = form4Service;
+        this.form5Service = form5Service;
+        this.form6KService = form6KService;
+        this.form8KService = form8KService;
+        this.form13DGService = form13DGService;
+        this.form13FService = form13FService;
+        this.form20FService = form20FService;
+        this.objectMapper = objectMapper;
+        this.enabledFallback = enabledFallback;
+        this.formsFallback = formsFallback;
+        this.lookbackHoursFallback = lookbackHoursFallback;
+        this.maxPagesFallback = maxPagesFallback;
+        this.pageSizeFallback = pageSizeFallback;
+        this.secBlockCooldownMinutes = secBlockCooldownMinutes;
+    }
 
     @Scheduled(cron = "${edgar4j.jobs.realtime-filing-sync.cron:0 */15 * * * *}")
     public void syncRecentFilings() {

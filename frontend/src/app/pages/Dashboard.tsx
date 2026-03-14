@@ -7,6 +7,7 @@ import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { ErrorMessage } from '../components/common/ErrorMessage';
 import { EmptyState } from '../components/common/EmptyState';
 import { buildForm4SearchUrl } from '../utils';
+import { toDisplayDate, toDisplayDateTime } from '../utils/formatters';
 
 export function Dashboard() {
   const navigate = useNavigate();
@@ -44,23 +45,8 @@ export function Dashboard() {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString();
-    } catch {
-      return dateString;
-    }
-  };
-
-  const formatDateTime = (dateString: string) => {
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleString();
-    } catch {
-      return dateString;
-    }
-  };
+  const formatDate = toDisplayDate;
+  const formatDateTime = toDisplayDateTime;
 
   return (
     <div className="space-y-6">

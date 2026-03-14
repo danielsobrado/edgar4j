@@ -8,6 +8,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.time.Instant;
@@ -24,7 +25,6 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 @SpringBootTest
 @ActiveProfiles("test")
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class Form4RepositoryTest {
 
     @Autowired
@@ -33,6 +33,7 @@ class Form4RepositoryTest {
     private static final String ACCESSION_1 = "0001234567-24-000001";
     private static final String ACCESSION_2 = "0001234567-24-000002";
     private static final String ACCESSION_3 = "0001234567-24-000003";
+    private static final LocalDate BASE_DATE = LocalDate.of(2025, 1, 15);
 
     @BeforeEach
     void setUp() {
@@ -45,7 +46,6 @@ class Form4RepositoryTest {
     }
 
     @Test
-    @Order(1)
     @DisplayName("Should save and find Form4 by accession number")
     void shouldSaveAndFindByAccessionNumber() {
         Form4 form4 = createForm4(ACCESSION_1, "MSFT", "789019", "John Doe");
@@ -60,7 +60,6 @@ class Form4RepositoryTest {
     }
 
     @Test
-    @Order(2)
     @DisplayName("Should find Form4 by trading symbol")
     void shouldFindByTradingSymbol() {
         form4Repository.save(createForm4(ACCESSION_1, "MSFT", "789019", "John Doe"));
@@ -74,7 +73,6 @@ class Form4RepositoryTest {
     }
 
     @Test
-    @Order(3)
     @DisplayName("Should find Form4 by trading symbol with pagination")
     void shouldFindByTradingSymbolPaginated() {
         for (int i = 0; i < 25; i++) {
@@ -95,7 +93,6 @@ class Form4RepositoryTest {
     }
 
     @Test
-    @Order(4)
     @DisplayName("Should find Form4 by CIK")
     void shouldFindByCik() {
         form4Repository.save(createForm4(ACCESSION_1, "MSFT", "789019", "John Doe"));
@@ -108,7 +105,6 @@ class Form4RepositoryTest {
     }
 
     @Test
-    @Order(5)
     @DisplayName("Should find Form4 by owner name (case insensitive)")
     void shouldFindByOwnerNameContaining() {
         form4Repository.save(createForm4(ACCESSION_1, "MSFT", "789019", "John Doe"));
@@ -122,7 +118,6 @@ class Form4RepositoryTest {
     }
 
     @Test
-    @Order(6)
     @DisplayName("Should find Form4 by transaction date range")
     void shouldFindByTransactionDateBetween() {
         LocalDate midDate = LocalDate.of(2024, 1, 15);
@@ -139,7 +134,6 @@ class Form4RepositoryTest {
     }
 
     @Test
-    @Order(7)
     @DisplayName("Should find directors only")
     void shouldFindDirectors() {
         Form4 director = createForm4(ACCESSION_1, "MSFT", "789019", "Director Person");
@@ -160,7 +154,6 @@ class Form4RepositoryTest {
     }
 
     @Test
-    @Order(8)
     @DisplayName("Should find officers only")
     void shouldFindOfficers() {
         Form4 director = createForm4(ACCESSION_1, "MSFT", "789019", "Director Person");
@@ -181,7 +174,6 @@ class Form4RepositoryTest {
     }
 
     @Test
-    @Order(9)
     @DisplayName("Should find 10% owners")
     void shouldFindTenPercentOwners() {
         Form4 owner = createForm4(ACCESSION_1, "MSFT", "789019", "Big Owner");
@@ -199,7 +191,6 @@ class Form4RepositoryTest {
     }
 
     @Test
-    @Order(10)
     @DisplayName("Should find top 10 recent filings")
     void shouldFindTop10Recent() {
         for (int i = 0; i < 15; i++) {
@@ -209,7 +200,7 @@ class Form4RepositoryTest {
                     "789019",
                     "Owner " + i
             );
-            form4.setTransactionDate(LocalDate.now().minusDays(i));
+            form4.setTransactionDate(BASE_DATE.minusDays(i));
             form4Repository.save(form4);
         }
 
@@ -223,7 +214,6 @@ class Form4RepositoryTest {
     }
 
     @Test
-    @Order(11)
     @DisplayName("Should count buys and sells")
     void shouldCountBuysAndSells() {
         Form4 buy1 = createForm4(ACCESSION_1, "MSFT", "789019", "Buyer 1");
@@ -243,7 +233,6 @@ class Form4RepositoryTest {
     }
 
     @Test
-    @Order(12)
     @DisplayName("Should count buys and sells by symbol")
     void shouldCountBuysAndSellsBySymbol() {
         Form4 msftBuy = createForm4(ACCESSION_1, "MSFT", "789019", "MSFT Buyer");
@@ -265,7 +254,6 @@ class Form4RepositoryTest {
     }
 
     @Test
-    @Order(13)
     @DisplayName("Should check existence by accession number")
     void shouldCheckExistenceByAccessionNumber() {
         form4Repository.save(createForm4(ACCESSION_1, "MSFT", "789019", "John Doe"));
@@ -275,7 +263,6 @@ class Form4RepositoryTest {
     }
 
     @Test
-    @Order(14)
     @DisplayName("Should find large transactions by symbol")
     void shouldFindLargeTransactionsBySymbol() {
         Form4 large = createForm4(ACCESSION_1, "MSFT", "789019", "Big Trader");
@@ -293,7 +280,6 @@ class Form4RepositoryTest {
     }
 
     @Test
-    @Order(15)
     @DisplayName("Should find by symbol and owner name")
     void shouldFindBySymbolAndOwnerName() {
         form4Repository.save(createForm4(ACCESSION_1, "MSFT", "789019", "John Doe"));
@@ -307,18 +293,16 @@ class Form4RepositoryTest {
     }
 
     @Test
-    @Order(16)
     @DisplayName("Should enforce unique accession number constraint")
     void shouldEnforceUniqueAccessionNumber() {
         form4Repository.save(createForm4(ACCESSION_1, "MSFT", "789019", "John Doe"));
 
         Form4 duplicate = createForm4(ACCESSION_1, "AAPL", "320193", "Different Person");
 
-        assertThrows(Exception.class, () -> form4Repository.save(duplicate));
+        assertThrows(DuplicateKeyException.class, () -> form4Repository.save(duplicate));
     }
 
     @Test
-    @Order(17)
     @DisplayName("Should save Form4 with transactions")
     void shouldSaveWithTransactions() {
         Form4 form4 = createForm4(ACCESSION_1, "MSFT", "789019", "John Doe");
@@ -357,13 +341,12 @@ class Form4RepositoryTest {
     }
 
     @Test
-    @Order(18)
     @DisplayName("Should find recent acquisitions from nested transactions")
     void shouldFindRecentAcquisitionsFromNestedTransactions() {
-        LocalDate recentDate = LocalDate.now().minusDays(2);
+        LocalDate recentDate = BASE_DATE.minusDays(2);
 
         Form4 nestedAcquisition = createForm4(ACCESSION_1, "MSFT", "789019", "John Doe");
-        nestedAcquisition.setTransactionDate(LocalDate.now().minusDays(45));
+        nestedAcquisition.setTransactionDate(BASE_DATE.minusDays(45));
         nestedAcquisition.setAcquiredDisposedCode("D");
         nestedAcquisition.setTransactions(List.of(
                 Form4Transaction.builder()
@@ -379,32 +362,31 @@ class Form4RepositoryTest {
         form4Repository.save(nestedAcquisition);
 
         Form4 oldAcquisition = createForm4(ACCESSION_2, "AAPL", "320193", "Tim Cook");
-        oldAcquisition.setTransactionDate(LocalDate.now().minusDays(45));
+        oldAcquisition.setTransactionDate(BASE_DATE.minusDays(45));
         form4Repository.save(oldAcquisition);
 
-        List<Form4> acquisitions = form4Repository.findRecentAcquisitions(LocalDate.now().minusDays(30));
+        List<Form4> acquisitions = form4Repository.findRecentAcquisitions(BASE_DATE.minusDays(30));
 
         assertEquals(1, acquisitions.size());
         assertEquals(ACCESSION_1, acquisitions.get(0).getAccessionNumber());
     }
 
     @Test
-    @Order(19)
     @DisplayName("Should find acquisitions by code and minimum transaction date with pagination")
     void shouldFindByAcquiredDisposedCodeAndTransactionDateGreaterThanEqual() {
         Form4 recentBuy = createForm4(ACCESSION_1, "MSFT", "789019", "John Doe");
-        recentBuy.setTransactionDate(LocalDate.now().minusDays(3));
+        recentBuy.setTransactionDate(BASE_DATE.minusDays(3));
         recentBuy.setAcquiredDisposedCode("A");
         form4Repository.save(recentBuy);
 
         Form4 olderBuy = createForm4(ACCESSION_2, "AAPL", "320193", "Tim Cook");
-        olderBuy.setTransactionDate(LocalDate.now().minusDays(40));
+        olderBuy.setTransactionDate(BASE_DATE.minusDays(40));
         olderBuy.setAcquiredDisposedCode("A");
         form4Repository.save(olderBuy);
 
         Page<Form4> page = form4Repository.findByAcquiredDisposedCodeAndTransactionDateGreaterThanEqual(
                 "A",
-                LocalDate.now().minusDays(30),
+            BASE_DATE.minusDays(30),
                 PageRequest.of(0, 10));
 
         assertEquals(1, page.getTotalElements());
@@ -426,7 +408,7 @@ class Form4RepositoryTest {
                 .isOther(false)
                 .ownerType("Officer")
                 .officerTitle("CFO")
-                .transactionDate(LocalDate.now())
+                .transactionDate(BASE_DATE)
                 .transactionShares(1000f)
                 .transactionPricePerShare(100f)
                 .transactionValue(100000f)

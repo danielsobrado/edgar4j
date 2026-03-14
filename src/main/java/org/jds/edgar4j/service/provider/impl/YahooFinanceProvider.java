@@ -1,6 +1,7 @@
 package org.jds.edgar4j.service.provider.impl;
 
 import java.math.BigDecimal;
+import java.net.CookieManager;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -13,6 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.jds.edgar4j.service.provider.MarketDataProvider;
 import org.jds.edgar4j.service.provider.MarketDataProviderSettingsResolver;
@@ -33,13 +35,19 @@ public class YahooFinanceProvider implements MarketDataProvider {
 
     private final ObjectMapper objectMapper;
     private final MarketDataProviderSettingsResolver settingsResolver;
+    private final CookieManager cookieManager = new CookieManager();
     private final HttpClient httpClient = HttpClient.newBuilder()
             .followRedirects(HttpClient.Redirect.NORMAL)
+            .cookieHandler(cookieManager)
             .build();
     private final AtomicLong unavailableUntilEpochMillis = new AtomicLong(0);
     private final AtomicLong lastRequestTime = new AtomicLong(0);
+    private final AtomicReference<YahooSession> yahooSession = new AtomicReference<>();
 
-    private static final String USER_AGENT = "Edgar4J/1.0 Yahoo Finance Client";
+    private static final String USER_AGENT =
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                    + "(KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36";
+    private static final Duration SESSION_TTL = Duration.ofMinutes(15);
 
     @Override
     public String getProviderName() {
@@ -83,7 +91,9 @@ public class YahooFinanceProvider implements MarketDataProvider {
                 }
 
                 log.warn("Yahoo Finance API returned status: {} for symbol: {}", response.statusCode(), symbol);
-                markTemporarilyUnavailable(config.retryDelay());
+                if (shouldMarkTemporarilyUnavailable(response.statusCode())) {
+                    markTemporarilyUnavailable(config.retryDelay());
+                }
                 return null;
             } catch (Exception e) {
                 log.error("Error getting current price from Yahoo Finance for symbol: {}", symbol, e);
@@ -119,7 +129,9 @@ public class YahooFinanceProvider implements MarketDataProvider {
                 }
 
                 log.warn("Yahoo Finance API returned status: {} for symbol: {}", response.statusCode(), symbol);
-                markTemporarilyUnavailable(config.retryDelay());
+                if (shouldMarkTemporarilyUnavailable(response.statusCode())) {
+                    markTemporarilyUnavailable(config.retryDelay());
+                }
                 return List.of();
             } catch (Exception e) {
                 log.error("Error getting historical prices from Yahoo Finance for symbol: {}", symbol, e);
@@ -131,7 +143,49 @@ public class YahooFinanceProvider implements MarketDataProvider {
 
     @Override
     public CompletableFuture<CompanyProfile> getCompanyProfile(String symbol) {
-        return CompletableFuture.completedFuture(null);
+        MarketDataProviderSettingsResolver.ResolvedProviderConfig config = config();
+        if (!config.operational()) {
+            return CompletableFuture.completedFuture(null);
+        }
+
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                log.debug("Getting company profile for symbol: {} from Yahoo Finance", symbol);
+
+                enforceRateLimit(config);
+                HttpRequest request = HttpRequest.newBuilder()
+                        .uri(buildProfileUri(config.baseUrl(), symbol))
+                        .header("User-Agent", USER_AGENT)
+                        .header("Accept", "application/json")
+                        .timeout(config.timeout())
+                        .build();
+
+                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+                if (response.statusCode() == 200) {
+                    markAvailable();
+                    return parseCompanyProfile(response.body(), symbol);
+                }
+
+                if (requiresCrumb(response.statusCode())) {
+                    CompanyProfile quoteSummaryProfile = fetchQuoteSummaryProfile(config, symbol);
+                    if (quoteSummaryProfile != null) {
+                        markAvailable();
+                        return quoteSummaryProfile;
+                    }
+                }
+
+                log.warn("Yahoo Finance profile API returned status: {} for symbol: {}", response.statusCode(), symbol);
+                if (shouldMarkTemporarilyUnavailable(response.statusCode())) {
+                    markTemporarilyUnavailable(config.retryDelay());
+                }
+                return null;
+            } catch (Exception e) {
+                log.error("Error getting company profile from Yahoo Finance for symbol: {}", symbol, e);
+                markTemporarilyUnavailable(config.retryDelay());
+                return null;
+            }
+        });
     }
 
     @Override
@@ -191,6 +245,61 @@ public class YahooFinanceProvider implements MarketDataProvider {
                 .queryParam("period1", startTimestamp)
                 .queryParam("period2", endTimestamp)
                 .queryParam("interval", "1d")
+                .build()
+                .encode()
+                .toUri();
+    }
+
+    private URI buildProfileUri(String baseUrl, String symbol) {
+        URI baseUri = URI.create(baseUrl);
+        return UriComponentsBuilder.newInstance()
+                .scheme(baseUri.getScheme())
+                .host(baseUri.getHost())
+                .port(baseUri.getPort())
+                .path("/v7/finance/quote")
+                .queryParam("symbols", symbol)
+                .build()
+                .encode()
+                .toUri();
+    }
+
+    private URI buildQuoteSummaryUri(String baseUrl, String symbol, String crumb) {
+        URI baseUri = URI.create(baseUrl);
+        return UriComponentsBuilder.newInstance()
+                .scheme(baseUri.getScheme())
+                .host(baseUri.getHost())
+                .port(baseUri.getPort())
+                .path("/v10/finance/quoteSummary/{symbol}")
+                .queryParam("modules", "price,defaultKeyStatistics")
+                .queryParam("crumb", crumb)
+                .buildAndExpand(symbol)
+                .encode()
+                .toUri();
+    }
+
+    private URI buildCrumbUri(String baseUrl) {
+        URI baseUri = URI.create(baseUrl);
+        return UriComponentsBuilder.newInstance()
+                .scheme(baseUri.getScheme())
+                .host(baseUri.getHost())
+                .port(baseUri.getPort())
+                .path("/v1/test/getcrumb")
+                .build()
+                .encode()
+                .toUri();
+    }
+
+    private URI buildSessionBootstrapUri(String baseUrl) {
+        URI baseUri = URI.create(baseUrl);
+        if (baseUri.getHost() != null && baseUri.getHost().endsWith("finance.yahoo.com")) {
+            return URI.create("https://fc.yahoo.com");
+        }
+
+        return UriComponentsBuilder.newInstance()
+                .scheme(baseUri.getScheme())
+                .host(baseUri.getHost())
+                .port(baseUri.getPort())
+                .path("/")
                 .build()
                 .encode()
                 .toUri();
@@ -329,6 +438,167 @@ public class YahooFinanceProvider implements MarketDataProvider {
                 .toList();
     }
 
+    private CompanyProfile parseCompanyProfile(String jsonResponse, String symbol) {
+        try {
+            JsonNode rootNode = objectMapper.readTree(jsonResponse);
+            JsonNode results = rootNode.path("quoteResponse").path("result");
+            if (results.isArray() && !results.isEmpty()) {
+                return parseQuoteResponseProfile(results.get(0), symbol);
+            }
+
+            JsonNode summaryResults = rootNode.path("quoteSummary").path("result");
+            if (summaryResults.isArray() && !summaryResults.isEmpty()) {
+                return parseQuoteSummaryProfile(summaryResults.get(0), symbol);
+            }
+
+            log.warn("No company profile data found in Yahoo Finance response for symbol: {}", symbol);
+            return null;
+        } catch (Exception e) {
+            log.error("Error parsing company profile response from Yahoo Finance", e);
+            return null;
+        }
+    }
+
+    private CompanyProfile parseQuoteResponseProfile(JsonNode result, String symbol) {
+        CompanyProfile profile = new CompanyProfile();
+        profile.setSymbol(symbol);
+        profile.setName(firstNonBlank(
+                result.path("longName").asText(null),
+                result.path("shortName").asText(null),
+                result.path("displayName").asText(null)));
+        profile.setExchange(result.path("fullExchangeName").asText(result.path("exchange").asText("US")));
+        profile.setCurrency(result.path("currency").asText("USD"));
+
+        Long marketCap = parseLongNode(result.get("marketCap"));
+        Long sharesOutstanding = parseLongNode(result.get("sharesOutstanding"));
+        if (marketCap == null && sharesOutstanding != null) {
+            BigDecimal regularMarketPrice = parseBigDecimalNode(result.get("regularMarketPrice"));
+            if (regularMarketPrice != null) {
+                marketCap = regularMarketPrice
+                        .multiply(BigDecimal.valueOf(sharesOutstanding))
+                        .setScale(0, java.math.RoundingMode.HALF_UP)
+                        .longValue();
+            }
+        }
+
+        profile.setMarketCapitalization(marketCap);
+        profile.setSharesOutstanding(sharesOutstanding);
+        return profile;
+    }
+
+    private CompanyProfile parseQuoteSummaryProfile(JsonNode result, String symbol) {
+        JsonNode price = result.path("price");
+        JsonNode defaultKeyStatistics = result.path("defaultKeyStatistics");
+
+        CompanyProfile profile = new CompanyProfile();
+        profile.setSymbol(symbol);
+        profile.setName(firstNonBlank(
+                extractTextValue(price.get("longName")),
+                extractTextValue(price.get("shortName")),
+                extractTextValue(price.get("displayName"))));
+        profile.setExchange(firstNonBlank(
+                extractTextValue(price.get("fullExchangeName")),
+                extractTextValue(price.get("exchangeName")),
+                extractTextValue(price.get("exchange")),
+                "US"));
+        profile.setCurrency(firstNonBlank(
+                extractTextValue(price.get("currency")),
+                "USD"));
+
+        Long marketCap = extractLongValue(price.get("marketCap"));
+        Long sharesOutstanding = extractLongValue(defaultKeyStatistics.get("sharesOutstanding"));
+        if (marketCap == null && sharesOutstanding != null) {
+            BigDecimal regularMarketPrice = extractBigDecimalValue(price.get("regularMarketPrice"));
+            if (regularMarketPrice != null) {
+                marketCap = regularMarketPrice
+                        .multiply(BigDecimal.valueOf(sharesOutstanding))
+                        .setScale(0, java.math.RoundingMode.HALF_UP)
+                        .longValue();
+            }
+        }
+
+        profile.setMarketCapitalization(marketCap);
+        profile.setSharesOutstanding(sharesOutstanding);
+        return profile;
+    }
+
+    private CompanyProfile fetchQuoteSummaryProfile(
+            MarketDataProviderSettingsResolver.ResolvedProviderConfig config,
+            String symbol) {
+        try {
+            YahooSession session = getOrRefreshYahooSession(config);
+            if (session == null || session.crumb() == null || session.crumb().isBlank()) {
+                return null;
+            }
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(buildQuoteSummaryUri(config.baseUrl(), symbol, session.crumb()))
+                    .header("User-Agent", USER_AGENT)
+                    .header("Accept", "application/json")
+                    .timeout(config.timeout())
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() == 200) {
+                return parseCompanyProfile(response.body(), symbol);
+            }
+
+            if (requiresCrumb(response.statusCode())) {
+                yahooSession.set(null);
+            }
+
+            log.warn("Yahoo Finance quoteSummary API returned status: {} for symbol: {}", response.statusCode(), symbol);
+            return null;
+        } catch (Exception e) {
+            log.error("Error fetching company profile from Yahoo Finance quoteSummary for symbol: {}", symbol, e);
+            return null;
+        }
+    }
+
+    private synchronized YahooSession getOrRefreshYahooSession(
+            MarketDataProviderSettingsResolver.ResolvedProviderConfig config) throws Exception {
+        YahooSession cachedSession = yahooSession.get();
+        if (cachedSession != null && cachedSession.expiresAt().isAfter(Instant.now())) {
+            return cachedSession;
+        }
+
+        HttpRequest bootstrapRequest = HttpRequest.newBuilder()
+                .uri(buildSessionBootstrapUri(config.baseUrl()))
+                .header("User-Agent", USER_AGENT)
+                .timeout(config.timeout())
+                .build();
+        httpClient.send(bootstrapRequest, HttpResponse.BodyHandlers.discarding());
+
+        HttpRequest crumbRequest = HttpRequest.newBuilder()
+                .uri(buildCrumbUri(config.baseUrl()))
+                .header("User-Agent", USER_AGENT)
+                .timeout(config.timeout())
+                .build();
+        HttpResponse<String> crumbResponse = httpClient.send(crumbRequest, HttpResponse.BodyHandlers.ofString());
+        if (crumbResponse.statusCode() != 200) {
+            log.warn("Yahoo Finance crumb endpoint returned status: {}", crumbResponse.statusCode());
+            return null;
+        }
+
+        String crumb = crumbResponse.body() != null ? crumbResponse.body().trim() : null;
+        if (crumb == null || crumb.isBlank()) {
+            log.warn("Yahoo Finance crumb endpoint returned an empty crumb");
+            return null;
+        }
+
+        YahooSession refreshedSession = new YahooSession(crumb, Instant.now().plus(SESSION_TTL));
+        yahooSession.set(refreshedSession);
+        return refreshedSession;
+    }
+
+    private boolean requiresCrumb(int statusCode) {
+        return statusCode == 401 || statusCode == 403;
+    }
+
+    private boolean shouldMarkTemporarilyUnavailable(int statusCode) {
+        return statusCode == 429 || statusCode >= 500;
+    }
+
     private BigDecimal parseBigDecimal(String value) {
         if (value == null || value.trim().isEmpty() || "null".equals(value)) {
             return null;
@@ -353,6 +623,74 @@ public class YahooFinanceProvider implements MarketDataProvider {
         }
     }
 
+    private BigDecimal parseBigDecimalNode(JsonNode node) {
+        if (node == null || node.isNull()) {
+            return null;
+        }
+        return parseBigDecimal(node.asText());
+    }
+
+    private Long parseLongNode(JsonNode node) {
+        if (node == null || node.isNull()) {
+            return null;
+        }
+        return parseLong(node.asText());
+    }
+
+    private Long extractLongValue(JsonNode node) {
+        if (node == null || node.isNull()) {
+            return null;
+        }
+
+        if (node.isObject()) {
+            return extractLongValue(node.get("raw"));
+        }
+
+        return parseLongNode(node);
+    }
+
+    private BigDecimal extractBigDecimalValue(JsonNode node) {
+        if (node == null || node.isNull()) {
+            return null;
+        }
+
+        if (node.isObject()) {
+            return extractBigDecimalValue(node.get("raw"));
+        }
+
+        return parseBigDecimalNode(node);
+    }
+
+    private String extractTextValue(JsonNode node) {
+        if (node == null || node.isNull()) {
+            return null;
+        }
+
+        if (node.isObject()) {
+            String formatted = extractTextValue(node.get("fmt"));
+            if (formatted != null) {
+                return formatted;
+            }
+            return extractTextValue(node.get("longFmt"));
+        }
+
+        String value = node.asText(null);
+        return value != null && !value.isBlank() ? value : null;
+    }
+
+    private String firstNonBlank(String... values) {
+        if (values == null) {
+            return null;
+        }
+
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
+    }
+
     @SafeVarargs
     private final <T> T firstNonNull(T... values) {
         if (values == null) {
@@ -364,5 +702,8 @@ public class YahooFinanceProvider implements MarketDataProvider {
             }
         }
         return null;
+    }
+
+    private record YahooSession(String crumb, Instant expiresAt) {
     }
 }

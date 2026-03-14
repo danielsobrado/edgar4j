@@ -35,6 +35,8 @@ public class CompanyMarketData {
 
     private Double marketCap;
 
+    private MarketCapSource marketCapSource;
+
     private Double currentPrice;
 
     private Double previousClose;
