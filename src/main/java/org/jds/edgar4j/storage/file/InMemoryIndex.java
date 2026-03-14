@@ -3,6 +3,7 @@ package org.jds.edgar4j.storage.file;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.function.Function;
 
 final class InMemoryIndex<T> {
@@ -24,45 +25,44 @@ final class InMemoryIndex<T> {
         this.keyNormalizer = keyNormalizer;
     }
 
-    void rebuild(Iterable<T> records) {
+    synchronized void rebuild(Iterable<T> records) {
         buckets.clear();
         for (T record : records) {
-            add(record);
+            addInternal(record);
         }
     }
 
-    void add(T record) {
+    synchronized void add(T record) {
+        addInternal(record);
+    }
+
+    synchronized void update(String id, T record) {
+        if (id == null) {
+            return;
+        }
+
+        removeByIdInternal(id);
+        addInternal(record);
+    }
+
+    synchronized void removeById(String id) {
+        if (id == null) {
+            return;
+        }
+
+        removeByIdInternal(id);
+    }
+
+    synchronized void remove(T record) {
         String id = idExtractor.apply(record);
         if (id == null) {
             return;
         }
 
-        for (String bucketKey : bucketKeysForRecord(record)) {
-            buckets.computeIfAbsent(bucketKey, ignored -> new LinkedHashMap<>())
-                    .put(id, record);
-        }
+        removeByIdInternal(id);
     }
 
-    void remove(T record) {
-        String id = idExtractor.apply(record);
-        if (id == null) {
-            return;
-        }
-
-        for (String bucketKey : bucketKeysForRecord(record)) {
-            LinkedHashMap<String, T> bucket = buckets.get(bucketKey);
-            if (bucket == null) {
-                continue;
-            }
-
-            bucket.remove(id);
-            if (bucket.isEmpty()) {
-                buckets.remove(bucketKey);
-            }
-        }
-    }
-
-    List<T> findAll(Object value) {
+    synchronized List<T> findAll(Object value) {
         String bucketKey = normalizeLookupValue(value);
         if (bucketKey == null) {
             return List.of();
@@ -74,6 +74,29 @@ final class InMemoryIndex<T> {
 
     String name() {
         return name;
+    }
+
+    private void addInternal(T record) {
+        String id = idExtractor.apply(record);
+        if (id == null) {
+            return;
+        }
+
+        for (String bucketKey : bucketKeysForRecord(record)) {
+            buckets.computeIfAbsent(bucketKey, ignored -> new LinkedHashMap<>())
+                    .put(id, record);
+        }
+    }
+
+    private void removeByIdInternal(String id) {
+        for (var iterator = buckets.entrySet().iterator(); iterator.hasNext();) {
+            Entry<String, LinkedHashMap<String, T>> entry = iterator.next();
+            LinkedHashMap<String, T> bucket = entry.getValue();
+            bucket.remove(id);
+            if (bucket.isEmpty()) {
+                iterator.remove();
+            }
+        }
     }
 
     private List<String> bucketKeysForRecord(T record) {

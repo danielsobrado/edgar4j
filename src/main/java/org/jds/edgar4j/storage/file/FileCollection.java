@@ -9,10 +9,12 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.BiConsumer;
@@ -118,7 +120,7 @@ public class FileCollection<T> {
             if (existingIndex >= 0) {
                 records.set(existingIndex, record);
                 recordsById.put(id, record);
-                buildIndexes();
+                updateIndexes(id, record);
             } else {
                 records.add(record);
                 recordsById.put(id, record);
@@ -137,7 +139,6 @@ public class FileCollection<T> {
         try {
             ensureLoaded();
             List<S> saved = new ArrayList<>();
-            boolean requiresIndexRebuild = false;
             for (S entity : entities) {
                 assignIdIfMissing(entity);
                 String id = idGetter.apply(entity);
@@ -145,16 +146,13 @@ public class FileCollection<T> {
                 if (existingIndex >= 0) {
                     records.set(existingIndex, entity);
                     recordsById.put(id, entity);
-                    requiresIndexRebuild = true;
+                    updateIndexes(id, entity);
                 } else {
                     records.add(entity);
                     recordsById.put(id, entity);
                     addToIndexes(entity);
                 }
                 saved.add(entity);
-            }
-            if (requiresIndexRebuild) {
-                buildIndexes();
             }
             flushIfNeeded();
             return saved;
@@ -236,15 +234,18 @@ public class FileCollection<T> {
     }
 
     public void deleteById(String id) {
+        if (id == null) {
+            return;
+        }
+
+        deleteAllById(List.of(id));
+    }
+
+    public void deleteAllById(Iterable<String> ids) {
         lock.writeLock().lock();
         try {
             ensureLoaded();
-            T removed = id == null ? null : recordsById.remove(id);
-            if (removed != null) {
-                records.removeIf(record -> id.equals(idGetter.apply(record)));
-                removeFromIndexes(removed);
-            }
-            flushIfNeeded();
+            deleteAllByIdsInternal(normalizeIds(ids));
         } finally {
             lock.writeLock().unlock();
         }
@@ -254,33 +255,23 @@ public class FileCollection<T> {
         lock.writeLock().lock();
         try {
             ensureLoaded();
-            List<String> ids = new ArrayList<>();
+            LinkedHashSet<String> ids = new LinkedHashSet<>();
             for (T entity : entities) {
                 String id = idGetter.apply(entity);
                 if (id != null) {
                     ids.add(id);
                 }
             }
-            if (!ids.isEmpty()) {
-                List<T> removedRecords = records.stream()
-                        .filter(record -> ids.contains(idGetter.apply(record)))
-                        .toList();
-                records.removeIf(record -> ids.contains(idGetter.apply(record)));
-                removedRecords.forEach(record -> {
-                    recordsById.remove(idGetter.apply(record));
-                    removeFromIndexes(record);
-                });
-                flushIfNeeded();
-            }
+            deleteAllByIdsInternal(ids);
         } finally {
             lock.writeLock().unlock();
         }
     }
 
     public Iterable<T> findAllByIds(Iterable<String> ids) {
-        List<String> requestedIds = new ArrayList<>();
-        for (String id : ids) {
-            requestedIds.add(id);
+        Set<String> requestedIds = normalizeIds(ids);
+        if (requestedIds.isEmpty()) {
+            return List.of();
         }
         return findAllMatching(record -> requestedIds.contains(idGetter.apply(record)));
     }
@@ -402,7 +393,18 @@ public class FileCollection<T> {
     }
 
     private void removeFromIndexes(T record) {
-        indexes.values().forEach(index -> index.remove(record));
+        String id = idGetter.apply(record);
+        if (id != null) {
+            removeFromIndexesById(id);
+        }
+    }
+
+    private void updateIndexes(String id, T record) {
+        indexes.values().forEach(index -> index.update(id, record));
+    }
+
+    private void removeFromIndexesById(String id) {
+        indexes.values().forEach(index -> index.removeById(id));
     }
 
     private InMemoryIndex<T> index(String indexName) {
@@ -421,6 +423,31 @@ public class FileCollection<T> {
 
     private List<Object> singleValue(Object value) {
         return value == null ? List.of() : List.of(value);
+    }
+
+    private LinkedHashSet<String> normalizeIds(Iterable<String> ids) {
+        LinkedHashSet<String> normalizedIds = new LinkedHashSet<>();
+        for (String id : ids) {
+            if (id != null) {
+                normalizedIds.add(id);
+            }
+        }
+        return normalizedIds;
+    }
+
+    private void deleteAllByIdsInternal(Set<String> ids) {
+        if (ids.isEmpty()) {
+            return;
+        }
+
+        boolean removedAny = records.removeIf(record -> ids.contains(idGetter.apply(record)));
+        if (!removedAny) {
+            return;
+        }
+
+        ids.forEach(recordsById::remove);
+        ids.forEach(this::removeFromIndexesById);
+        flushIfNeeded();
     }
 
     private int indexOf(String id) {

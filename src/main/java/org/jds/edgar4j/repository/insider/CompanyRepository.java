@@ -1,15 +1,13 @@
 package org.jds.edgar4j.repository.insider;
 
-import org.jds.edgar4j.model.insider.Company;
-import org.jds.edgar4j.port.InsiderCompanyDataPort;
-import org.springframework.context.annotation.Profile;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
-
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+
+import org.jds.edgar4j.model.insider.Company;
+import org.springframework.context.annotation.Profile;
+import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.data.mongodb.repository.Query;
 
 /**
  * Repository interface for Company entities
@@ -19,7 +17,7 @@ import java.util.Optional;
  * @since 2025-01-01
  */
 @Profile("resource-high & !resource-low")
-public interface CompanyRepository extends JpaRepository<Company, Long>, InsiderCompanyDataPort {
+public interface CompanyRepository extends MongoRepository<Company, Long> {
 
     /**
      * Find company by CIK
@@ -34,8 +32,7 @@ public interface CompanyRepository extends JpaRepository<Company, Long>, Insider
     /**
      * Find companies by name (case-insensitive)
      */
-    @Query("SELECT c FROM Company c WHERE LOWER(c.companyName) LIKE LOWER(CONCAT('%', :name, '%'))")
-    List<Company> findByCompanyNameContainingIgnoreCase(@Param("name") String name);
+    List<Company> findByCompanyNameContainingIgnoreCase(String name);
 
     /**
      * Find active companies
@@ -55,8 +52,7 @@ public interface CompanyRepository extends JpaRepository<Company, Long>, Insider
     /**
      * Find companies with recent filings
      */
-    @Query("SELECT c FROM Company c WHERE c.lastFilingDate > :since")
-    List<Company> findByLastFilingDateAfter(@Param("since") LocalDateTime since);
+    List<Company> findByLastFilingDateAfter(LocalDateTime since);
 
     /**
      * Find companies by SIC code
@@ -76,12 +72,6 @@ public interface CompanyRepository extends JpaRepository<Company, Long>, Insider
     /**
      * Count active companies
      */
-    @Query("SELECT COUNT(c) FROM Company c WHERE c.isActive = true")
+    @Query(value = "{ 'isActive': true }", count = true)
     Long countActiveCompanies();
-
-    /**
-     * Find companies with insider transactions
-     */
-    @Query("SELECT DISTINCT c FROM Company c JOIN c.insiderTransactions t WHERE t.transactionDate > :since")
-    List<Company> findCompaniesWithTransactionsSince(@Param("since") LocalDateTime since);
 }

@@ -497,6 +497,28 @@ public class DataMigrationServiceImpl implements DataMigrationService {
         }
 
         private long importRecords(Path inputFile, ObjectMapper objectMapper) throws IOException {
+            Path backupFile = Files.createTempFile("edgar4j-" + name + "-backup-", format.extension());
+            export(backupFile, objectMapper);
+
+            try {
+                return replaceRecords(inputFile, objectMapper);
+            } catch (IOException | RuntimeException importFailure) {
+                try {
+                    replaceRecords(backupFile, objectMapper);
+                } catch (IOException | RuntimeException restoreFailure) {
+                    importFailure.addSuppressed(restoreFailure);
+                }
+                throw importFailure;
+            } finally {
+                try {
+                    Files.deleteIfExists(backupFile);
+                } catch (IOException ignored) {
+                    // Best effort cleanup for the temporary backup file.
+                }
+            }
+        }
+
+        private long replaceRecords(Path inputFile, ObjectMapper objectMapper) throws IOException {
             crudRepository.deleteAll();
             if (format == FileFormat.CSV) {
                 return importCsv(inputFile);

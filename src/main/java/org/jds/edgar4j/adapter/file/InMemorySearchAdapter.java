@@ -2,6 +2,7 @@ package org.jds.edgar4j.adapter.file;
 
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 import org.jds.edgar4j.model.Filling;
@@ -18,6 +19,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Profile;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 
 import lombok.extern.slf4j.Slf4j;
@@ -61,13 +63,16 @@ public class InMemorySearchAdapter implements FilingSearchPort {
 
     @Override
     public List<String> suggest(String prefix, int maxResults) {
-        String normalizedPrefix = prefix == null ? "" : prefix.trim().toLowerCase();
+        String normalizedPrefix = prefix == null ? "" : prefix.trim().toLowerCase(Locale.ROOT);
         Set<String> suggestions = new LinkedHashSet<>();
 
-        for (Filling filling : fillingDataPort.findAll()) {
+        List<Filling> filings = FilingSearchSupport.applyFillingSort(
+                fillingDataPort.findAll(),
+                Sort.by(Sort.Direction.DESC, "fillingDate"));
+
+        for (Filling filling : filings) {
             addSuggestion(suggestions, filling.getCompany(), normalizedPrefix, maxResults);
             addSuggestion(suggestions, filling.getCik(), normalizedPrefix, maxResults);
-            addSuggestion(suggestions, filling.getFormType() != null ? filling.getFormType().getNumber() : null, normalizedPrefix, maxResults);
             if (suggestions.size() >= maxResults) {
                 break;
             }
@@ -126,7 +131,7 @@ public class InMemorySearchAdapter implements FilingSearchPort {
         if (!FilingSearchSupport.hasText(candidate) || suggestions.size() >= maxResults) {
             return;
         }
-        if (prefix.isBlank() || candidate.toLowerCase().startsWith(prefix)) {
+        if (prefix.isBlank() || candidate.toLowerCase(Locale.ROOT).startsWith(prefix)) {
             suggestions.add(candidate);
         }
     }

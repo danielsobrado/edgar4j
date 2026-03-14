@@ -1,13 +1,12 @@
 package org.jds.edgar4j.repository.insider;
 
-import org.jds.edgar4j.model.insider.TransactionType;
-import org.jds.edgar4j.port.TransactionTypeDataPort;
-import org.springframework.context.annotation.Profile;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-
 import java.util.List;
 import java.util.Optional;
+
+import org.jds.edgar4j.model.insider.TransactionType;
+import org.springframework.context.annotation.Profile;
+import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.data.mongodb.repository.Query;
 
 /**
  * Repository interface for TransactionType entities
@@ -17,7 +16,7 @@ import java.util.Optional;
  * @since 2025-01-01
  */
 @Profile("resource-high & !resource-low")
-public interface TransactionTypeRepository extends JpaRepository<TransactionType, Long>, TransactionTypeDataPort {
+public interface TransactionTypeRepository extends MongoRepository<TransactionType, Long> {
 
     /**
      * Find transaction type by code
@@ -47,24 +46,24 @@ public interface TransactionTypeRepository extends JpaRepository<TransactionType
     /**
      * Count active transaction types
      */
-    @Query("SELECT COUNT(t) FROM TransactionType t WHERE t.isActive = true")
+    @Query(value = "{ 'isActive': true }", count = true)
     Long countActiveTransactionTypes();
 
     /**
      * Find purchase-related transaction types
      */
-    @Query("SELECT t FROM TransactionType t WHERE t.transactionCategory IN ('PURCHASE', 'GRANT') AND t.isActive = true")
+    @Query("{ 'isActive': true, 'transactionCategory': { $in: ['PURCHASE', 'GRANT'] } }")
     List<TransactionType> findPurchaseTransactionTypes();
 
     /**
      * Find sale-related transaction types
      */
-    @Query("SELECT t FROM TransactionType t WHERE t.transactionCategory = 'SALE' AND t.isActive = true")
+    @Query("{ 'isActive': true, 'transactionCategory': 'SALE' }")
     List<TransactionType> findSaleTransactionTypes();
 
     /**
      * Find derivative-related transaction types
      */
-    @Query("SELECT t FROM TransactionType t WHERE t.transactionCategory = 'EXERCISE' AND t.isActive = true")
+    @Query("{ 'isActive': true, 'transactionCategory': 'EXERCISE' }")
     List<TransactionType> findDerivativeTransactionTypes();
 }

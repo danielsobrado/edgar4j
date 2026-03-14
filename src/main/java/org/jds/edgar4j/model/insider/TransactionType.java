@@ -10,6 +10,8 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.Set;
 
+import org.springframework.data.mongodb.core.mapping.Document;
+
 /**
  * Entity representing transaction types for insider trading
  * 
@@ -18,6 +20,7 @@ import java.util.Set;
  * @since 2025-01-01
  */
 @Entity
+@Document(collection = "transaction_types")
 @Table(name = "transaction_types", indexes = {
         @Index(name = "idx_transaction_code", columnList = "transaction_code"),
         @Index(name = "idx_transaction_active", columnList = "is_active")

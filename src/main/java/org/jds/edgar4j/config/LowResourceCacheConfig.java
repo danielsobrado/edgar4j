@@ -4,7 +4,6 @@ import java.time.Duration;
 import java.util.List;
 
 import org.jds.edgar4j.properties.MarketDataProviderProperties;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.caffeine.CaffeineCache;
@@ -20,7 +19,6 @@ import lombok.RequiredArgsConstructor;
 
 @Configuration
 @Profile("resource-low")
-@ConditionalOnProperty(prefix = "edgar4j", name = "resource-mode", havingValue = "low")
 @RequiredArgsConstructor
 public class LowResourceCacheConfig {
 

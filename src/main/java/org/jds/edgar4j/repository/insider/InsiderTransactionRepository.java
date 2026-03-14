@@ -1,18 +1,16 @@
 package org.jds.edgar4j.repository.insider;
 
-import org.jds.edgar4j.model.insider.InsiderTransaction;
-import org.jds.edgar4j.port.InsiderTransactionDataPort;
-import org.springframework.context.annotation.Profile;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
-
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+
+import org.jds.edgar4j.model.insider.InsiderTransaction;
+import org.springframework.context.annotation.Profile;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.data.mongodb.repository.Query;
 
 /**
  * Repository interface for InsiderTransaction entities
@@ -22,7 +20,7 @@ import java.util.Optional;
  * @since 2025-01-01
  */
 @Profile("resource-high & !resource-low")
-public interface InsiderTransactionRepository extends JpaRepository<InsiderTransaction, Long>, InsiderTransactionDataPort {
+public interface InsiderTransactionRepository extends MongoRepository<InsiderTransaction, Long> {
 
     /**
      * Find transaction by accession number
@@ -84,14 +82,13 @@ public interface InsiderTransactionRepository extends JpaRepository<InsiderTrans
     /**
      * Find significant transactions (over $1M)
      */
-    @Query("SELECT t FROM InsiderTransaction t WHERE t.transactionValue > :threshold")
-    List<InsiderTransaction> findSignificantTransactions(@Param("threshold") BigDecimal threshold);
+    @Query("{ 'transactionValue': { $gt: ?0 } }")
+    List<InsiderTransaction> findSignificantTransactions(BigDecimal threshold);
 
     /**
      * Find recent transactions
      */
-    @Query("SELECT t FROM InsiderTransaction t WHERE t.transactionDate > :since ORDER BY t.transactionDate DESC")
-    List<InsiderTransaction> findRecentTransactions(@Param("since") LocalDate since);
+    List<InsiderTransaction> findByTransactionDateAfterOrderByTransactionDateDesc(LocalDate since);
 
     /**
      * Find transactions for company and insider
@@ -122,29 +119,36 @@ public interface InsiderTransactionRepository extends JpaRepository<InsiderTrans
     /**
      * Count transactions by company
      */
-    @Query("SELECT COUNT(t) FROM InsiderTransaction t WHERE t.company.cik = :cik")
-    Long countTransactionsByCompany(@Param("cik") String cik);
+    @Query(value = "{ 'company.cik': ?0 }", count = true)
+    Long countTransactionsByCompany(String cik);
 
     /**
      * Count transactions by insider
      */
-    @Query("SELECT COUNT(t) FROM InsiderTransaction t WHERE t.insider.cik = :cik")
-    Long countTransactionsByInsider(@Param("cik") String cik);
+    @Query(value = "{ 'insider.cik': ?0 }", count = true)
+    Long countTransactionsByInsider(String cik);
 
     /**
      * Find transactions with high ownership percentage changes
      */
-    @Query("SELECT t FROM InsiderTransaction t WHERE ABS(t.ownershipPercentageAfter - t.ownershipPercentageBefore) > :threshold")
-    List<InsiderTransaction> findTransactionsWithHighOwnershipChange(@Param("threshold") BigDecimal threshold);
+    @Query("{ $expr: { $gt: [ { $abs: { $subtract: ['$ownershipPercentageAfter', '$ownershipPercentageBefore'] } }, ?0 ] } }")
+    List<InsiderTransaction> findTransactionsWithHighOwnershipChange(BigDecimal threshold);
 
     /**
      * Find latest transactions by company
      */
-    @Query("SELECT t FROM InsiderTransaction t WHERE t.company.cik = :cik ORDER BY t.transactionDate DESC")
-    List<InsiderTransaction> findLatestTransactionsByCompany(@Param("cik") String cik, Pageable pageable);
+    Page<InsiderTransaction> findByCompanyCikOrderByTransactionDateDesc(String cik, Pageable pageable);
 
     /**
      * Find transactions by security title
      */
     List<InsiderTransaction> findBySecurityTitleContainingIgnoreCase(String securityTitle);
+
+    default List<InsiderTransaction> findRecentTransactions(LocalDate since) {
+        return findByTransactionDateAfterOrderByTransactionDateDesc(since);
+    }
+
+    default List<InsiderTransaction> findLatestTransactionsByCompany(String cik, Pageable pageable) {
+        return findByCompanyCikOrderByTransactionDateDesc(cik, pageable).getContent();
+    }
 }

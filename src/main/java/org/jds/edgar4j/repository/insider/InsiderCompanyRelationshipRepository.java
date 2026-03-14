@@ -1,14 +1,12 @@
 package org.jds.edgar4j.repository.insider;
 
-import org.jds.edgar4j.model.insider.InsiderCompanyRelationship;
-import org.jds.edgar4j.port.InsiderCompanyRelationshipDataPort;
-import org.springframework.context.annotation.Profile;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
-
 import java.time.LocalDate;
 import java.util.List;
+
+import org.jds.edgar4j.model.insider.InsiderCompanyRelationship;
+import org.springframework.context.annotation.Profile;
+import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.data.mongodb.repository.Query;
 
 /**
  * Repository interface for InsiderCompanyRelationship entities
@@ -18,7 +16,7 @@ import java.util.List;
  * @since 2025-01-01
  */
 @Profile("resource-high & !resource-low")
-public interface InsiderCompanyRelationshipRepository extends JpaRepository<InsiderCompanyRelationship, Long>, InsiderCompanyRelationshipDataPort {
+public interface InsiderCompanyRelationshipRepository extends MongoRepository<InsiderCompanyRelationship, Long> {
 
     /**
      * Find relationships by insider CIK
@@ -93,36 +91,36 @@ public interface InsiderCompanyRelationshipRepository extends JpaRepository<Insi
     /**
      * Find current relationships (active and within date range)
      */
-    @Query("SELECT r FROM InsiderCompanyRelationship r WHERE r.isActive = true AND r.startDate <= :currentDate AND (r.endDate IS NULL OR r.endDate > :currentDate)")
-    List<InsiderCompanyRelationship> findCurrentRelationships(@Param("currentDate") LocalDate currentDate);
+    @Query("{ 'isActive': true, 'startDate': { $lte: ?0 }, $or: [ { 'endDate': null }, { 'endDate': { $gt: ?0 } } ] }")
+    List<InsiderCompanyRelationship> findCurrentRelationships(LocalDate currentDate);
 
     /**
      * Find current relationships for company
      */
-    @Query("SELECT r FROM InsiderCompanyRelationship r WHERE r.company.cik = :cik AND r.isActive = true AND r.startDate <= :currentDate AND (r.endDate IS NULL OR r.endDate > :currentDate)")
-    List<InsiderCompanyRelationship> findCurrentRelationshipsForCompany(@Param("cik") String cik, @Param("currentDate") LocalDate currentDate);
+    @Query("{ 'company.cik': ?0, 'isActive': true, 'startDate': { $lte: ?1 }, $or: [ { 'endDate': null }, { 'endDate': { $gt: ?1 } } ] }")
+    List<InsiderCompanyRelationship> findCurrentRelationshipsForCompany(String cik, LocalDate currentDate);
 
     /**
      * Find current relationships for insider
      */
-    @Query("SELECT r FROM InsiderCompanyRelationship r WHERE r.insider.cik = :cik AND r.isActive = true AND r.startDate <= :currentDate AND (r.endDate IS NULL OR r.endDate > :currentDate)")
-    List<InsiderCompanyRelationship> findCurrentRelationshipsForInsider(@Param("cik") String cik, @Param("currentDate") LocalDate currentDate);
+    @Query("{ 'insider.cik': ?0, 'isActive': true, 'startDate': { $lte: ?1 }, $or: [ { 'endDate': null }, { 'endDate': { $gt: ?1 } } ] }")
+    List<InsiderCompanyRelationship> findCurrentRelationshipsForInsider(String cik, LocalDate currentDate);
 
     /**
      * Count relationships by company
      */
-    @Query("SELECT COUNT(r) FROM InsiderCompanyRelationship r WHERE r.company.cik = :cik AND r.isActive = true")
-    Long countActiveRelationshipsByCompany(@Param("cik") String cik);
+    @Query(value = "{ 'company.cik': ?0, 'isActive': true }", count = true)
+    Long countActiveRelationshipsByCompany(String cik);
 
     /**
      * Count relationships by insider
      */
-    @Query("SELECT COUNT(r) FROM InsiderCompanyRelationship r WHERE r.insider.cik = :cik AND r.isActive = true")
-    Long countActiveRelationshipsByInsider(@Param("cik") String cik);
+    @Query(value = "{ 'insider.cik': ?0, 'isActive': true }", count = true)
+    Long countActiveRelationshipsByInsider(String cik);
 
     /**
      * Find relationships with insider status
      */
-    @Query("SELECT r FROM InsiderCompanyRelationship r WHERE (r.isDirector = true OR r.isOfficer = true OR r.isTenPercentOwner = true) AND r.isActive = true")
+    @Query("{ 'isActive': true, $or: [ { 'isDirector': true }, { 'isOfficer': true }, { 'isTenPercentOwner': true } ] }")
     List<InsiderCompanyRelationship> findRelationshipsWithInsiderStatus();
 }

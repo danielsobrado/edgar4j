@@ -25,6 +25,7 @@ public abstract class AbstractLongIdFileDataPort<T> implements BaseInsiderDataPo
     private final Function<T, Long> longIdGetter;
     private final BiConsumer<T, Long> longIdSetter;
     private final AtomicLong idSequence = new AtomicLong(-1L);
+    private final Object saveMonitor = new Object();
 
     protected AbstractLongIdFileDataPort(
             FileCollection<T> collection,
@@ -37,18 +38,22 @@ public abstract class AbstractLongIdFileDataPort<T> implements BaseInsiderDataPo
 
     @Override
     public <S extends T> S save(S entity) {
-        assignLongIdIfMissing(entity);
-        return collection.save(entity);
+        synchronized (saveMonitor) {
+            assignLongIdIfMissing(entity);
+            return collection.save(entity);
+        }
     }
 
     @Override
     public <S extends T> List<S> saveAll(Iterable<S> entities) {
-        List<S> prepared = new ArrayList<>();
-        for (S entity : entities) {
-            assignLongIdIfMissing(entity);
-            prepared.add(entity);
+        synchronized (saveMonitor) {
+            List<S> prepared = new ArrayList<>();
+            for (S entity : entities) {
+                assignLongIdIfMissing(entity);
+                prepared.add(entity);
+            }
+            return collection.saveAll(prepared);
         }
-        return collection.saveAll(prepared);
     }
 
     @Override
@@ -111,9 +116,14 @@ public abstract class AbstractLongIdFileDataPort<T> implements BaseInsiderDataPo
 
     @Override
     public void deleteAllById(Iterable<? extends Long> ids) {
+        List<String> stringIds = new ArrayList<>();
         for (Long id : ids) {
-            deleteById(id);
+            String stringId = toStringId(id);
+            if (stringId != null) {
+                stringIds.add(stringId);
+            }
         }
+        collection.deleteAllById(stringIds);
     }
 
     @Override

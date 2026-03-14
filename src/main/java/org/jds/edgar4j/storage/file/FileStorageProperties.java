@@ -12,6 +12,8 @@ public class FileStorageProperties {
     private String collectionsPath = "collections";
     private boolean indexOnStartup = true;
     private boolean flushOnWrite = true;
+    private Path resolvedBaseDirectory = Paths.get(basePath);
+    private Path resolvedCollectionsDirectory = resolvedBaseDirectory.resolve(collectionsPath);
 
     public String getBasePath() {
         return basePath;
@@ -19,6 +21,7 @@ public class FileStorageProperties {
 
     public void setBasePath(String basePath) {
         this.basePath = basePath;
+        refreshResolvedPaths();
     }
 
     public String getCollectionsPath() {
@@ -27,6 +30,7 @@ public class FileStorageProperties {
 
     public void setCollectionsPath(String collectionsPath) {
         this.collectionsPath = collectionsPath;
+        refreshResolvedPaths();
     }
 
     public boolean isIndexOnStartup() {
@@ -46,10 +50,17 @@ public class FileStorageProperties {
     }
 
     public Path resolveBaseDirectory() {
-        return Paths.get(basePath);
+        return resolvedBaseDirectory;
     }
 
     public Path resolveCollectionsDirectory() {
-        return Paths.get(basePath).resolve(collectionsPath);
+        return resolvedCollectionsDirectory;
+    }
+
+    private void refreshResolvedPaths() {
+        String effectiveBasePath = (basePath == null || basePath.isBlank()) ? "./data" : basePath;
+        String effectiveCollectionsPath = (collectionsPath == null || collectionsPath.isBlank()) ? "collections" : collectionsPath;
+        resolvedBaseDirectory = Paths.get(effectiveBasePath);
+        resolvedCollectionsDirectory = resolvedBaseDirectory.resolve(effectiveCollectionsPath);
     }
 }

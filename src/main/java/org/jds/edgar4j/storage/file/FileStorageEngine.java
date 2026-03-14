@@ -7,6 +7,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 
+import jakarta.annotation.PreDestroy;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class FileStorageEngine {
@@ -32,6 +34,11 @@ public class FileStorageEngine {
 
     public void flushAll() {
         collections.values().forEach(FileCollection::flush);
+    }
+
+    @PreDestroy
+    public void flushOnShutdown() {
+        flushAll();
     }
 
     public FileStorageProperties getProperties() {

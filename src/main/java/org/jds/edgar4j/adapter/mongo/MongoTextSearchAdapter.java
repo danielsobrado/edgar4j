@@ -3,6 +3,7 @@ package org.jds.edgar4j.adapter.mongo;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -69,8 +70,9 @@ public class MongoTextSearchAdapter implements FilingSearchPort {
 
     @Override
     public List<String> suggest(String prefix, int maxResults) {
+        String normalizedPrefix = prefix == null ? "" : prefix.trim().toLowerCase(Locale.ROOT);
         Query query = new Query().limit(Math.max(maxResults * 3, 10));
-        if (FilingSearchSupport.hasText(prefix)) {
+        if (!normalizedPrefix.isBlank()) {
             Pattern pattern = Pattern.compile("^" + Pattern.quote(prefix.trim()), Pattern.CASE_INSENSITIVE);
             query.addCriteria(new Criteria().orOperator(
                     Criteria.where("company").regex(pattern),
@@ -80,8 +82,8 @@ public class MongoTextSearchAdapter implements FilingSearchPort {
 
         Set<String> suggestions = new LinkedHashSet<>();
         for (Filling filling : mongoTemplate.find(query, Filling.class)) {
-            addSuggestion(suggestions, filling.getCompany(), prefix, maxResults);
-            addSuggestion(suggestions, filling.getCik(), prefix, maxResults);
+            addSuggestion(suggestions, filling.getCompany(), normalizedPrefix, maxResults);
+            addSuggestion(suggestions, filling.getCik(), normalizedPrefix, maxResults);
             if (suggestions.size() >= maxResults) {
                 break;
             }
@@ -206,7 +208,7 @@ public class MongoTextSearchAdapter implements FilingSearchPort {
         if (!FilingSearchSupport.hasText(candidate) || suggestions.size() >= maxResults) {
             return;
         }
-        if (!FilingSearchSupport.hasText(prefix) || candidate.toLowerCase().startsWith(prefix.trim().toLowerCase())) {
+        if (prefix.isBlank() || candidate.toLowerCase(Locale.ROOT).startsWith(prefix)) {
             suggestions.add(candidate);
         }
     }

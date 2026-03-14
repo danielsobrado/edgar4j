@@ -2,6 +2,7 @@ package org.jds.edgar4j.adapter.file;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.ArrayList;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.StreamSupport;
@@ -80,9 +81,13 @@ public abstract class AbstractFileDataPort<T> implements BaseDocumentDataPort<T>
 
     @Override
     public void deleteAllById(Iterable<? extends String> ids) {
+        List<String> stringIds = new ArrayList<>();
         for (String id : ids) {
-            deleteById(id);
+            if (id != null) {
+                stringIds.add(id);
+            }
         }
+        collection.deleteAllById(stringIds);
     }
 
     @Override

@@ -97,7 +97,23 @@ class InMemorySearchAdapterTest {
 
         List<String> suggestions = inMemorySearchAdapter.suggest("Ac", 5);
 
-        assertThat(suggestions).containsExactly("Acme Corporation", "Acuity Holdings");
+        assertThat(suggestions).containsExactly("Acuity Holdings", "Acme Corporation");
+    }
+
+    @Test
+    @DisplayName("suggest should use latest filings first when the prefix is blank")
+    void suggestShouldPreferLatestFilingsWhenPrefixBlank() throws ParseException {
+        when(fillingDataPort.findAll()).thenReturn(List.of(
+                filing("1", "Older Filing", "0001234567", "10-K", "2024-01-15"),
+                filing("2", "Newest Filing", "0007654321", "8-K", "2024-02-20")));
+
+        List<String> suggestions = inMemorySearchAdapter.suggest(null, 4);
+
+        assertThat(suggestions).containsExactly(
+                "Newest Filing",
+                "0007654321",
+                "Older Filing",
+                "0001234567");
     }
 
     private Filling filing(String id, String company, String cik, String formType, String date) throws ParseException {

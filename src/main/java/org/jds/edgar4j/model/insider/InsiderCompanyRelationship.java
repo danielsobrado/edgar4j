@@ -10,6 +10,8 @@ import jakarta.persistence.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+import org.springframework.data.mongodb.core.mapping.Document;
+
 /**
  * Entity representing the relationship between an insider and a company
  * 
@@ -18,6 +20,7 @@ import java.time.LocalDateTime;
  * @since 2025-01-01
  */
 @Entity
+@Document(collection = "insider_company_relationships")
 @Table(name = "insider_company_relationships", indexes = {
         @Index(name = "idx_relationship_insider", columnList = "insider_id"),
         @Index(name = "idx_relationship_company", columnList = "company_id"),

@@ -1,15 +1,13 @@
 package org.jds.edgar4j.repository.insider;
 
-import org.jds.edgar4j.model.insider.Insider;
-import org.jds.edgar4j.port.InsiderDataPort;
-import org.springframework.context.annotation.Profile;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
-
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+
+import org.jds.edgar4j.model.insider.Insider;
+import org.springframework.context.annotation.Profile;
+import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.data.mongodb.repository.Query;
 
 /**
  * Repository interface for Insider entities
@@ -19,7 +17,7 @@ import java.util.Optional;
  * @since 2025-01-01
  */
 @Profile("resource-high & !resource-low")
-public interface InsiderRepository extends JpaRepository<Insider, Long>, InsiderDataPort {
+public interface InsiderRepository extends MongoRepository<Insider, Long> {
 
     /**
      * Find insider by CIK
@@ -29,8 +27,7 @@ public interface InsiderRepository extends JpaRepository<Insider, Long>, Insider
     /**
      * Find insiders by full name (case-insensitive)
      */
-    @Query("SELECT i FROM Insider i WHERE LOWER(i.fullName) LIKE LOWER(CONCAT('%', :name, '%'))")
-    List<Insider> findByFullNameContainingIgnoreCase(@Param("name") String name);
+    List<Insider> findByFullNameContainingIgnoreCase(String name);
 
     /**
      * Find insiders by last name
@@ -50,8 +47,7 @@ public interface InsiderRepository extends JpaRepository<Insider, Long>, Insider
     /**
      * Find insiders with recent transactions
      */
-    @Query("SELECT i FROM Insider i WHERE i.lastTransactionDate > :since")
-    List<Insider> findByLastTransactionDateAfter(@Param("since") LocalDateTime since);
+    List<Insider> findByLastTransactionDateAfter(LocalDateTime since);
 
     /**
      * Find insiders by city
@@ -71,18 +67,6 @@ public interface InsiderRepository extends JpaRepository<Insider, Long>, Insider
     /**
      * Count active insiders
      */
-    @Query("SELECT COUNT(i) FROM Insider i WHERE i.isActive = true")
+    @Query(value = "{ 'isActive': true }", count = true)
     Long countActiveInsiders();
-
-    /**
-     * Find insiders with transactions for specific company
-     */
-    @Query("SELECT DISTINCT i FROM Insider i JOIN i.insiderTransactions t WHERE t.company.cik = :cik")
-    List<Insider> findInsidersWithTransactionsForCompany(@Param("cik") String cik);
-
-    /**
-     * Find insiders with active company relationships
-     */
-    @Query("SELECT DISTINCT i FROM Insider i JOIN i.companyRelationships r WHERE r.isActive = true")
-    List<Insider> findInsidersWithActiveRelationships();
 }

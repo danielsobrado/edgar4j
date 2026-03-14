@@ -10,6 +10,8 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.Set;
 
+import org.springframework.data.mongodb.core.mapping.Document;
+
 /**
  * Entity representing an insider (person or entity) in insider trading data
  * 
@@ -18,6 +20,7 @@ import java.util.Set;
  * @since 2025-01-01
  */
 @Entity
+@Document(collection = "insiders")
 @Table(name = "insiders", indexes = {
         @Index(name = "idx_insider_cik", columnList = "cik"),
         @Index(name = "idx_insider_name", columnList = "full_name"),

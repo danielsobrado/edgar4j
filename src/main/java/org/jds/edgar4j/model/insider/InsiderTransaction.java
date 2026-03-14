@@ -12,6 +12,8 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+import org.springframework.data.mongodb.core.mapping.Document;
+
 /**
  * Entity representing an insider transaction record
  * 
@@ -20,6 +22,7 @@ import java.time.LocalDateTime;
  * @since 2025-01-01
  */
 @Entity
+@Document(collection = "insider_transactions")
 @Table(name = "insider_transactions", indexes = {
         @Index(name = "idx_transaction_date", columnList = "transaction_date"),
         @Index(name = "idx_filing_date", columnList = "filing_date"),

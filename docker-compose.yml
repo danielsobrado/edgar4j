@@ -20,13 +20,10 @@ services:
     depends_on:
       mongodb:
         condition: service_healthy
-        required: false
       postgres:
         condition: service_healthy
-        required: false
       redis:
         condition: service_started
-        required: false
     profiles:
       - low
       - high

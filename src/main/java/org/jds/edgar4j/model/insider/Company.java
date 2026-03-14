@@ -11,6 +11,8 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Set;
 
+import org.springframework.data.mongodb.core.mapping.Document;
+
 /**
  * Entity representing a company/issuer for insider trading data
  * 
@@ -19,6 +21,7 @@ import java.util.Set;
  * @since 2025-01-01
  */
 @Entity
+@Document(collection = "insider_companies")
 @Table(name = "companies", indexes = {
         @Index(name = "idx_company_cik", columnList = "cik"),
         @Index(name = "idx_company_ticker", columnList = "ticker_symbol"),
