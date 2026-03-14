@@ -17,6 +17,9 @@ spring:
       ddl-auto: create-drop
     database-platform: org.hibernate.dialect.H2Dialect
   data:
+    jpa:
+      repositories:
+        enabled: false
     redis:
       repositories:
         enabled: false

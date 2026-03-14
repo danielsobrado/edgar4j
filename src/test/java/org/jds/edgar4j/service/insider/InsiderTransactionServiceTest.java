@@ -4,7 +4,7 @@ import org.jds.edgar4j.model.insider.Company;
 import org.jds.edgar4j.model.insider.Insider;
 import org.jds.edgar4j.model.insider.InsiderTransaction;
 import org.jds.edgar4j.model.insider.TransactionType;
-import org.jds.edgar4j.repository.insider.InsiderTransactionRepository;
+import org.jds.edgar4j.port.InsiderTransactionDataPort;
 import org.jds.edgar4j.service.insider.impl.InsiderTransactionServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -35,7 +35,7 @@ import static org.mockito.Mockito.*;
 class InsiderTransactionServiceTest {
 
     @Mock
-    private InsiderTransactionRepository transactionRepository;
+    private InsiderTransactionDataPort transactionRepository;
 
     private InsiderTransactionServiceImpl insiderTransactionService;
 
