@@ -9,6 +9,7 @@ import org.jds.edgar4j.model.insider.InsiderTransaction;
 import org.jds.edgar4j.properties.Edgar4JProperties;
 import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.job.Job;
+import org.springframework.batch.infrastructure.support.transaction.ResourcelessTransactionManager;
 import org.springframework.batch.core.job.parameters.RunIdIncrementer;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.Step;
@@ -33,7 +34,7 @@ import java.util.List;
  */
 @Slf4j
 @Configuration
-@ConditionalOnBean({JobRepository.class, PlatformTransactionManager.class})
+@ConditionalOnBean(JobRepository.class)
 @RequiredArgsConstructor
 public class BatchConfiguration {
 
@@ -41,7 +42,7 @@ public class BatchConfiguration {
     private final Form4DocumentProcessor form4DocumentProcessor;
     private final InsiderTransactionWriter insiderTransactionWriter;
     private final JobRepository jobRepository;
-    private final PlatformTransactionManager transactionManager;
+    private final ObjectProvider<PlatformTransactionManager> transactionManagerProvider;
     private final Edgar4JProperties edgar4JProperties;
     @Qualifier("batchTaskExecutor")
     private final TaskExecutor batchTaskExecutor;
@@ -57,6 +58,7 @@ public class BatchConfiguration {
 
     @Bean
     public Step processForm4Step() {
+        PlatformTransactionManager transactionManager = resolveTransactionManager();
         SimpleStepBuilder<String, List<InsiderTransaction>> stepBuilder = new StepBuilder("processForm4Step", jobRepository)
                 .<String, List<InsiderTransaction>>chunk(edgar4JProperties.getBatch().getChunkSize(), transactionManager)
                 .reader(edgarFilingReader)
@@ -82,6 +84,7 @@ public class BatchConfiguration {
 
     @Bean
     public Step bulkHistoricalDataStep() {
+        PlatformTransactionManager transactionManager = resolveTransactionManager();
         SimpleStepBuilder<String, List<InsiderTransaction>> stepBuilder = new StepBuilder("bulkHistoricalDataStep", jobRepository)
                 .<String, List<InsiderTransaction>>chunk(edgar4JProperties.getBatch().getChunkSize(), transactionManager)
                 .reader(edgarFilingReader)
@@ -95,5 +98,11 @@ public class BatchConfiguration {
         }
 
         return stepBuilder.build();
+    }
+
+    private PlatformTransactionManager resolveTransactionManager() {
+        return transactionManagerProvider.orderedStream()
+                .findFirst()
+                .orElseGet(ResourcelessTransactionManager::new);
     }
 }
