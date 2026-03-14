@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.jds.edgar4j.model.insider.Company;
 import org.jds.edgar4j.model.insider.InsiderTransaction;
 import org.jds.edgar4j.service.provider.MarketDataService;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -24,6 +25,7 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Service
+@Profile("resource-high & !resource-low")
 @RequiredArgsConstructor
 public class InsiderAnalyticsService {
 

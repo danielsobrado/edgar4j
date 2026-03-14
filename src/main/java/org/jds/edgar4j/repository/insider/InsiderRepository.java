@@ -1,10 +1,11 @@
 package org.jds.edgar4j.repository.insider;
 
 import org.jds.edgar4j.model.insider.Insider;
+import org.jds.edgar4j.port.InsiderDataPort;
+import org.springframework.context.annotation.Profile;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -17,8 +18,8 @@ import java.util.Optional;
  * @version 1.0
  * @since 2025-01-01
  */
-@Repository
-public interface InsiderRepository extends JpaRepository<Insider, Long> {
+@Profile("resource-high & !resource-low")
+public interface InsiderRepository extends JpaRepository<Insider, Long>, InsiderDataPort {
 
     /**
      * Find insider by CIK

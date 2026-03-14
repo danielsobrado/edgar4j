@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Database, Search, Building2, Download, Settings, LayoutDashboard, Radio, Briefcase, Users, FileText, UserPlus, FileCheck, Globe, FileBarChart, TrendingUp, ChevronDown, Bell, ShoppingCart, LineChart } from 'lucide-react';
+import { Database, Search, Building2, Download, Settings, LayoutDashboard, Radio, Briefcase, Users, FileText, UserPlus, FileCheck, Globe, FileBarChart, TrendingUp, ChevronDown, Bell, ShoppingCart, LineChart, Landmark } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -28,6 +28,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   ]), [location.pathname, searchParams]);
 
   const analysisNavItems = React.useMemo(() => ([
+    { path: '/analysis/dividend-viability', label: 'Dividend Viability', icon: Landmark },
     { path: '/companies', label: 'Fundamentals', icon: LineChart },
     { path: '/insider-purchases', label: 'Insider Buys', icon: ShoppingCart },
   ]), []);
@@ -38,15 +39,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { path: '/settings', label: 'Settings', icon: Settings }
   ];
 
+  const isPathActive = React.useCallback((path: string) => (
+    path === '/companies'
+      ? location.pathname.startsWith('/companies')
+      : location.pathname === path || location.pathname.startsWith(`${path}/`)
+  ), [location.pathname]);
+
   const isFormActive = React.useMemo(
     () => formNavItems.some(item => item.isActive ?? location.pathname === item.path),
     [formNavItems, location.pathname]
   );
   const isAnalysisActive = React.useMemo(
-    () => analysisNavItems.some(item => item.path === '/companies'
-      ? location.pathname.startsWith('/companies')
-      : location.pathname === item.path),
-    [analysisNavItems, location.pathname]
+    () => analysisNavItems.some(item => isPathActive(item.path)),
+    [analysisNavItems, isPathActive]
   );
   const navItems = [...primaryNavItems, ...secondaryNavItems];
   
@@ -64,9 +69,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <nav className="hidden md:flex items-center gap-2 overflow-x-auto">
               {primaryNavItems.map(item => {
                 const Icon = item.icon;
-                const isActive = item.path === '/companies'
-                  ? location.pathname.startsWith('/companies')
-                  : location.pathname === item.path;
+                const isActive = isPathActive(item.path);
                 return (
                   <Link
                     key={item.path}
@@ -178,9 +181,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-4 py-2 min-w-max">
             {navItems.map(item => {
               const Icon = item.icon;
-              const isActive = item.path === '/companies'
-                ? location.pathname.startsWith('/companies')
-                : location.pathname === item.path;
+              const isActive = isPathActive(item.path);
               return (
                 <Link
                   key={item.path}
@@ -218,8 +219,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     </DropdownMenuItem>
                   );
                 })}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

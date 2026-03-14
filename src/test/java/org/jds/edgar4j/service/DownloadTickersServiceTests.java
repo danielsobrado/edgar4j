@@ -3,7 +3,7 @@ package org.jds.edgar4j.service;
 import org.jds.edgar4j.integration.SecApiClient;
 import org.jds.edgar4j.integration.SecResponseParser;
 import org.jds.edgar4j.model.Ticker;
-import org.jds.edgar4j.repository.TickerRepository;
+import org.jds.edgar4j.port.TickerDataPort;
 import org.jds.edgar4j.service.impl.DownloadTickersServiceImpl;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -33,7 +33,7 @@ class DownloadTickersServiceTests {
     private SecResponseParser responseParser;
 
     @Mock
-    private TickerRepository tickerRepository;
+    private TickerDataPort tickerRepository;
 
     @InjectMocks
     private DownloadTickersServiceImpl downloadTickersService;

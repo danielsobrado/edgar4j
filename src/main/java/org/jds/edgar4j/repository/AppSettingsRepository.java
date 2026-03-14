@@ -1,11 +1,9 @@
 package org.jds.edgar4j.repository;
 
 import org.jds.edgar4j.model.AppSettings;
-import org.jds.edgar4j.port.AppSettingsDataPort;
 import org.springframework.data.mongodb.repository.MongoRepository;
-import org.springframework.stereotype.Repository;
+import org.springframework.context.annotation.Profile;
 
-@Repository
-public interface AppSettingsRepository extends MongoRepository<AppSettings, String>, AppSettingsDataPort {
+@Profile("resource-high & !resource-low")
+public interface AppSettingsRepository extends MongoRepository<AppSettings, String> {
 }
-

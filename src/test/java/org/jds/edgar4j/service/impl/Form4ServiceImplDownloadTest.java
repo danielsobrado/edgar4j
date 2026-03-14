@@ -22,9 +22,9 @@ import java.util.zip.GZIPOutputStream;
 
 import org.jds.edgar4j.integration.Form4Parser;
 import org.jds.edgar4j.integration.SecApiClient;
-import org.jds.edgar4j.repository.FillingRepository;
-import org.jds.edgar4j.repository.Form4Repository;
-import org.jds.edgar4j.repository.TickerRepository;
+import org.jds.edgar4j.port.FillingDataPort;
+import org.jds.edgar4j.port.Form4DataPort;
+import org.jds.edgar4j.port.TickerDataPort;
 import org.jds.edgar4j.service.SettingsService;
 import org.jds.edgar4j.storage.DownloadedResourceStore;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,7 +39,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 class Form4ServiceImplDownloadTest {
 
     @Mock
-    private Form4Repository form4Repository;
+    private Form4DataPort form4Repository;
 
     @Mock
     private Form4Parser form4Parser;
@@ -51,10 +51,10 @@ class Form4ServiceImplDownloadTest {
     private SecApiClient secApiClient;
 
     @Mock
-    private TickerRepository tickerRepository;
+    private TickerDataPort tickerRepository;
 
     @Mock
-    private FillingRepository fillingRepository;
+    private FillingDataPort fillingRepository;
 
     @Mock
     private DownloadedResourceStore downloadedResourceStore;

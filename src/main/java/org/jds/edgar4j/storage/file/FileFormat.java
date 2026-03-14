@@ -2,7 +2,9 @@ package org.jds.edgar4j.storage.file;
 
 public enum FileFormat {
     JSON(".json"),
-    JSONL(".jsonl");
+    JSONL(".jsonl"),
+    CSV(".csv"),
+    PARQUET(".parquet");
 
     private final String extension;
 

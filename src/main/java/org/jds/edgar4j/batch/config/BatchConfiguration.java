@@ -6,14 +6,20 @@ import org.jds.edgar4j.batch.processor.Form4DocumentProcessor;
 import org.jds.edgar4j.batch.reader.EdgarFilingReader;
 import org.jds.edgar4j.batch.writer.InsiderTransactionWriter;
 import org.jds.edgar4j.model.insider.InsiderTransaction;
+import org.jds.edgar4j.properties.Edgar4JProperties;
 import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.job.Job;
 import org.springframework.batch.core.job.parameters.RunIdIncrementer;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.Step;
+import org.springframework.batch.core.step.builder.SimpleStepBuilder;
 import org.springframework.batch.core.step.builder.StepBuilder;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.task.TaskExecutor;
 import org.springframework.transaction.PlatformTransactionManager;
 
 import java.util.List;
@@ -27,6 +33,7 @@ import java.util.List;
  */
 @Slf4j
 @Configuration
+@ConditionalOnBean({JobRepository.class, PlatformTransactionManager.class})
 @RequiredArgsConstructor
 public class BatchConfiguration {
 
@@ -35,6 +42,10 @@ public class BatchConfiguration {
     private final InsiderTransactionWriter insiderTransactionWriter;
     private final JobRepository jobRepository;
     private final PlatformTransactionManager transactionManager;
+    private final Edgar4JProperties edgar4JProperties;
+    @Qualifier("batchTaskExecutor")
+    private final TaskExecutor batchTaskExecutor;
+    private final ObjectProvider<FileFlushChunkListener> fileFlushChunkListenerProvider;
 
     @Bean
     public Job processForm4FilingsJob() {
@@ -46,12 +57,19 @@ public class BatchConfiguration {
 
     @Bean
     public Step processForm4Step() {
-        return new StepBuilder("processForm4Step", jobRepository)
-                .<String, List<InsiderTransaction>>chunk(10, transactionManager)
+        SimpleStepBuilder<String, List<InsiderTransaction>> stepBuilder = new StepBuilder("processForm4Step", jobRepository)
+                .<String, List<InsiderTransaction>>chunk(edgar4JProperties.getBatch().getChunkSize(), transactionManager)
                 .reader(edgarFilingReader)
                 .processor(form4DocumentProcessor)
                 .writer(insiderTransactionWriter)
-                .build();
+                .taskExecutor(batchTaskExecutor);
+
+        FileFlushChunkListener chunkListener = fileFlushChunkListenerProvider.getIfAvailable();
+        if (chunkListener != null) {
+            stepBuilder.listener(chunkListener);
+        }
+
+        return stepBuilder.build();
     }
 
     @Bean
@@ -64,11 +82,18 @@ public class BatchConfiguration {
 
     @Bean
     public Step bulkHistoricalDataStep() {
-        return new StepBuilder("bulkHistoricalDataStep", jobRepository)
-                .<String, List<InsiderTransaction>>chunk(50, transactionManager)
+        SimpleStepBuilder<String, List<InsiderTransaction>> stepBuilder = new StepBuilder("bulkHistoricalDataStep", jobRepository)
+                .<String, List<InsiderTransaction>>chunk(edgar4JProperties.getBatch().getChunkSize(), transactionManager)
                 .reader(edgarFilingReader)
                 .processor(form4DocumentProcessor)
                 .writer(insiderTransactionWriter)
-                .build();
+                .taskExecutor(batchTaskExecutor);
+
+        FileFlushChunkListener chunkListener = fileFlushChunkListenerProvider.getIfAvailable();
+        if (chunkListener != null) {
+            stepBuilder.listener(chunkListener);
+        }
+
+        return stepBuilder.build();
     }
 }

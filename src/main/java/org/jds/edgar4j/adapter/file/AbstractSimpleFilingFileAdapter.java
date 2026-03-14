@@ -5,29 +5,40 @@ import java.util.Optional;
 
 import org.jds.edgar4j.port.SimpleAccessionedFilingDataPort;
 import org.jds.edgar4j.storage.file.FileCollection;
+import org.jds.edgar4j.storage.file.FilePageSupport;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 public abstract class AbstractSimpleFilingFileAdapter<T> extends AbstractFileDataPort<T>
         implements SimpleAccessionedFilingDataPort<T> {
 
+    private static final String INDEX_ACCESSION_NUMBER = "accessionNumber";
+    private static final String INDEX_CIK = "cik";
+    private static final String INDEX_TRADING_SYMBOL = "tradingSymbol";
+
     protected AbstractSimpleFilingFileAdapter(FileCollection<T> collection) {
         super(collection);
     }
 
+    protected void registerCommonFilingIndexes() {
+        registerExactIndex(INDEX_ACCESSION_NUMBER, this::getAccessionNumber);
+        registerExactIndex(INDEX_CIK, this::getCik);
+        registerIgnoreCaseIndex(INDEX_TRADING_SYMBOL, this::getTradingSymbol);
+    }
+
     @Override
     public Optional<T> findByAccessionNumber(String accessionNumber) {
-        return findFirst(value -> equalsSafe(accessionNumber, getAccessionNumber(value)));
+        return findFirstByIndex(INDEX_ACCESSION_NUMBER, accessionNumber);
     }
 
     @Override
     public Page<T> findByCik(String cik, Pageable pageable) {
-        return findMatching(value -> equalsSafe(cik, getCik(value)), pageable);
+        return FilePageSupport.page(findAllByIndex(INDEX_CIK, cik), pageable);
     }
 
     @Override
     public Page<T> findByTradingSymbol(String tradingSymbol, Pageable pageable) {
-        return findMatching(value -> equalsIgnoreCase(getTradingSymbol(value), tradingSymbol), pageable);
+        return FilePageSupport.page(findAllByIndex(INDEX_TRADING_SYMBOL, tradingSymbol), pageable);
     }
 
     @Override
@@ -40,7 +51,7 @@ public abstract class AbstractSimpleFilingFileAdapter<T> extends AbstractFileDat
 
     @Override
     public boolean existsByAccessionNumber(String accessionNumber) {
-        return exists(value -> equalsSafe(accessionNumber, getAccessionNumber(value)));
+        return existsByIndex(INDEX_ACCESSION_NUMBER, accessionNumber);
     }
 
     protected boolean equalsSafe(String left, String right) {

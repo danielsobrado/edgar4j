@@ -1,10 +1,9 @@
 package org.jds.edgar4j.repository;
 
 import org.jds.edgar4j.model.CompanyTicker;
-import org.jds.edgar4j.port.CompanyTickerDataPort;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
-import org.springframework.stereotype.Repository;
+import org.springframework.context.annotation.Profile;
 
 import java.util.List;
 import java.util.Optional;
@@ -12,16 +11,16 @@ import java.util.Optional;
 /**
  * Repository for the {@code company_tickers} collection.
  *
- * <p>Provides fast CIK ↔ Ticker cross-lookups without loading the full
+ * <p>Provides fast CIK Ã¢â€ â€ Ticker cross-lookups without loading the full
  * {@code submissions} documents.
  */
-@Repository
-public interface CompanyTickerRepository extends MongoRepository<CompanyTicker, String>, CompanyTickerDataPort {
+@Profile("resource-high & !resource-low")
+public interface CompanyTickerRepository extends MongoRepository<CompanyTicker, String> {
 
     /** Find by exact ticker (case-sensitive, as stored in the collection). */
     Optional<CompanyTicker> findByTicker(String ticker);
 
-    /** Find by ticker, ignoring case — useful for user-entered symbols. */
+    /** Find by ticker, ignoring case Ã¢â‚¬â€ useful for user-entered symbols. */
     Optional<CompanyTicker> findByTickerIgnoreCase(String ticker);
 
     /** Find all entries for a given numeric CIK value. */
@@ -32,7 +31,7 @@ public interface CompanyTickerRepository extends MongoRepository<CompanyTicker, 
     @Query("{ 'cik_str': ?0 }")
     Optional<CompanyTicker> findFirstByCikStr(Long cikStr);
 
-    /** Case-insensitive prefix search — useful for autocomplete. */
+    /** Case-insensitive prefix search Ã¢â‚¬â€ useful for autocomplete. */
     List<CompanyTicker> findByTickerStartingWithIgnoreCase(String prefix);
 
     /** Full-text-style title search for autocomplete. */

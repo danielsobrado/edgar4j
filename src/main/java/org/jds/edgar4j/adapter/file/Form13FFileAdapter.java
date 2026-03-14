@@ -13,6 +13,7 @@ import org.jds.edgar4j.port.Form13FDataPort;
 import org.jds.edgar4j.repository.Form13FRepository.FilerSummary;
 import org.jds.edgar4j.repository.Form13FRepository.HoldingSummary;
 import org.jds.edgar4j.repository.Form13FRepository.PortfolioSnapshot;
+import org.jds.edgar4j.storage.file.FilePageSupport;
 import org.jds.edgar4j.storage.file.FileFormat;
 import org.jds.edgar4j.storage.file.FileStorageEngine;
 import org.springframework.context.annotation.Profile;
@@ -24,6 +25,11 @@ import org.springframework.stereotype.Component;
 @Profile("resource-low")
 public class Form13FFileAdapter extends AbstractFileDataPort<Form13F> implements Form13FDataPort {
 
+    private static final String INDEX_ACCESSION_NUMBER = "accessionNumber";
+    private static final String INDEX_CIK = "cik";
+    private static final String INDEX_REPORT_PERIOD = "reportPeriod";
+    private static final String INDEX_HOLDING_CUSIP = "holdingCusip";
+
     public Form13FFileAdapter(FileStorageEngine storageEngine) {
         super(storageEngine.registerCollection(
                 "form13f",
@@ -31,16 +37,25 @@ public class Form13FFileAdapter extends AbstractFileDataPort<Form13F> implements
                 FileFormat.JSONL,
                 Form13F::getId,
                 Form13F::setId));
+        registerExactIndex(INDEX_ACCESSION_NUMBER, Form13F::getAccessionNumber);
+        registerExactIndex(INDEX_CIK, Form13F::getCik);
+        registerExactIndex(INDEX_REPORT_PERIOD, Form13F::getReportPeriod);
+        registerMultiValueExactIndex(INDEX_HOLDING_CUSIP, filing -> filing.getHoldings() == null
+                ? List.of()
+                : filing.getHoldings().stream()
+                        .map(Form13FHolding::getCusip)
+                        .filter(java.util.Objects::nonNull)
+                        .toList());
     }
 
     @Override
     public Optional<Form13F> findByAccessionNumber(String accessionNumber) {
-        return findFirst(value -> accessionNumber != null && accessionNumber.equals(value.getAccessionNumber()));
+        return findFirstByIndex(INDEX_ACCESSION_NUMBER, accessionNumber);
     }
 
     @Override
     public Page<Form13F> findByCik(String cik, Pageable pageable) {
-        return findMatching(value -> cik != null && cik.equals(value.getCik()), pageable);
+        return FilePageSupport.page(findAllByIndex(INDEX_CIK, cik), pageable);
     }
 
     @Override
@@ -50,7 +65,7 @@ public class Form13FFileAdapter extends AbstractFileDataPort<Form13F> implements
 
     @Override
     public Page<Form13F> findByReportPeriod(LocalDate reportPeriod, Pageable pageable) {
-        return findMatching(value -> reportPeriod != null && reportPeriod.equals(value.getReportPeriod()), pageable);
+        return FilePageSupport.page(findAllByIndex(INDEX_REPORT_PERIOD, reportPeriod), pageable);
     }
 
     @Override
@@ -60,47 +75,49 @@ public class Form13FFileAdapter extends AbstractFileDataPort<Form13F> implements
 
     @Override
     public Page<Form13F> findByCikAndReportPeriodBetween(String cik, LocalDate startDate, LocalDate endDate, Pageable pageable) {
-        return findMatching(value -> cik != null
-                && cik.equals(value.getCik())
-                && between(value.getReportPeriod(), startDate, endDate), pageable);
+        return FilePageSupport.page(findAllByIndex(INDEX_CIK, cik).stream()
+                .filter(value -> between(value.getReportPeriod(), startDate, endDate))
+                .toList(), pageable);
     }
 
     @Override
     public List<Form13F> findByCikAndReportPeriodBetweenList(String cik, LocalDate startDate, LocalDate endDate) {
-        return findMatching(value -> cik != null
-                && cik.equals(value.getCik())
-                && between(value.getReportPeriod(), startDate, endDate));
+        return findAllByIndex(INDEX_CIK, cik).stream()
+                .filter(value -> between(value.getReportPeriod(), startDate, endDate))
+                .toList();
     }
 
     @Override
     public List<Form13F> findByHoldingCusip(String cusip) {
-        return findMatching(value -> hasHolding(value, holding -> cusip != null && cusip.equals(holding.getCusip())));
+        return findAllByIndex(INDEX_HOLDING_CUSIP, cusip);
     }
 
     @Override
     public Page<Form13F> findByHoldingCusip(String cusip, Pageable pageable) {
-        return findMatching(value -> hasHolding(value, holding -> cusip != null && cusip.equals(holding.getCusip())), pageable);
+        return FilePageSupport.page(findAllByIndex(INDEX_HOLDING_CUSIP, cusip), pageable);
     }
 
     @Override
     public Page<Form13F> findByHoldingIssuerName(String issuerName, Pageable pageable) {
-        return findMatching(value -> hasHolding(value, holding -> containsIgnoreCase(holding.getNameOfIssuer(), issuerName)), pageable);
+        return findMatching(value -> value.getHoldings() != null
+                && value.getHoldings().stream().anyMatch(holding -> containsIgnoreCase(holding.getNameOfIssuer(), issuerName)), pageable);
     }
 
     @Override
     public boolean existsByAccessionNumber(String accessionNumber) {
-        return exists(value -> accessionNumber != null && accessionNumber.equals(value.getAccessionNumber()));
+        return existsByIndex(INDEX_ACCESSION_NUMBER, accessionNumber);
     }
 
     @Override
     public boolean existsByCikAndReportPeriod(String cik, LocalDate reportPeriod) {
-        return exists(value -> cik != null && cik.equals(value.getCik()) && reportPeriod != null && reportPeriod.equals(value.getReportPeriod()));
+        return findAllByIndex(INDEX_CIK, cik).stream()
+                .anyMatch(value -> reportPeriod != null && reportPeriod.equals(value.getReportPeriod()));
     }
 
     @Override
     public List<FilerSummary> getTopFilersByPeriod(LocalDate reportPeriod, int limit) {
         Map<String, AggregatedFilerSummary> aggregated = new LinkedHashMap<>();
-        for (Form13F filing : findMatching(value -> reportPeriod != null && reportPeriod.equals(value.getReportPeriod()))) {
+        for (Form13F filing : findAllByIndex(INDEX_REPORT_PERIOD, reportPeriod)) {
             String key = (filing.getCik() != null ? filing.getCik() : "") + "|" + (filing.getFilerName() != null ? filing.getFilerName() : "");
             AggregatedFilerSummary existing = aggregated.getOrDefault(key,
                     new AggregatedFilerSummary(filing.getCik(), filing.getFilerName(), 0L, 0));
@@ -123,7 +140,7 @@ public class Form13FFileAdapter extends AbstractFileDataPort<Form13F> implements
     @Override
     public List<HoldingSummary> getTopHoldingsByPeriod(LocalDate reportPeriod, int limit) {
         Map<String, AggregatedHoldingSummary> aggregated = new LinkedHashMap<>();
-        for (Form13F filing : findMatching(value -> reportPeriod != null && reportPeriod.equals(value.getReportPeriod()))) {
+        for (Form13F filing : findAllByIndex(INDEX_REPORT_PERIOD, reportPeriod)) {
             if (filing.getHoldings() == null) {
                 continue;
             }
@@ -158,7 +175,7 @@ public class Form13FFileAdapter extends AbstractFileDataPort<Form13F> implements
 
     @Override
     public List<PortfolioSnapshot> getPortfolioHistory(String cik) {
-        return findMatching(value -> cik != null && cik.equals(value.getCik())).stream()
+        return findAllByIndex(INDEX_CIK, cik).stream()
                 .sorted(Comparator.comparing(Form13F::getReportPeriod, Comparator.nullsLast(Comparator.reverseOrder())))
                 .map(value -> new PortfolioSnapshotView(
                         value.getReportPeriod(),
@@ -170,10 +187,6 @@ public class Form13FFileAdapter extends AbstractFileDataPort<Form13F> implements
 
     private boolean between(LocalDate value, LocalDate startDate, LocalDate endDate) {
         return value != null && !value.isBefore(startDate) && !value.isAfter(endDate);
-    }
-
-    private boolean hasHolding(Form13F filing, java.util.function.Predicate<Form13FHolding> predicate) {
-        return filing.getHoldings() != null && filing.getHoldings().stream().anyMatch(predicate);
     }
 
     private record AggregatedFilerSummary(String cik, String filerName, Long totalValue, Integer holdingsCount) {

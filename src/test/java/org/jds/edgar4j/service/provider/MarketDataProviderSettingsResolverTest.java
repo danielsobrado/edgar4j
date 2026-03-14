@@ -8,7 +8,7 @@ import static org.mockito.Mockito.when;
 import org.jds.edgar4j.config.TiingoEnvProperties;
 import org.jds.edgar4j.model.AppSettings;
 import org.jds.edgar4j.properties.MarketDataProviderProperties;
-import org.jds.edgar4j.repository.AppSettingsRepository;
+import org.jds.edgar4j.port.AppSettingsDataPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -20,7 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class MarketDataProviderSettingsResolverTest {
 
     @Mock
-    private AppSettingsRepository appSettingsRepository;
+    private AppSettingsDataPort appSettingsRepository;
 
     @Mock
     private TiingoEnvProperties tiingoEnvProperties;

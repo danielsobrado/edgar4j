@@ -4,12 +4,11 @@ import java.util.List;
 import java.util.Optional;
 
 import org.jds.edgar4j.model.Sp500Constituent;
-import org.jds.edgar4j.port.Sp500ConstituentDataPort;
 import org.springframework.data.mongodb.repository.MongoRepository;
-import org.springframework.stereotype.Repository;
+import org.springframework.context.annotation.Profile;
 
-@Repository
-public interface Sp500ConstituentRepository extends MongoRepository<Sp500Constituent, String>, Sp500ConstituentDataPort {
+@Profile("resource-high & !resource-low")
+public interface Sp500ConstituentRepository extends MongoRepository<Sp500Constituent, String> {
 
     Optional<Sp500Constituent> findByTickerIgnoreCase(String ticker);
 

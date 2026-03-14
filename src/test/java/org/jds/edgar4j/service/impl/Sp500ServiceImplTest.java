@@ -18,8 +18,8 @@ import java.util.Set;
 
 import org.jds.edgar4j.model.CompanyTicker;
 import org.jds.edgar4j.model.Sp500Constituent;
-import org.jds.edgar4j.repository.CompanyTickerRepository;
-import org.jds.edgar4j.repository.Sp500ConstituentRepository;
+import org.jds.edgar4j.port.CompanyTickerDataPort;
+import org.jds.edgar4j.port.Sp500ConstituentDataPort;
 import org.jds.edgar4j.service.SettingsService;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -77,10 +77,10 @@ class Sp500ServiceImplTest {
             """;
 
     @Mock
-    private Sp500ConstituentRepository sp500Repository;
+    private Sp500ConstituentDataPort sp500Repository;
 
     @Mock
-    private CompanyTickerRepository companyTickerRepository;
+    private CompanyTickerDataPort companyTickerRepository;
 
     @Mock
     private SettingsService settingsService;

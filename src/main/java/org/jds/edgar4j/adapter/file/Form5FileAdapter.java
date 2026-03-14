@@ -20,6 +20,7 @@ public class Form5FileAdapter extends AbstractSimpleFilingFileAdapter<Form5> imp
                 FileFormat.JSONL,
                 Form5::getId,
                 Form5::setId));
+        registerCommonFilingIndexes();
     }
 
     @Override

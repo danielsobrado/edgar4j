@@ -7,6 +7,7 @@ import { FilingSearch } from './pages/FilingSearch';
 import { FilingDetail } from './pages/FilingDetail';
 import { Companies } from './pages/Companies';
 import { CompanyFundamentals } from './pages/CompanyFundamentals';
+import { DividendViabilityDashboard } from './pages/DividendViabilityDashboard';
 import { Downloads } from './pages/Downloads';
 import { Settings } from './pages/Settings';
 import { Form13FPage } from './pages/Form13F';
@@ -31,6 +32,7 @@ export default function App() {
             <Route path="/insider-purchases" element={<InsiderPurchasesPage />} />
             <Route path="/search" element={<FilingSearch />} />
             <Route path="/filing/:id" element={<FilingDetail />} />
+            <Route path="/analysis/dividend-viability" element={<DividendViabilityDashboard />} />
             <Route path="/companies" element={<Companies />} />
             <Route path="/companies/:cik/fundamentals" element={<CompanyFundamentals />} />
             <Route path="/form13f" element={<Form13FPage />} />

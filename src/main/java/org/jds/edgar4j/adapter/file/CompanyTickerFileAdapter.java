@@ -13,6 +13,9 @@ import org.springframework.stereotype.Component;
 @Profile("resource-low")
 public class CompanyTickerFileAdapter extends AbstractFileDataPort<CompanyTicker> implements CompanyTickerDataPort {
 
+    private static final String INDEX_TICKER = "ticker";
+    private static final String INDEX_CIK_STR = "cikStr";
+
     public CompanyTickerFileAdapter(FileStorageEngine storageEngine) {
         super(storageEngine.registerCollection(
                 "company_tickers",
@@ -20,15 +23,17 @@ public class CompanyTickerFileAdapter extends AbstractFileDataPort<CompanyTicker
                 FileFormat.JSON,
                 CompanyTicker::getId,
                 CompanyTicker::setId));
+        registerIgnoreCaseIndex(INDEX_TICKER, CompanyTicker::getTicker);
+        registerExactIndex(INDEX_CIK_STR, CompanyTicker::getCikStr);
     }
 
     @Override
     public Optional<CompanyTicker> findByTickerIgnoreCase(String ticker) {
-        return findFirst(value -> equalsIgnoreCase(value.getTicker(), ticker));
+        return findFirstByIndex(INDEX_TICKER, ticker);
     }
 
     @Override
     public Optional<CompanyTicker> findFirstByCikStr(Long cikStr) {
-        return findFirst(value -> value.getCikStr() != null && value.getCikStr().equals(cikStr));
+        return findFirstByIndex(INDEX_CIK_STR, cikStr);
     }
 }

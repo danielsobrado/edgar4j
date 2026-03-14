@@ -1,0 +1,2 @@
+org.springframework.boot.env.EnvironmentPostProcessor=\
+org.jds.edgar4j.config.ResourceModeProfileActivator

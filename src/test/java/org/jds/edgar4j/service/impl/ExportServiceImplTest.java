@@ -14,7 +14,7 @@ import org.jds.edgar4j.dto.request.FilingSearchRequest;
 import org.jds.edgar4j.dto.response.FilingResponse;
 import org.jds.edgar4j.dto.response.PaginatedResponse;
 import org.jds.edgar4j.model.Filling;
-import org.jds.edgar4j.repository.FillingRepository;
+import org.jds.edgar4j.port.FillingDataPort;
 import org.jds.edgar4j.service.FilingService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -31,7 +31,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 class ExportServiceImplTest {
 
     @Mock
-    private FillingRepository fillingRepository;
+    private FillingDataPort fillingRepository;
 
     @Mock
     private FilingService filingService;

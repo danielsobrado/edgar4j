@@ -20,6 +20,7 @@ public class Form6KFileAdapter extends AbstractSimpleFilingFileAdapter<Form6K> i
                 FileFormat.JSONL,
                 Form6K::getId,
                 Form6K::setId));
+        registerCommonFilingIndexes();
     }
 
     @Override

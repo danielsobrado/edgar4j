@@ -4,12 +4,11 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import org.jds.edgar4j.model.SearchHistory;
-import org.jds.edgar4j.port.SearchHistoryDataPort;
 import org.springframework.data.mongodb.repository.MongoRepository;
-import org.springframework.stereotype.Repository;
+import org.springframework.context.annotation.Profile;
 
-@Repository
-public interface SearchHistoryRepository extends MongoRepository<SearchHistory, String>, SearchHistoryDataPort {
+@Profile("resource-high & !resource-low")
+public interface SearchHistoryRepository extends MongoRepository<SearchHistory, String> {
 
     List<SearchHistory> findTop10ByOrderByTimestampDesc();
 
@@ -19,4 +18,3 @@ public interface SearchHistoryRepository extends MongoRepository<SearchHistory, 
 
     void deleteByTimestampBefore(LocalDateTime timestamp);
 }
-

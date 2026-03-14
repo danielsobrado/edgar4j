@@ -6,6 +6,8 @@ import org.springframework.context.annotation.Configuration;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Configuration properties for Edgar4J application
@@ -21,6 +23,8 @@ public class Edgar4JProperties {
     
     private Urls urls = new Urls();
     private Persistence persistence = new Persistence();
+    private Batch batch = new Batch();
+    private Migration migration = new Migration();
     private String userAgent = "Edgar4J/1.0";
     private String dailyIndexesPath = "/tmp/edgar4j/daily-indexes";
 
@@ -41,6 +45,21 @@ public class Edgar4JProperties {
     @Data
     public static class Persistence {
         private String database = "postgresql";
+    }
+
+    @Data
+    public static class Batch {
+        private int chunkSize = 50;
+        private int maxConcurrentSteps = 4;
+        private boolean flushAfterChunk = false;
+    }
+
+    @Data
+    public static class Migration {
+        private String action;
+        private String targetPath;
+        private String sourcePath;
+        private List<String> collections = new ArrayList<>();
     }
 
     public String getDailyMasterUrl(LocalDate date) {

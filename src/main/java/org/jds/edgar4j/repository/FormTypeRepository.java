@@ -6,9 +6,9 @@ import java.util.Optional;
 import org.jds.edgar4j.model.FormType;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
-import org.springframework.stereotype.Repository;
+import org.springframework.context.annotation.Profile;
 
-@Repository
+@Profile("resource-high & !resource-low")
 public interface FormTypeRepository extends MongoRepository<FormType, String> {
 
     Optional<FormType> findByNumber(String number);
@@ -22,4 +22,3 @@ public interface FormTypeRepository extends MongoRepository<FormType, String> {
 
     boolean existsByNumber(String number);
 }
-

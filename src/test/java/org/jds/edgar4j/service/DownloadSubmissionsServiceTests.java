@@ -5,8 +5,8 @@ import org.jds.edgar4j.integration.SecResponseParser;
 import org.jds.edgar4j.integration.model.SecSubmissionResponse;
 import org.jds.edgar4j.model.Filling;
 import org.jds.edgar4j.model.Submissions;
-import org.jds.edgar4j.repository.FillingRepository;
-import org.jds.edgar4j.repository.SubmissionsRepository;
+import org.jds.edgar4j.port.FillingDataPort;
+import org.jds.edgar4j.port.SubmissionsDataPort;
 import org.jds.edgar4j.service.impl.DownloadSubmissionsServiceImpl;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -37,10 +37,10 @@ class DownloadSubmissionsServiceTests {
     private SecResponseParser responseParser;
 
     @Mock
-    private SubmissionsRepository submissionsRepository;
+    private SubmissionsDataPort submissionsRepository;
 
     @Mock
-    private FillingRepository fillingRepository;
+    private FillingDataPort fillingRepository;
 
     @InjectMocks
     private DownloadSubmissionsServiceImpl downloadSubmissionsService;

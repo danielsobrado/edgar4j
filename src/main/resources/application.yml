@@ -5,7 +5,6 @@ spring:
   application:
     name: edgar4j
   profiles:
-    active: ${EDGAR4J_RESOURCE_MODE:high}
     group:
       low:
         - resource-low
@@ -67,11 +66,6 @@ spring:
   elasticsearch:
     repositories:
       enabled: ${ELASTICSEARCH_REPOSITORIES_ENABLED:false}
-  cache:
-    type: redis
-    redis:
-      time-to-live: PT1H
-      cache-null-values: false
   task:
     execution:
       pool:

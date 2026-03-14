@@ -19,6 +19,9 @@ import org.springframework.stereotype.Component;
 @Profile("resource-low")
 public class FillingFileAdapter extends AbstractFileDataPort<Filling> implements FillingDataPort {
 
+    private static final String INDEX_ACCESSION_NUMBER = "accessionNumber";
+    private static final String INDEX_CIK = "cik";
+
     public FillingFileAdapter(FileStorageEngine storageEngine) {
         super(storageEngine.registerCollection(
                 "fillings",
@@ -26,16 +29,18 @@ public class FillingFileAdapter extends AbstractFileDataPort<Filling> implements
                 FileFormat.JSONL,
                 Filling::getId,
                 Filling::setId));
+        registerExactIndex(INDEX_ACCESSION_NUMBER, Filling::getAccessionNumber);
+        registerExactIndex(INDEX_CIK, Filling::getCik);
     }
 
     @Override
     public Optional<Filling> findByAccessionNumber(String accessionNumber) {
-        return findFirst(value -> accessionNumber != null && accessionNumber.equals(value.getAccessionNumber()));
+        return findFirstByIndex(INDEX_ACCESSION_NUMBER, accessionNumber);
     }
 
     @Override
     public Page<Filling> findByCik(String cik, Pageable pageable) {
-        return findMatching(value -> cik != null && cik.equals(value.getCik()), pageable);
+        return org.jds.edgar4j.storage.file.FilePageSupport.page(findAllByIndex(INDEX_CIK, cik), pageable);
     }
 
     @Override

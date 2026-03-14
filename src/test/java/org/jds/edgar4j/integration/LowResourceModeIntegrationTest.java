@@ -6,13 +6,18 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDate;
 import java.util.Map;
 import java.util.UUID;
 
+import org.jds.edgar4j.TestFixtures;
 import org.jds.edgar4j.config.ResourceModeInfo;
 import org.jds.edgar4j.model.CompanyTicker;
+import org.jds.edgar4j.model.Filling;
 import org.jds.edgar4j.port.AppSettingsDataPort;
 import org.jds.edgar4j.port.CompanyTickerDataPort;
+import org.jds.edgar4j.port.FillingDataPort;
+import org.jds.edgar4j.port.Form4DataPort;
 import org.jds.edgar4j.port.Form5DataPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -26,7 +31,7 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test-low")
+@ActiveProfiles({"test-low", "resource-low"})
 class LowResourceModeIntegrationTest {
 
     private static final Path DATA_PATH = createDataPath();
@@ -51,6 +56,12 @@ class LowResourceModeIntegrationTest {
     @Autowired
     private Form5DataPort form5DataPort;
 
+    @Autowired
+    private FillingDataPort fillingDataPort;
+
+    @Autowired
+    private Form4DataPort form4DataPort;
+
     private WebTestClient webTestClient;
 
     @DynamicPropertySource
@@ -66,6 +77,8 @@ class LowResourceModeIntegrationTest {
                 .build();
         appSettingsDataPort.deleteAll();
         companyTickerDataPort.deleteAll();
+        fillingDataPort.deleteAll();
+        form4DataPort.deleteAll();
         form5DataPort.deleteAll();
     }
 
@@ -74,6 +87,16 @@ class LowResourceModeIntegrationTest {
     void activatesLowResourceMode() {
         assertThat(resourceModeInfo.mode()).isEqualTo("low");
         assertThat(resourceModeInfo.description()).contains("File-backed");
+
+        webTestClient.get()
+                .uri("/actuator/health")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.components.resourceMode.status").isEqualTo("UP")
+                .jsonPath("$.components.resourceMode.details.resourceMode").isEqualTo("low")
+                .jsonPath("$.components.resourceMode.details.storage").isEqualTo("file")
+                .jsonPath("$.components.resourceMode.details.dataPath").isEqualTo(DATA_PATH.toAbsolutePath().toString());
     }
 
     @Test
@@ -182,6 +205,69 @@ class LowResourceModeIntegrationTest {
         Path form5File = DATA_PATH.resolve("collections").resolve("form5.jsonl");
         assertThat(form5File).exists();
         assertThat(Files.readString(form5File)).contains("0000777777-26-000001");
+    }
+
+    @Test
+    @DisplayName("filing endpoints serve file-backed filing data")
+    void filingEndpointsUseFileBackedStorage() throws IOException {
+        Filling filing = TestFixtures.createTestFilling(
+                "0001234567-26-000101",
+                "0001234567",
+                "8-K",
+                LocalDate.of(2026, 3, 10));
+        filing.setCompany("Acme Corp");
+        fillingDataPort.save(filing);
+
+        webTestClient.get()
+                .uri("/api/filings/accession/0001234567-26-000101")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.success").isEqualTo(true)
+                .jsonPath("$.data.accessionNumber").isEqualTo("0001234567-26-000101")
+                .jsonPath("$.data.cik").isEqualTo("0001234567")
+                .jsonPath("$.data.formType").isEqualTo("8-K");
+
+        webTestClient.get()
+                .uri("/api/filings/recent?limit=5")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.success").isEqualTo(true)
+                .jsonPath("$.data[0].accessionNumber").isEqualTo("0001234567-26-000101");
+
+        Path filingsFile = DATA_PATH.resolve("collections").resolve("fillings.jsonl");
+        assertThat(filingsFile).exists();
+        assertThat(Files.readString(filingsFile)).contains("0001234567-26-000101");
+    }
+
+    @Test
+    @DisplayName("form4 endpoints read from file-backed insider filings")
+    void form4EndpointsUseFileBackedStorage() throws IOException {
+        form4DataPort.save(TestFixtures.createTestForm4(
+                "0000666666-26-000001",
+                "NOVA",
+                LocalDate.of(2026, 3, 12)));
+
+        webTestClient.get()
+                .uri("/api/form4/accession/0000666666-26-000001")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.accessionNumber").isEqualTo("0000666666-26-000001")
+                .jsonPath("$.tradingSymbol").isEqualTo("NOVA");
+
+        webTestClient.get()
+                .uri("/api/form4/symbol/NOVA?page=0&size=10")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.content[0].accessionNumber").isEqualTo("0000666666-26-000001")
+                .jsonPath("$.content[0].tradingSymbol").isEqualTo("NOVA");
+
+        Path form4File = DATA_PATH.resolve("collections").resolve("form4.jsonl");
+        assertThat(form4File).exists();
+        assertThat(Files.readString(form4File)).contains("0000666666-26-000001");
     }
 
     private static Path createDataPath() {

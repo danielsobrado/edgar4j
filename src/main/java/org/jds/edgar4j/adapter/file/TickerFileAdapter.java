@@ -14,6 +14,9 @@ import org.springframework.stereotype.Component;
 @Profile("resource-low")
 public class TickerFileAdapter extends AbstractFileDataPort<Ticker> implements TickerDataPort {
 
+    private static final String INDEX_CODE = "code";
+    private static final String INDEX_CIK = "cik";
+
     public TickerFileAdapter(FileStorageEngine storageEngine) {
         super(storageEngine.registerCollection(
                 "tickers",
@@ -21,16 +24,18 @@ public class TickerFileAdapter extends AbstractFileDataPort<Ticker> implements T
                 FileFormat.JSON,
                 Ticker::getId,
                 Ticker::setId));
+        registerIgnoreCaseIndex(INDEX_CODE, Ticker::getCode);
+        registerExactIndex(INDEX_CIK, Ticker::getCik);
     }
 
     @Override
     public Optional<Ticker> findByCode(String code) {
-        return findFirst(value -> equalsIgnoreCase(value.getCode(), code));
+        return findFirstByIndex(INDEX_CODE, code);
     }
 
     @Override
     public Optional<Ticker> findByCik(String cik) {
-        return findFirst(value -> cik != null && cik.equals(value.getCik()));
+        return findFirstByIndex(INDEX_CIK, cik);
     }
 
     @Override
@@ -38,6 +43,10 @@ public class TickerFileAdapter extends AbstractFileDataPort<Ticker> implements T
         if (codes == null || codes.isEmpty()) {
             return List.of();
         }
-        return findMatching(value -> codes.stream().anyMatch(code -> equalsIgnoreCase(value.getCode(), code)));
+        java.util.LinkedHashMap<String, Ticker> matches = new java.util.LinkedHashMap<>();
+        for (String code : codes) {
+            findAllByIndex(INDEX_CODE, code).forEach(ticker -> matches.putIfAbsent(ticker.getId(), ticker));
+        }
+        return List.copyOf(matches.values());
     }
 }

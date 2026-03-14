@@ -4,9 +4,9 @@ import org.jds.edgar4j.batch.processor.Form4DocumentProcessor;
 import org.jds.edgar4j.batch.reader.EdgarFilingReader;
 import org.jds.edgar4j.batch.writer.InsiderTransactionWriter;
 import org.jds.edgar4j.model.insider.InsiderTransaction;
+import org.jds.edgar4j.port.InsiderTransactionDataPort;
 import org.jds.edgar4j.service.insider.EdgarApiService;
 import org.jds.edgar4j.service.insider.Form4ParserService;
-import org.jds.edgar4j.service.insider.InsiderTransactionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -14,8 +14,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.batch.infrastructure.item.Chunk;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.batch.infrastructure.item.ExecutionContext;
-import org.springframework.batch.infrastructure.item.ItemStreamException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
@@ -44,7 +42,7 @@ class BatchComponentsTest {
     private Form4ParserService form4ParserService;
 
     @Mock
-    private InsiderTransactionService insiderTransactionService;
+    private InsiderTransactionDataPort insiderTransactionDataPort;
 
     private EdgarFilingReader edgarFilingReader;
     private Form4DocumentProcessor form4DocumentProcessor;
@@ -54,7 +52,7 @@ class BatchComponentsTest {
     void setUp() {
         edgarFilingReader = new EdgarFilingReader(edgarApiService);
         form4DocumentProcessor = new Form4DocumentProcessor(edgarApiService, form4ParserService);
-        insiderTransactionWriter = new InsiderTransactionWriter(insiderTransactionService);
+        insiderTransactionWriter = new InsiderTransactionWriter(insiderTransactionDataPort);
     }
 
     @DisplayName("EdgarFilingReader should read accession numbers correctly")
@@ -188,13 +186,13 @@ class BatchComponentsTest {
         List<InsiderTransaction> chunk2 = createTestTransactions();
         List<List<InsiderTransaction>> chunks = Arrays.asList(chunk1, chunk2);
 
-        when(insiderTransactionService.saveAll(any())).thenReturn(chunk1).thenReturn(chunk2);
+        when(insiderTransactionDataPort.saveAll(any())).thenReturn(chunk1).thenReturn(chunk2);
 
         // When
         insiderTransactionWriter.write(new Chunk<>(chunks));
 
         // Then
-        verify(insiderTransactionService, times(2)).saveAll(any());
+        verify(insiderTransactionDataPort, times(2)).saveAll(any());
     }
 
     @DisplayName("InsiderTransactionWriter should handle save errors with fallback")
@@ -204,15 +202,15 @@ class BatchComponentsTest {
         List<InsiderTransaction> chunk = createTestTransactions();
         List<List<InsiderTransaction>> chunks = Arrays.asList(chunk);
 
-        when(insiderTransactionService.saveAll(any())).thenThrow(new RuntimeException("Save Error"));
-        when(insiderTransactionService.save(any())).thenReturn(chunk.get(0));
+        when(insiderTransactionDataPort.saveAll(any())).thenThrow(new RuntimeException("Save Error"));
+        when(insiderTransactionDataPort.save(any())).thenReturn(chunk.get(0));
 
         // When
         insiderTransactionWriter.write(new Chunk<>(chunks));
 
         // Then
-        verify(insiderTransactionService, times(1)).saveAll(any());
-        verify(insiderTransactionService, times(chunk.size())).save(any());
+        verify(insiderTransactionDataPort, times(1)).saveAll(any());
+        verify(insiderTransactionDataPort, times(chunk.size())).save(any());
     }
 
     @DisplayName("InsiderTransactionWriter should handle null chunks gracefully")
@@ -226,7 +224,7 @@ class BatchComponentsTest {
             insiderTransactionWriter.write(new Chunk<>(chunks));
         });
 
-        verify(insiderTransactionService, never()).saveAll(any());
+        verify(insiderTransactionDataPort, never()).saveAll(any());
     }
 
     @DisplayName("Should handle date parsing in EdgarFilingReader")

@@ -1,17 +1,19 @@
 spring:
   autoconfigure:
     exclude:
-      - org.springframework.boot.data.mongodb.autoconfigure.DataMongoAutoConfiguration
-      - org.springframework.boot.data.mongodb.autoconfigure.DataMongoRepositoriesAutoConfiguration
-      - org.springframework.boot.data.mongodb.autoconfigure.DataMongoReactiveAutoConfiguration
-      - org.springframework.boot.data.mongodb.autoconfigure.DataMongoReactiveRepositoriesAutoConfiguration
       - org.springframework.boot.mongodb.autoconfigure.MongoAutoConfiguration
       - org.springframework.boot.mongodb.autoconfigure.MongoReactiveAutoConfiguration
+      - org.springframework.boot.data.mongodb.autoconfigure.DataMongoAutoConfiguration
+      - org.springframework.boot.data.mongodb.autoconfigure.DataMongoReactiveAutoConfiguration
+      - org.springframework.boot.data.mongodb.autoconfigure.DataMongoRepositoriesAutoConfiguration
+      - org.springframework.boot.data.mongodb.autoconfigure.DataMongoReactiveRepositoriesAutoConfiguration
+      - org.springframework.boot.elasticsearch.autoconfigure.ElasticsearchClientAutoConfiguration
+      - org.springframework.boot.elasticsearch.autoconfigure.ElasticsearchRestClientAutoConfiguration
       - org.springframework.boot.data.elasticsearch.autoconfigure.DataElasticsearchAutoConfiguration
       - org.springframework.boot.data.elasticsearch.autoconfigure.DataElasticsearchRepositoriesAutoConfiguration
       - org.springframework.boot.data.elasticsearch.autoconfigure.DataElasticsearchReactiveRepositoriesAutoConfiguration
-      - org.springframework.boot.elasticsearch.autoconfigure.ElasticsearchClientAutoConfiguration
-      - org.springframework.boot.elasticsearch.autoconfigure.ElasticsearchRestClientAutoConfiguration
+      - org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration
+      - org.springframework.boot.data.jpa.autoconfigure.DataJpaRepositoriesAutoConfiguration
   datasource:
     url: jdbc:h2:file:${edgar4j.storage.file.base-path:./data}/batch/edgar4j;MODE=PostgreSQL;DB_CLOSE_ON_EXIT=FALSE
     driver-class-name: org.h2.Driver
@@ -43,7 +45,25 @@ logging:
   level:
     org.jds.edgar4j.adapter.file: INFO
 
+management:
+  health:
+    redis:
+      enabled: false
+
 edgar4j:
+  resource-mode: low
+  search:
+    engine: ${EDGAR4J_SEARCH_ENGINE:simple}
+  batch:
+    chunk-size: ${EDGAR4J_BATCH_CHUNK_SIZE:5}
+    max-concurrent-steps: ${EDGAR4J_BATCH_MAX_CONCURRENT_STEPS:1}
+    flush-after-chunk: ${EDGAR4J_BATCH_FLUSH_AFTER_CHUNK:true}
+  jobs:
+    realtime-filing-sync:
+      cron: ${REALTIME_FILING_SYNC_CRON:0 */30 * * * *}
+      max-pages: ${REALTIME_FILING_SYNC_MAX_PAGES:5}
+    market-data-sync:
+      cron: ${MARKET_DATA_SYNC_CRON:0 0 */4 * * MON-FRI}
   storage:
     file:
       base-path: ${EDGAR4J_DATA_PATH:./data}

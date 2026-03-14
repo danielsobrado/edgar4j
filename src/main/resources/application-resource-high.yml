@@ -2,3 +2,21 @@ spring:
   config:
     activate:
       on-profile: resource-high
+  cache:
+    type: redis
+    redis:
+      time-to-live: PT1H
+      cache-null-values: false
+
+edgar4j:
+  resource-mode: high
+  batch:
+    chunk-size: ${EDGAR4J_BATCH_CHUNK_SIZE:50}
+    max-concurrent-steps: ${EDGAR4J_BATCH_MAX_CONCURRENT_STEPS:4}
+    flush-after-chunk: ${EDGAR4J_BATCH_FLUSH_AFTER_CHUNK:false}
+  jobs:
+    realtime-filing-sync:
+      cron: ${REALTIME_FILING_SYNC_CRON:0 */15 * * * *}
+      max-pages: ${REALTIME_FILING_SYNC_MAX_PAGES:10}
+    market-data-sync:
+      cron: ${MARKET_DATA_SYNC_CRON:0 0 */2 * * MON-FRI}

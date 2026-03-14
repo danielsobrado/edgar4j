@@ -16,6 +16,9 @@ import org.springframework.stereotype.Component;
 @Profile("resource-low")
 public class SubmissionsFileAdapter extends AbstractFileDataPort<Submissions> implements SubmissionsDataPort {
 
+    private static final String INDEX_CIK = "cik";
+    private static final String INDEX_TICKER = "ticker";
+
     public SubmissionsFileAdapter(FileStorageEngine storageEngine) {
         super(storageEngine.registerCollection(
                 "submissions",
@@ -23,11 +26,13 @@ public class SubmissionsFileAdapter extends AbstractFileDataPort<Submissions> im
                 FileFormat.JSONL,
                 Submissions::getId,
                 Submissions::setId));
+        registerExactIndex(INDEX_CIK, Submissions::getCik);
+        registerMultiValueIgnoreCaseIndex(INDEX_TICKER, value -> value.getTickers() == null ? List.of() : value.getTickers());
     }
 
     @Override
     public Optional<Submissions> findByCik(String cik) {
-        return findFirst(value -> cik != null && cik.equals(value.getCik()));
+        return findFirstByIndex(INDEX_CIK, cik);
     }
 
     @Override
@@ -39,8 +44,6 @@ public class SubmissionsFileAdapter extends AbstractFileDataPort<Submissions> im
 
     @Override
     public List<Submissions> findByTickersContaining(String ticker) {
-        return findMatching(value -> value.getTickers() != null
-                && ticker != null
-                && value.getTickers().stream().anyMatch(existingTicker -> existingTicker != null && existingTicker.equalsIgnoreCase(ticker)));
+        return findAllByIndex(INDEX_TICKER, ticker);
     }
 }

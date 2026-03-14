@@ -1,6 +1,7 @@
 package org.jds.edgar4j.service.impl;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -10,9 +11,8 @@ import org.jds.edgar4j.dto.response.FilingDetailResponse;
 import org.jds.edgar4j.dto.response.FilingResponse;
 import org.jds.edgar4j.dto.response.PaginatedResponse;
 import org.jds.edgar4j.model.Filling;
-import org.jds.edgar4j.port.CompanyTickerDataPort;
+import org.jds.edgar4j.port.FilingSearchPort;
 import org.jds.edgar4j.port.FillingDataPort;
-import org.jds.edgar4j.port.TickerDataPort;
 import org.jds.edgar4j.service.FilingService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -28,8 +28,7 @@ import lombok.extern.slf4j.Slf4j;
 public class FilingServiceImpl implements FilingService {
 
     private final FillingDataPort fillingRepository;
-    private final CompanyTickerDataPort companyTickerRepository;
-    private final TickerDataPort tickerRepository;
+    private final FilingSearchPort filingSearchPort;
 
     @Override
     public PaginatedResponse<FilingResponse> searchFilings(FilingSearchRequest request) {
@@ -51,27 +50,17 @@ public class FilingServiceImpl implements FilingService {
         );
         PageRequest pageRequest = PageRequest.of(request.getPage(), request.getSize(), sort);
 
-        Page<Filling> page;
+        Page<FilingSearchPort.SearchResult> page = filingSearchPort.search(toSearchCriteria(request), pageRequest);
 
-        if (request.getCik() != null && !request.getCik().isEmpty()) {
-            if (request.getFormTypes() != null && !request.getFormTypes().isEmpty()) {
-                page = request.getFormTypes().size() == 1
-                        ? fillingRepository.findByCikAndFormType(request.getCik(), request.getFormTypes().get(0), pageRequest)
-                        : fillingRepository.findByCikAndFormTypeIn(request.getCik(), request.getFormTypes(), pageRequest);
-            } else {
-                page = fillingRepository.findByCik(request.getCik(), pageRequest);
-            }
-        } else if (request.getTicker() != null && !request.getTicker().isEmpty()) {
-            page = searchByTicker(request, pageRequest);
-        } else if (request.getDateFrom() != null && request.getDateTo() != null && request.getFormTypes() != null) {
-            page = fillingRepository.searchFillings(request.getDateFrom(), request.getDateTo(), request.getFormTypes(), pageRequest);
-        } else if (request.getCompanyName() != null && !request.getCompanyName().isEmpty()) {
-            page = fillingRepository.searchByCompanyOrCik(request.getCompanyName(), pageRequest);
-        } else {
-            page = fillingRepository.findAllByOrderByFillingDateDesc(pageRequest);
-        }
+        List<String> filingIds = page.getContent().stream()
+                .map(FilingSearchPort.SearchResult::id)
+                .toList();
+        Map<String, Filling> filingsById = fillingRepository.findAllById(filingIds).stream()
+                .collect(Collectors.toMap(Filling::getId, filling -> filling));
 
-        var content = page.getContent().stream()
+        var content = filingIds.stream()
+                .map(filingsById::get)
+                .filter(filing -> filing != null)
                 .map(this::toFilingResponse)
                 .collect(Collectors.toList());
 
@@ -142,28 +131,28 @@ public class FilingServiceImpl implements FilingService {
         return fillingRepository.countByFormTypeNumber(formType);
     }
 
-    private Page<Filling> searchByTicker(FilingSearchRequest request, PageRequest pageRequest) {
-        Optional<List<String>> tickerCiks = tickerRepository.findByCode(request.getTicker().trim().toUpperCase())
-                .map(ticker -> List.of(ticker.getCik()));
+    private FilingSearchPort.SearchCriteria toSearchCriteria(FilingSearchRequest request) {
+        String query = null;
+        if (request.getKeywords() != null && !request.getKeywords().isEmpty()) {
+            query = request.getKeywords().stream()
+                    .filter(keyword -> keyword != null && !keyword.isBlank())
+                    .collect(Collectors.joining(" "));
+        }
+        if ((query == null || query.isBlank()) && request.getCompanyName() != null && !request.getCompanyName().isBlank()) {
+            query = request.getCompanyName();
+        }
 
-        Optional<List<String>> companyTickerCiks = companyTickerRepository.findByTickerIgnoreCase(request.getTicker())
-                .map(companyTicker -> {
-                    String rawCik = String.valueOf(companyTicker.getCikStr());
-                    String paddedCik = String.format("%010d", companyTicker.getCikStr());
-                    return rawCik.equals(paddedCik) ? List.of(rawCik) : List.of(rawCik, paddedCik);
-                });
-
-        return tickerCiks.or(() -> companyTickerCiks)
-                .map(ciks -> {
-                    if (request.getFormTypes() != null && !request.getFormTypes().isEmpty()) {
-                        return request.getFormTypes().size() == 1
-                                ? fillingRepository.findByCikInAndFormType(ciks, request.getFormTypes().get(0), pageRequest)
-                                : fillingRepository.findByCikInAndFormTypeIn(ciks, request.getFormTypes(), pageRequest);
-                    }
-
-                    return fillingRepository.findByCikIn(ciks, pageRequest);
-                })
-                .orElseGet(() -> fillingRepository.searchByCompanyOrCik(request.getTicker(), pageRequest));
+        return new FilingSearchPort.SearchCriteria(
+                query,
+                request.getFormTypes(),
+                request.getCik(),
+                request.getTicker(),
+            request.getDateFrom() == null ? null : java.time.Instant.ofEpochMilli(request.getDateFrom().getTime())
+                .atZone(java.time.ZoneId.systemDefault())
+                .toLocalDate(),
+            request.getDateTo() == null ? null : java.time.Instant.ofEpochMilli(request.getDateTo().getTime())
+                .atZone(java.time.ZoneId.systemDefault())
+                .toLocalDate());
     }
 
     private FilingResponse toFilingResponse(Filling f) {

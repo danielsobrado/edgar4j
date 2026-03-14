@@ -10,12 +10,12 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
-final class FilePageSupport {
+public final class FilePageSupport {
 
     private FilePageSupport() {
     }
 
-    static <T> Page<T> page(List<T> source, Pageable pageable) {
+    public static <T> Page<T> page(List<T> source, Pageable pageable) {
         if (pageable == null || pageable.isUnpaged()) {
             return new PageImpl<>(List.copyOf(source));
         }
@@ -26,7 +26,7 @@ final class FilePageSupport {
         return new PageImpl<>(sorted.subList(start, end), pageable, sorted.size());
     }
 
-    static <T> List<T> applySort(List<T> source, Sort sort) {
+    public static <T> List<T> applySort(List<T> source, Sort sort) {
         List<T> records = new ArrayList<>(source);
         if (sort == null || sort.isUnsorted()) {
             return records;

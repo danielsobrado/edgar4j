@@ -83,3 +83,6 @@ target/
 build.log
 start_log*.txt
 staging-logs/
+
+docs\dual-mode-architecture\FINISH-IMPLEMENTATION-PROMPT.md
+docs/dual-mode-architecture/FINISH-IMPLEMENTATION-PROMPT.md

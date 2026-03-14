@@ -3,9 +3,9 @@ package org.jds.edgar4j.service.insider.impl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jds.edgar4j.model.insider.Company;
-import org.jds.edgar4j.repository.insider.CompanyRepository;
-import org.jds.edgar4j.repository.insider.InsiderCompanyRelationshipRepository;
-import org.jds.edgar4j.repository.insider.InsiderTransactionRepository;
+import org.jds.edgar4j.port.InsiderCompanyDataPort;
+import org.jds.edgar4j.port.InsiderCompanyRelationshipDataPort;
+import org.jds.edgar4j.port.InsiderTransactionDataPort;
 import org.jds.edgar4j.service.insider.CompanyService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,9 +26,9 @@ import java.util.Optional;
 @Transactional
 public class CompanyServiceImpl implements CompanyService {
 
-    private final CompanyRepository companyRepository;
-    private final InsiderTransactionRepository transactionRepository;
-    private final InsiderCompanyRelationshipRepository relationshipRepository;
+    private final InsiderCompanyDataPort companyRepository;
+    private final InsiderTransactionDataPort transactionRepository;
+    private final InsiderCompanyRelationshipDataPort relationshipRepository;
 
     @Override
     public Company saveCompany(Company company) {

@@ -1,5 +1,6 @@
 package org.jds.edgar4j.config;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.FullyQualifiedAnnotationBeanNameGenerator;
@@ -11,7 +12,8 @@ import org.springframework.data.mongodb.core.convert.MappingMongoConverter;
 import org.springframework.data.mongodb.repository.config.EnableMongoRepositories;
 
 @Configuration
-@Profile("resource-high")
+@Profile("resource-high & !resource-low")
+@ConditionalOnProperty(prefix = "edgar4j", name = "resource-mode", havingValue = "high", matchIfMissing = true)
 @EnableMongoRepositories(
     basePackages = "org.jds.edgar4j.repository",
     nameGenerator = FullyQualifiedAnnotationBeanNameGenerator.class

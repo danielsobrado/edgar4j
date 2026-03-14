@@ -2,6 +2,7 @@ package org.jds.edgar4j.adapter.file;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.StreamSupport;
 
@@ -98,8 +99,16 @@ public abstract class AbstractFileDataPort<T> implements BaseDocumentDataPort<T>
         return collection.findAllMatching(predicate).stream().findFirst();
     }
 
+    protected Optional<T> findFirstByIndex(String indexName, Object value) {
+        return collection.findIndexedFirst(indexName, value);
+    }
+
     protected List<T> findMatching(Predicate<T> predicate) {
         return collection.findAllMatching(predicate);
+    }
+
+    protected List<T> findAllByIndex(String indexName, Object value) {
+        return collection.findAllIndexed(indexName, value);
     }
 
     protected Page<T> findMatching(Predicate<T> predicate, Pageable pageable) {
@@ -110,8 +119,32 @@ public abstract class AbstractFileDataPort<T> implements BaseDocumentDataPort<T>
         return collection.exists(predicate);
     }
 
+    protected boolean existsByIndex(String indexName, Object value) {
+        return collection.existsIndexed(indexName, value);
+    }
+
     protected long count(Predicate<T> predicate) {
         return collection.count(predicate);
+    }
+
+    protected long countByIndex(String indexName, Object value) {
+        return collection.countIndexed(indexName, value);
+    }
+
+    protected void registerExactIndex(String indexName, Function<T, ?> keyExtractor) {
+        collection.registerIndex(indexName, keyExtractor);
+    }
+
+    protected void registerIgnoreCaseIndex(String indexName, Function<T, String> keyExtractor) {
+        collection.registerIgnoreCaseIndex(indexName, keyExtractor);
+    }
+
+    protected void registerMultiValueExactIndex(String indexName, Function<T, Iterable<?>> keyExtractor) {
+        collection.registerMultiValueIndex(indexName, keyExtractor);
+    }
+
+    protected void registerMultiValueIgnoreCaseIndex(String indexName, Function<T, Iterable<String>> keyExtractor) {
+        collection.registerMultiValueIgnoreCaseIndex(indexName, keyExtractor);
     }
 
     protected boolean equalsIgnoreCase(String left, String right) {

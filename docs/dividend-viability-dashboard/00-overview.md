@@ -1,4 +1,4 @@
-D![1773478139412](image/00-overview/1773478139412.png)ividend Viability Dashboard — Implementation Plan
+Dividend Viability Dashboard — Implementation Plan
 
 ## Executive Summary
 

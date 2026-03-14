@@ -3,6 +3,12 @@ spring:
     hibernate:
       ddl-auto: create-drop
 
+management:
+  endpoint:
+    health:
+      show-details: always
+
 edgar4j:
+  resource-mode: low
   security:
     enabled: false

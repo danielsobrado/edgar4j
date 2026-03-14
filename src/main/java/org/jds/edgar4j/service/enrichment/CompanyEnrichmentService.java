@@ -6,6 +6,7 @@ import org.jds.edgar4j.model.insider.Company;
 import org.jds.edgar4j.service.insider.CompanyService;
 import org.jds.edgar4j.service.provider.MarketDataProvider;
 import org.jds.edgar4j.service.provider.MarketDataService;
+import org.springframework.context.annotation.Profile;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +25,7 @@ import java.util.concurrent.CompletableFuture;
  */
 @Slf4j
 @Service
+@Profile("resource-high & !resource-low")
 @RequiredArgsConstructor
 public class CompanyEnrichmentService {
 

@@ -4,12 +4,11 @@ import java.util.List;
 import java.util.Optional;
 
 import org.jds.edgar4j.model.CompanyMarketData;
-import org.jds.edgar4j.port.CompanyMarketDataDataPort;
 import org.springframework.data.mongodb.repository.MongoRepository;
-import org.springframework.stereotype.Repository;
+import org.springframework.context.annotation.Profile;
 
-@Repository
-public interface CompanyMarketDataRepository extends MongoRepository<CompanyMarketData, String>, CompanyMarketDataDataPort {
+@Profile("resource-high & !resource-low")
+public interface CompanyMarketDataRepository extends MongoRepository<CompanyMarketData, String> {
 
     Optional<CompanyMarketData> findByTickerIgnoreCase(String ticker);
 

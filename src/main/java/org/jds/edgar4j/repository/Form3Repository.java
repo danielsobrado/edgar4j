@@ -5,18 +5,17 @@ import java.util.List;
 import java.util.Optional;
 
 import org.jds.edgar4j.model.Form3;
-import org.jds.edgar4j.port.Form3DataPort;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
-import org.springframework.stereotype.Repository;
+import org.springframework.context.annotation.Profile;
 
 /**
  * Repository for Form 3 SEC filings.
  */
-@Repository
-public interface Form3Repository extends MongoRepository<Form3, String>, Form3DataPort {
+@Profile("resource-high & !resource-low")
+public interface Form3Repository extends MongoRepository<Form3, String> {
 
     Optional<Form3> findByAccessionNumber(String accessionNumber);
 

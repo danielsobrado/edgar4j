@@ -19,7 +19,7 @@ import org.jds.edgar4j.dto.response.SettingsResponse;
 import org.jds.edgar4j.model.AppSettings;
 import org.jds.edgar4j.properties.Edgar4JProperties;
 import org.jds.edgar4j.properties.MarketDataProviderProperties;
-import org.jds.edgar4j.repository.AppSettingsRepository;
+import org.jds.edgar4j.port.AppSettingsDataPort;
 import org.jds.edgar4j.service.provider.MarketDataProviderSettingsResolver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -36,7 +36,7 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 class SettingsServiceImplTest {
 
     @Mock
-    private AppSettingsRepository appSettingsRepository;
+    private AppSettingsDataPort appSettingsRepository;
 
     @Mock(answer = Answers.RETURNS_DEEP_STUBS)
     private MongoTemplate mongoTemplate;

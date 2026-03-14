@@ -15,13 +15,15 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Component
-@Profile("resource-high")
+@Profile("resource-high & !resource-low")
 @RequiredArgsConstructor
 public class MongoFilingIndexCleanup implements ApplicationRunner {
 
     private static final List<String> INVALID_UNIQUE_INDEXES = List.of(
             "fillingType.number",
-            "formType.number"
+            "formType.number",
+            "fillingType.number_1",
+            "formType.number_1"
     );
 
     private final MongoTemplate mongoTemplate;
@@ -36,7 +38,9 @@ public class MongoFilingIndexCleanup implements ApplicationRunner {
             }
 
             String indexName = indexInfo.getName();
-            if (!INVALID_UNIQUE_INDEXES.contains(indexName)) {
+            boolean invalidIndex = INVALID_UNIQUE_INDEXES.contains(indexName)
+                    || INVALID_UNIQUE_INDEXES.stream().anyMatch(indexName::contains);
+            if (!invalidIndex) {
                 continue;
             }
 
@@ -45,3 +49,4 @@ public class MongoFilingIndexCleanup implements ApplicationRunner {
         }
     }
 }
+

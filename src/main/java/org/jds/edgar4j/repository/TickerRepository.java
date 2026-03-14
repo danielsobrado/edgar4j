@@ -5,20 +5,21 @@ import java.util.Optional;
 
 import org.jds.edgar4j.model.Exchange;
 import org.jds.edgar4j.model.Ticker;
-import org.jds.edgar4j.port.TickerDataPort;
+import org.springframework.context.annotation.Profile;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
-import org.springframework.stereotype.Repository;
 
-@Repository
-public interface TickerRepository extends MongoRepository<Ticker, String>, TickerDataPort {
+@Profile("resource-high & !resource-low")
+public interface TickerRepository extends MongoRepository<Ticker, String> {
 
+    @Query(value = "{ 'code': ?0 }", collation = "{ 'locale': 'en', 'strength': 2 }")
     Optional<Ticker> findByCode(String code);
 
     Optional<Ticker> findByCik(String cik);
 
+    @Query(value = "{ 'code': { $in: ?0 } }", collation = "{ 'locale': 'en', 'strength': 2 }")
     List<Ticker> findByCodeIn(List<String> codes);
 
     List<Ticker> findByCikIn(List<String> ciks);

@@ -6,14 +6,13 @@ import java.util.Optional;
 import org.jds.edgar4j.model.DownloadJob;
 import org.jds.edgar4j.model.DownloadJob.JobStatus;
 import org.jds.edgar4j.model.DownloadJob.JobType;
-import org.jds.edgar4j.port.DownloadJobDataPort;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
-import org.springframework.stereotype.Repository;
+import org.springframework.context.annotation.Profile;
 
-@Repository
-public interface DownloadJobRepository extends MongoRepository<DownloadJob, String>, DownloadJobDataPort {
+@Profile("resource-high & !resource-low")
+public interface DownloadJobRepository extends MongoRepository<DownloadJob, String> {
 
     List<DownloadJob> findByStatus(JobStatus status);
 
@@ -31,4 +30,3 @@ public interface DownloadJobRepository extends MongoRepository<DownloadJob, Stri
 
     Optional<DownloadJob> findFirstByTypeInAndStatusOrderByCompletedAtDesc(List<JobType> types, JobStatus status);
 }
-

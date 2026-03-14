@@ -1,12 +1,14 @@
 package org.jds.edgar4j.batch;
 
+import javax.sql.DataSource;
+
 import org.jds.edgar4j.batch.processor.Form4DocumentProcessor;
 import org.jds.edgar4j.batch.reader.EdgarFilingReader;
 import org.jds.edgar4j.batch.writer.InsiderTransactionWriter;
 import org.jds.edgar4j.model.insider.InsiderTransaction;
+import org.jds.edgar4j.port.InsiderTransactionDataPort;
 import org.jds.edgar4j.service.insider.EdgarApiService;
 import org.jds.edgar4j.service.insider.Form4ParserService;
-import org.jds.edgar4j.service.insider.InsiderTransactionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,8 +26,11 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
+import org.springframework.boot.jdbc.DataSourceBuilder;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
@@ -83,7 +88,7 @@ public class SpringBatchIntegrationTest {
     private Form4ParserService form4ParserService;
 
     @Autowired
-    private InsiderTransactionService insiderTransactionService;
+    private InsiderTransactionDataPort insiderTransactionDataPort;
 
     private final String TEST_XML_CONTENT = """
         <?xml version="1.0" encoding="UTF-8"?>
@@ -155,7 +160,7 @@ public class SpringBatchIntegrationTest {
     void setUp() {
         jobRepositoryTestUtils.removeJobExecutions();
         jobLauncherTestUtils.setJob(processForm4FilingsJob);
-        reset(edgarApiService, form4ParserService, insiderTransactionService);
+        reset(edgarApiService, form4ParserService, insiderTransactionDataPort);
     }
 
     @DisplayName("Should process Form 4 batch job successfully")
@@ -170,7 +175,7 @@ public class SpringBatchIntegrationTest {
             .thenReturn(TEST_XML_CONTENT);
         when(form4ParserService.parseForm4Xml(anyString(), anyString()))
             .thenReturn(createTestTransactions());
-        when(insiderTransactionService.saveAll(any()))
+        when(insiderTransactionDataPort.saveAll(any()))
             .thenReturn(createTestTransactions());
 
         JobParameters jobParameters = new JobParametersBuilder()
@@ -256,8 +261,25 @@ public class SpringBatchIntegrationTest {
 
         @Bean
         @Primary
-        InsiderTransactionService insiderTransactionService() {
-            return mock(InsiderTransactionService.class);
+        InsiderTransactionDataPort insiderTransactionDataPort() {
+            return mock(InsiderTransactionDataPort.class);
+        }
+
+        @Bean(name = "dataSource")
+        @Primary
+        DataSource dataSource() {
+            return DataSourceBuilder.create()
+                    .driverClassName("org.h2.Driver")
+                    .url("jdbc:h2:mem:batchtest;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE")
+                    .username("sa")
+                    .password("")
+                    .build();
+        }
+
+        @Bean(name = "transactionManager")
+        @Primary
+        PlatformTransactionManager transactionManager(DataSource dataSource) {
+            return new DataSourceTransactionManager(dataSource);
         }
     }
 }

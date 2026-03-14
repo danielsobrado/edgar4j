@@ -14,7 +14,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.jds.edgar4j.config.TiingoEnvProperties;
 import org.jds.edgar4j.dto.response.MarketDataResponse;
 import org.jds.edgar4j.model.AppSettings;
-import org.jds.edgar4j.repository.AppSettingsRepository;
+import org.jds.edgar4j.port.AppSettingsDataPort;
 import org.jds.edgar4j.service.SettingsService;
 import org.jds.edgar4j.service.provider.MarketDataProvider;
 import org.jds.edgar4j.service.provider.MarketDataProviderSettingsResolver;
@@ -28,7 +28,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class MarketDataServiceImplProviderTest {
 
     @Mock
-    private AppSettingsRepository appSettingsRepository;
+    private AppSettingsDataPort appSettingsRepository;
 
     @Mock
     private SettingsService settingsService;

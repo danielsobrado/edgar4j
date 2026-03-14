@@ -20,6 +20,7 @@ public class Form3FileAdapter extends AbstractSimpleFilingFileAdapter<Form3> imp
                 FileFormat.JSONL,
                 Form3::getId,
                 Form3::setId));
+        registerCommonFilingIndexes();
     }
 
     @Override

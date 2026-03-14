@@ -3,7 +3,7 @@ package org.jds.edgar4j.batch.writer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jds.edgar4j.model.insider.InsiderTransaction;
-import org.jds.edgar4j.service.insider.InsiderTransactionService;
+import org.jds.edgar4j.port.InsiderTransactionDataPort;
 import org.springframework.batch.infrastructure.item.Chunk;
 import org.springframework.batch.infrastructure.item.ItemWriter;
 import org.springframework.stereotype.Component;
@@ -22,7 +22,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class InsiderTransactionWriter implements ItemWriter<List<InsiderTransaction>> {
 
-    private final InsiderTransactionService insiderTransactionService;
+    private final InsiderTransactionDataPort insiderTransactionDataPort;
 
     @Override
     public void write(Chunk<? extends List<InsiderTransaction>> chunks) throws Exception {
@@ -34,7 +34,7 @@ public class InsiderTransactionWriter implements ItemWriter<List<InsiderTransact
             if (transactionList != null && !transactionList.isEmpty()) {
                 try {
                     // Save all transactions in the current chunk
-                    List<InsiderTransaction> savedTransactions = insiderTransactionService.saveAll(transactionList);
+                    List<InsiderTransaction> savedTransactions = insiderTransactionDataPort.saveAll(transactionList);
 
                     totalTransactions += savedTransactions.size();
 
@@ -61,7 +61,7 @@ public class InsiderTransactionWriter implements ItemWriter<List<InsiderTransact
 
         for (InsiderTransaction transaction : transactions) {
             try {
-                insiderTransactionService.save(transaction);
+                insiderTransactionDataPort.save(transaction);
                 successCount++;
 
             } catch (Exception e) {

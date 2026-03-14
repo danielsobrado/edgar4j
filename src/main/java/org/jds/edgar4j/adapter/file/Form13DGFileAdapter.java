@@ -14,6 +14,7 @@ import org.jds.edgar4j.repository.Form13DGRepository.BeneficialOwnerSummary;
 import org.jds.edgar4j.repository.Form13DGRepository.OwnerPortfolioEntry;
 import org.jds.edgar4j.repository.Form13DGRepository.OwnershipHistoryEntry;
 import org.jds.edgar4j.repository.Form13DGRepository.ScheduleTypeCount;
+import org.jds.edgar4j.storage.file.FilePageSupport;
 import org.jds.edgar4j.storage.file.FileFormat;
 import org.jds.edgar4j.storage.file.FileStorageEngine;
 import org.springframework.context.annotation.Profile;
@@ -26,6 +27,13 @@ import org.springframework.stereotype.Component;
 public class Form13DGFileAdapter extends AbstractFileDataPort<Form13DG> implements Form13DGDataPort {
 
     private static final Comparator<LocalDate> LOCAL_DATE_DESC = Comparator.nullsLast(Comparator.reverseOrder());
+    private static final String INDEX_ACCESSION_NUMBER = "accessionNumber";
+    private static final String INDEX_FORM_TYPE = "formType";
+    private static final String INDEX_SCHEDULE_TYPE = "scheduleType";
+    private static final String INDEX_ISSUER_CIK = "issuerCik";
+    private static final String INDEX_CUSIP = "cusip";
+    private static final String INDEX_FILING_PERSON_CIK = "filingPersonCik";
+    private static final String INDEX_AMENDMENT_TYPE = "amendmentType";
 
     public Form13DGFileAdapter(FileStorageEngine storageEngine) {
         super(storageEngine.registerCollection(
@@ -34,26 +42,33 @@ public class Form13DGFileAdapter extends AbstractFileDataPort<Form13DG> implemen
                 FileFormat.JSONL,
                 Form13DG::getId,
                 Form13DG::setId));
+        registerExactIndex(INDEX_ACCESSION_NUMBER, Form13DG::getAccessionNumber);
+        registerIgnoreCaseIndex(INDEX_FORM_TYPE, Form13DG::getFormType);
+        registerIgnoreCaseIndex(INDEX_SCHEDULE_TYPE, Form13DG::getScheduleType);
+        registerExactIndex(INDEX_ISSUER_CIK, Form13DG::getIssuerCik);
+        registerExactIndex(INDEX_CUSIP, Form13DG::getCusip);
+        registerExactIndex(INDEX_FILING_PERSON_CIK, Form13DG::getFilingPersonCik);
+        registerIgnoreCaseIndex(INDEX_AMENDMENT_TYPE, Form13DG::getAmendmentType);
     }
 
     @Override
     public Optional<Form13DG> findByAccessionNumber(String accessionNumber) {
-        return findFirst(value -> accessionNumber != null && accessionNumber.equals(value.getAccessionNumber()));
+        return findFirstByIndex(INDEX_ACCESSION_NUMBER, accessionNumber);
     }
 
     @Override
     public Page<Form13DG> findByFormType(String formType, Pageable pageable) {
-        return findMatching(value -> equalsIgnoreCase(value.getFormType(), formType), pageable);
+        return FilePageSupport.page(findAllByIndex(INDEX_FORM_TYPE, formType), pageable);
     }
 
     @Override
     public Page<Form13DG> findByScheduleType(String scheduleType, Pageable pageable) {
-        return findMatching(value -> equalsIgnoreCase(value.getScheduleType(), scheduleType), pageable);
+        return FilePageSupport.page(findAllByIndex(INDEX_SCHEDULE_TYPE, scheduleType), pageable);
     }
 
     @Override
     public Page<Form13DG> findByIssuerCik(String issuerCik, Pageable pageable) {
-        return findMatching(value -> issuerCik != null && issuerCik.equals(value.getIssuerCik()), pageable);
+        return FilePageSupport.page(findAllByIndex(INDEX_ISSUER_CIK, issuerCik), pageable);
     }
 
     @Override
@@ -63,22 +78,22 @@ public class Form13DGFileAdapter extends AbstractFileDataPort<Form13DG> implemen
 
     @Override
     public List<Form13DG> findByCusip(String cusip) {
-        return findMatching(value -> cusip != null && cusip.equals(value.getCusip()));
+        return findAllByIndex(INDEX_CUSIP, cusip);
     }
 
     @Override
     public Page<Form13DG> findByCusip(String cusip, Pageable pageable) {
-        return findMatching(value -> cusip != null && cusip.equals(value.getCusip()), pageable);
+        return FilePageSupport.page(findAllByIndex(INDEX_CUSIP, cusip), pageable);
     }
 
     @Override
     public List<Form13DG> findByFilingPersonCik(String filingPersonCik) {
-        return findMatching(value -> filingPersonCik != null && filingPersonCik.equals(value.getFilingPersonCik()));
+        return findAllByIndex(INDEX_FILING_PERSON_CIK, filingPersonCik);
     }
 
     @Override
     public Page<Form13DG> findByFilingPersonCik(String filingPersonCik, Pageable pageable) {
-        return findMatching(value -> filingPersonCik != null && filingPersonCik.equals(value.getFilingPersonCik()), pageable);
+        return FilePageSupport.page(findAllByIndex(INDEX_FILING_PERSON_CIK, filingPersonCik), pageable);
     }
 
     @Override
@@ -113,22 +128,22 @@ public class Form13DGFileAdapter extends AbstractFileDataPort<Form13DG> implemen
 
     @Override
     public long countByScheduleType(String scheduleType) {
-        return count(value -> equalsIgnoreCase(value.getScheduleType(), scheduleType));
+        return countByIndex(INDEX_SCHEDULE_TYPE, scheduleType);
     }
 
     @Override
     public boolean existsByAccessionNumber(String accessionNumber) {
-        return exists(value -> accessionNumber != null && accessionNumber.equals(value.getAccessionNumber()));
+        return existsByIndex(INDEX_ACCESSION_NUMBER, accessionNumber);
     }
 
     @Override
     public Page<Form13DG> findAmendments(Pageable pageable) {
-        return findMatching(value -> equalsIgnoreCase(value.getAmendmentType(), "AMENDMENT"), pageable);
+        return FilePageSupport.page(findAllByIndex(INDEX_AMENDMENT_TYPE, "AMENDMENT"), pageable);
     }
 
     @Override
     public Page<Form13DG> findInitialFilings(Pageable pageable) {
-        return findMatching(value -> equalsIgnoreCase(value.getAmendmentType(), "INITIAL"), pageable);
+        return FilePageSupport.page(findAllByIndex(INDEX_AMENDMENT_TYPE, "INITIAL"), pageable);
     }
 
     @Override
@@ -154,10 +169,8 @@ public class Form13DGFileAdapter extends AbstractFileDataPort<Form13DG> implemen
 
     @Override
     public List<OwnershipHistoryEntry> getOwnershipHistory(String filingPersonCik, String issuerCik) {
-        return findMatching(value -> filingPersonCik != null
-                        && filingPersonCik.equals(value.getFilingPersonCik())
-                        && issuerCik != null
-                        && issuerCik.equals(value.getIssuerCik())).stream()
+        return findAllByIndex(INDEX_FILING_PERSON_CIK, filingPersonCik).stream()
+            .filter(value -> issuerCik != null && issuerCik.equals(value.getIssuerCik()))
                 .sorted(Comparator.comparing(Form13DG::getEventDate, LOCAL_DATE_DESC))
                 .map(value -> new OwnershipHistoryEntryView(
                         value.getEventDate(),
@@ -185,7 +198,8 @@ public class Form13DGFileAdapter extends AbstractFileDataPort<Form13DG> implemen
 
     @Override
     public List<Form13DG> getRecentActivistFilings(int limit) {
-        return findMatching(value -> equalsIgnoreCase(value.getScheduleType(), "13D") && value.getPurposeOfTransaction() != null).stream()
+        return findAllByIndex(INDEX_SCHEDULE_TYPE, "13D").stream()
+            .filter(value -> value.getPurposeOfTransaction() != null)
                 .sorted(Comparator.comparing(Form13DG::getEventDate, LOCAL_DATE_DESC))
                 .limit(limit)
                 .toList();

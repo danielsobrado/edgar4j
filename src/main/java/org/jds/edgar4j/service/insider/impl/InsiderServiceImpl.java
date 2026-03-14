@@ -3,9 +3,9 @@ package org.jds.edgar4j.service.insider.impl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jds.edgar4j.model.insider.Insider;
-import org.jds.edgar4j.repository.insider.InsiderRepository;
-import org.jds.edgar4j.repository.insider.InsiderCompanyRelationshipRepository;
-import org.jds.edgar4j.repository.insider.InsiderTransactionRepository;
+import org.jds.edgar4j.port.InsiderCompanyRelationshipDataPort;
+import org.jds.edgar4j.port.InsiderDataPort;
+import org.jds.edgar4j.port.InsiderTransactionDataPort;
 import org.jds.edgar4j.service.insider.InsiderService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,9 +26,9 @@ import java.util.Optional;
 @Transactional
 public class InsiderServiceImpl implements InsiderService {
 
-    private final InsiderRepository insiderRepository;
-    private final InsiderTransactionRepository transactionRepository;
-    private final InsiderCompanyRelationshipRepository relationshipRepository;
+    private final InsiderDataPort insiderRepository;
+    private final InsiderTransactionDataPort transactionRepository;
+    private final InsiderCompanyRelationshipDataPort relationshipRepository;
 
     @Override
     public Insider saveInsider(Insider insider) {

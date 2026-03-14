@@ -45,6 +45,10 @@ public class FileStorageProperties {
         this.flushOnWrite = flushOnWrite;
     }
 
+    public Path resolveBaseDirectory() {
+        return Paths.get(basePath);
+    }
+
     public Path resolveCollectionsDirectory() {
         return Paths.get(basePath).resolve(collectionsPath);
     }

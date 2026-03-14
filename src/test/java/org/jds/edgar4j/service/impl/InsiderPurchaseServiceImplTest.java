@@ -24,7 +24,7 @@ import org.jds.edgar4j.model.CompanyMarketData;
 import org.jds.edgar4j.model.Form4;
 import org.jds.edgar4j.model.Form4Transaction;
 import org.jds.edgar4j.model.MarketCapSource;
-import org.jds.edgar4j.repository.Form4Repository;
+import org.jds.edgar4j.port.Form4DataPort;
 import org.jds.edgar4j.service.CompanyMarketDataService;
 import org.jds.edgar4j.service.Sp500Service;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,7 +43,7 @@ class InsiderPurchaseServiceImplTest {
             ZoneId.systemDefault());
 
     @Mock
-    private Form4Repository form4Repository;
+    private Form4DataPort form4Repository;
 
     @Mock
     private CompanyMarketDataService companyMarketDataService;

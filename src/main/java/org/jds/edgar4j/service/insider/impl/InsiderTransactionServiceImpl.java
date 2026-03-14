@@ -3,7 +3,7 @@ package org.jds.edgar4j.service.insider.impl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jds.edgar4j.model.insider.InsiderTransaction;
-import org.jds.edgar4j.repository.insider.InsiderTransactionRepository;
+import org.jds.edgar4j.port.InsiderTransactionDataPort;
 import org.jds.edgar4j.service.insider.InsiderTransactionService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -30,7 +30,7 @@ import java.util.Optional;
 @Transactional
 public class InsiderTransactionServiceImpl implements InsiderTransactionService {
 
-    private final InsiderTransactionRepository transactionRepository;
+    private final InsiderTransactionDataPort transactionRepository;
 
     @Override
     public InsiderTransaction saveTransaction(InsiderTransaction transaction) {

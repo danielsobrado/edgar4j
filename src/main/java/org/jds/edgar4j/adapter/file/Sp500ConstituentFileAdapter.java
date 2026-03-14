@@ -16,6 +16,8 @@ import org.springframework.stereotype.Component;
 public class Sp500ConstituentFileAdapter extends AbstractFileDataPort<Sp500Constituent>
         implements Sp500ConstituentDataPort {
 
+    private static final String INDEX_TICKER = "ticker";
+
     public Sp500ConstituentFileAdapter(FileStorageEngine storageEngine) {
         super(storageEngine.registerCollection(
                 "sp500_constituents",
@@ -23,16 +25,17 @@ public class Sp500ConstituentFileAdapter extends AbstractFileDataPort<Sp500Const
                 FileFormat.JSON,
                 Sp500Constituent::getId,
                 Sp500Constituent::setId));
+        registerIgnoreCaseIndex(INDEX_TICKER, Sp500Constituent::getTicker);
     }
 
     @Override
     public Optional<Sp500Constituent> findByTickerIgnoreCase(String ticker) {
-        return findFirst(value -> equalsIgnoreCase(value.getTicker(), ticker));
+        return findFirstByIndex(INDEX_TICKER, ticker);
     }
 
     @Override
     public boolean existsByTickerIgnoreCase(String ticker) {
-        return exists(value -> equalsIgnoreCase(value.getTicker(), ticker));
+        return existsByIndex(INDEX_TICKER, ticker);
     }
 
     @Override

@@ -1,141 +1,79 @@
 services:
-  edgar4j-app:
-    image: edgar4j-app-clean
-    container_name: edgar4j-app
-    environment:
-      - SPRING_PROFILES_ACTIVE=docker
-      - SPRING_CLOUD_CONFIG_ENABLED=false
-      - SPRING_MONGODB_URI=mongodb://mongo:27017/edgar
-      - SPRING_MONGODB_DATABASE=edgar
-      - SPRING_DATA_MONGODB_AUTO_INDEX_CREATION=false
-      - MONGODB_AUTO_INDEX_CREATION=false
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/edgar4j
-      - SPRING_DATASOURCE_USERNAME=edgar4j
-      - SPRING_DATASOURCE_PASSWORD=edgar4j
-      - SPRING_DATA_REDIS_HOST=redis
-      - SPRING_DATA_REDIS_PORT=6379
-      - EDGAR4J_SECURITY_ENABLED=false
-      - SPRING_ELASTICSEARCH_URIS=http://elasticsearch:9200
-      - SPRING_DATA_ELASTICSEARCH_CLIENT_REACTIVE_ENDPOINTS=elasticsearch:9200
-      - MANAGEMENT_HEALTH_ELASTICSEARCH_ENABLED=false
-    depends_on:
-      mongo:
-        condition: service_started
-      postgres:
-        condition: service_started
-      elasticsearch:
-        condition: service_started
-      redis:
-        condition: service_healthy
+  edgar4j:
+    build:
+      context: .
+    image: edgar4j:latest
     ports:
       - "8080:8080"
-    restart: unless-stopped
-
-  frontend:
-    image: node:20-alpine
-    container_name: edgar4j-frontend
-    working_dir: /app
-    volumes:
-      - ./frontend:/app
-      - frontend_node_modules:/app/node_modules
     environment:
-      - VITE_API_URL=http://localhost:8080
-    command: sh -c "npm ci && npm run dev -- --host 0.0.0.0 --port 5173"
-    ports:
-      - "5173:5173"
-    depends_on:
-      edgar4j-app:
-        condition: service_healthy
-    restart: unless-stopped
-
-  mongo:
-    image: mongo:7
-    container_name: edgar4j-mongo
-    ports:
-      - "27018:27017"
+      EDGAR4J_RESOURCE_MODE: ${EDGAR4J_RESOURCE_MODE:-high}
+      SEC_USER_AGENT: ${SEC_USER_AGENT:-Edgar4J/1.0 (ops@example.com)}
+      SPRING_CLOUD_CONFIG_ENABLED: "false"
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/edgar4j
+      SPRING_DATASOURCE_USERNAME: edgar4j
+      SPRING_DATASOURCE_PASSWORD: edgar4j
+      SPRING_MONGODB_URI: mongodb://mongodb:27017/edgar
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
     volumes:
-      - mongo_data:/data/db
-    restart: unless-stopped
+      - edgar4j-data:/app/data
+    depends_on:
+      mongodb:
+        condition: service_healthy
+        required: false
+      postgres:
+        condition: service_healthy
+        required: false
+      redis:
+        condition: service_started
+        required: false
+    profiles:
+      - low
+      - high
+
+  mongodb:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    profiles:
+      - high
 
   postgres:
-    image: postgres:15-alpine
-    container_name: edgar4j-postgres
+    image: postgres:16
     environment:
-      - POSTGRES_DB=edgar4j
-      - POSTGRES_USER=edgar4j
-      - POSTGRES_PASSWORD=edgar4j
+      POSTGRES_DB: edgar4j
+      POSTGRES_USER: edgar4j
+      POSTGRES_PASSWORD: edgar4j
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./src/main/resources/db/migration:/docker-entrypoint-initdb.d
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U edgar4j"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    profiles:
+      - high
 
-  elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:7.16.3
-    container_name: edgar4j-elasticsearch
-    environment:
-      - discovery.type=single-node
-      - bootstrap.memory_lock=true
-      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
-    ports:
-      - "9200:9200"
-    volumes:
-      - esdata:/usr/share/elasticsearch/data
-
-  kibana:
-    image: docker.elastic.co/kibana/kibana:7.16.3
-    container_name: edgar4j-kibana
-    depends_on:
-      - elasticsearch
-    ports:
-      - "5601:5601"
-    environment:
-      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
-
-  # Phase 3: Redis Cache for Market Data
   redis:
     image: redis:7-alpine
-    container_name: edgar4j-redis
     ports:
       - "6379:6379"
-    command: redis-server --appendonly yes
     volumes:
-      - redis_data:/data
-    healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-
-  # Redis Commander - Web UI for Redis
-  redis-commander:
-    image: rediscommander/redis-commander:latest
-    container_name: edgar4j-redis-commander
-    environment:
-      - REDIS_HOSTS=local:redis:6379
-    ports:
-      - "8081:8081"
-    depends_on:
-      - redis
-
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: edgar4j-pgadmin
-    environment:
-      - PGADMIN_DEFAULT_EMAIL=admin@edgar4j.com
-      - PGADMIN_DEFAULT_PASSWORD=admin
-    ports:
-      - "5050:80"
-    depends_on:
-      - postgres
+      - redis-data:/data
+    profiles:
+      - high
 
 volumes:
-  postgres_data:
-  esdata:
-  redis_data:
-  mongo_data:
-  frontend_node_modules:
+  edgar4j-data:
+  mongo-data:
+  pg-data:
+  redis-data:

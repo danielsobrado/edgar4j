@@ -3,7 +3,7 @@ package org.jds.edgar4j.service.insider.impl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jds.edgar4j.model.insider.TransactionType;
-import org.jds.edgar4j.repository.insider.TransactionTypeRepository;
+import org.jds.edgar4j.port.TransactionTypeDataPort;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,7 +23,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class TransactionTypeInitService implements CommandLineRunner {
 
-    private final TransactionTypeRepository transactionTypeRepository;
+    private final TransactionTypeDataPort transactionTypeRepository;
 
     @Override
     @Transactional

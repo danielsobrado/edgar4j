@@ -15,6 +15,8 @@ import org.springframework.stereotype.Component;
 public class CompanyMarketDataFileAdapter extends AbstractFileDataPort<CompanyMarketData>
         implements CompanyMarketDataDataPort {
 
+    private static final String INDEX_TICKER = "ticker";
+
     public CompanyMarketDataFileAdapter(FileStorageEngine storageEngine) {
         super(storageEngine.registerCollection(
                 "company_market_data",
@@ -22,11 +24,12 @@ public class CompanyMarketDataFileAdapter extends AbstractFileDataPort<CompanyMa
                 FileFormat.JSON,
                 CompanyMarketData::getId,
                 CompanyMarketData::setId));
+        registerIgnoreCaseIndex(INDEX_TICKER, CompanyMarketData::getTicker);
     }
 
     @Override
     public Optional<CompanyMarketData> findByTickerIgnoreCase(String ticker) {
-        return findFirst(value -> equalsIgnoreCase(value.getTicker(), ticker));
+        return findFirstByIndex(INDEX_TICKER, ticker);
     }
 
     @Override
@@ -34,6 +37,10 @@ public class CompanyMarketDataFileAdapter extends AbstractFileDataPort<CompanyMa
         if (tickers == null || tickers.isEmpty()) {
             return List.of();
         }
-        return findMatching(value -> tickers.stream().anyMatch(ticker -> equalsIgnoreCase(value.getTicker(), ticker)));
+        java.util.LinkedHashMap<String, CompanyMarketData> matches = new java.util.LinkedHashMap<>();
+        for (String ticker : tickers) {
+            findAllByIndex(INDEX_TICKER, ticker).forEach(value -> matches.putIfAbsent(value.getId(), value));
+        }
+        return List.copyOf(matches.values());
     }
 }

@@ -20,6 +20,7 @@ public class Form8KFileAdapter extends AbstractSimpleFilingFileAdapter<Form8K> i
                 FileFormat.JSONL,
                 Form8K::getId,
                 Form8K::setId));
+        registerCommonFilingIndexes();
     }
 
     @Override

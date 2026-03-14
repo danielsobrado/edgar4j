@@ -31,9 +31,9 @@ import org.jds.edgar4j.model.Filling;
 import org.jds.edgar4j.model.FormType;
 import org.jds.edgar4j.model.MarketCapSource;
 import org.jds.edgar4j.model.Ticker;
-import org.jds.edgar4j.repository.CompanyMarketDataRepository;
-import org.jds.edgar4j.repository.CompanyTickerRepository;
-import org.jds.edgar4j.repository.FillingRepository;
+import org.jds.edgar4j.port.CompanyMarketDataDataPort;
+import org.jds.edgar4j.port.CompanyTickerDataPort;
+import org.jds.edgar4j.port.FillingDataPort;
 import org.jds.edgar4j.service.MarketDataService;
 import org.jds.edgar4j.service.provider.MarketDataProvider;
 import org.jds.edgar4j.xbrl.XbrlService;
@@ -58,13 +58,13 @@ import reactor.core.publisher.Mono;
 class CompanyMarketDataServiceImplTest {
 
     @Mock
-    private CompanyMarketDataRepository companyMarketDataRepository;
+    private CompanyMarketDataDataPort companyMarketDataRepository;
 
     @Mock
-    private CompanyTickerRepository companyTickerRepository;
+    private CompanyTickerDataPort companyTickerDataPort;
 
     @Mock
-    private FillingRepository fillingRepository;
+    private FillingDataPort fillingRepository;
 
     @Mock
     private MarketDataService historicalMarketDataService;
@@ -99,7 +99,7 @@ class CompanyMarketDataServiceImplTest {
     void setUp() {
         companyMarketDataService = org.mockito.Mockito.spy(new CompanyMarketDataServiceImpl(
                 companyMarketDataRepository,
-                companyTickerRepository,
+                companyTickerDataPort,
                 fillingRepository,
                 historicalMarketDataService,
                 providerMarketDataService,
@@ -138,7 +138,7 @@ class CompanyMarketDataServiceImplTest {
         when(providerMarketDataService.getCompanyProfile("AAPL"))
                 .thenReturn(CompletableFuture.completedFuture(companyProfile));
         when(companyMarketDataRepository.findByTickerIgnoreCase("AAPL")).thenReturn(Optional.of(existing));
-        when(companyTickerRepository.findByTickerIgnoreCase("AAPL")).thenReturn(Optional.of(
+        when(companyTickerDataPort.findByTickerIgnoreCase("AAPL")).thenReturn(Optional.of(
                 CompanyTicker.builder()
                         .ticker("AAPL")
                         .cikStr(320193L)
@@ -230,7 +230,7 @@ class CompanyMarketDataServiceImplTest {
                                 MarketDataResponse.PriceBar.builder().date(LocalDate.now().minusDays(1)).close(182.4d).build()))
                         .build());
         when(companyMarketDataRepository.findByTickerIgnoreCase("AAPL")).thenReturn(Optional.empty());
-        when(companyTickerRepository.findByTickerIgnoreCase("AAPL")).thenReturn(Optional.of(
+        when(companyTickerDataPort.findByTickerIgnoreCase("AAPL")).thenReturn(Optional.of(
                 CompanyTicker.builder()
                         .ticker("AAPL")
                         .cikStr(320193L)
@@ -267,7 +267,7 @@ class CompanyMarketDataServiceImplTest {
         when(providerMarketDataService.getCompanyProfile("PFE"))
                 .thenReturn(CompletableFuture.completedFuture(companyProfile));
         when(companyMarketDataRepository.findByTickerIgnoreCase("PFE")).thenReturn(Optional.of(existing));
-        when(companyTickerRepository.findByTickerIgnoreCase("PFE")).thenReturn(Optional.empty());
+        when(companyTickerDataPort.findByTickerIgnoreCase("PFE")).thenReturn(Optional.empty());
         when(companyMarketDataRepository.save(any(CompanyMarketData.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         CompanyMarketData marketData = companyMarketDataService.fetchAndSaveQuote("pfe");
@@ -298,7 +298,7 @@ class CompanyMarketDataServiceImplTest {
         when(providerMarketDataService.getCompanyProfile("PANW"))
                 .thenReturn(CompletableFuture.completedFuture(companyProfile));
         when(companyMarketDataRepository.findByTickerIgnoreCase("PANW")).thenReturn(Optional.empty());
-        when(companyTickerRepository.findByTickerIgnoreCase("PANW")).thenReturn(Optional.empty());
+        when(companyTickerDataPort.findByTickerIgnoreCase("PANW")).thenReturn(Optional.empty());
         when(companyMarketDataRepository.save(any(CompanyMarketData.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         CompanyMarketData marketData = companyMarketDataService.fetchAndSaveQuote("panw");
@@ -327,7 +327,7 @@ class CompanyMarketDataServiceImplTest {
         when(providerMarketDataService.getCompanyProfile("OXY"))
                 .thenReturn(CompletableFuture.completedFuture(companyProfile));
         when(companyMarketDataRepository.findByTickerIgnoreCase("OXY")).thenReturn(Optional.empty());
-        when(companyTickerRepository.findByTickerIgnoreCase("OXY")).thenReturn(Optional.of(
+        when(companyTickerDataPort.findByTickerIgnoreCase("OXY")).thenReturn(Optional.of(
                 CompanyTicker.builder()
                         .ticker("OXY")
                         .cikStr(797468L)
@@ -388,7 +388,7 @@ class CompanyMarketDataServiceImplTest {
         when(providerMarketDataService.getCompanyProfile("FSSL"))
                 .thenReturn(CompletableFuture.completedFuture(companyProfile));
         when(companyMarketDataRepository.findByTickerIgnoreCase("FSSL")).thenReturn(Optional.empty());
-        when(companyTickerRepository.findByTickerIgnoreCase("FSSL")).thenReturn(Optional.of(
+        when(companyTickerDataPort.findByTickerIgnoreCase("FSSL")).thenReturn(Optional.of(
                 CompanyTicker.builder()
                         .ticker("FSSL")
                         .cikStr(2_065_812L)
@@ -448,7 +448,7 @@ class CompanyMarketDataServiceImplTest {
         when(providerMarketDataService.getCompanyProfile("FSSL"))
                 .thenReturn(CompletableFuture.completedFuture(companyProfile));
         when(companyMarketDataRepository.findByTickerIgnoreCase("FSSL")).thenReturn(Optional.empty());
-        when(companyTickerRepository.findByTickerIgnoreCase("FSSL"))
+        when(companyTickerDataPort.findByTickerIgnoreCase("FSSL"))
                 .thenReturn(Optional.empty())
                 .thenReturn(Optional.empty());
         when(secApiClient.fetchCompanyTickers()).thenReturn("{\"0\":{\"cik_str\":2065812,\"ticker\":\"FSSL\",\"title\":\"FS Specialty Lending Fund\"}}");
@@ -485,7 +485,7 @@ class CompanyMarketDataServiceImplTest {
         assertEquals("0002065812", marketData.getCik());
         assertEquals(1_398_940_000d, marketData.getMarketCap());
         assertEquals(MarketCapSource.SEC_FILING_XBRL_SHARES_OUTSTANDING, marketData.getMarketCapSource());
-        verify(companyTickerRepository).save(any(CompanyTicker.class));
+        verify(companyTickerDataPort).save(any(CompanyTicker.class));
     }
 
     @Test

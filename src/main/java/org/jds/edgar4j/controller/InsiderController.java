@@ -6,14 +6,15 @@ import org.jds.edgar4j.model.insider.Company;
 import org.jds.edgar4j.model.insider.Insider;
 import org.jds.edgar4j.model.insider.InsiderTransaction;
 import org.jds.edgar4j.model.insider.TransactionType;
-import org.jds.edgar4j.repository.insider.CompanyRepository;
-import org.jds.edgar4j.repository.insider.InsiderRepository;
-import org.jds.edgar4j.repository.insider.InsiderTransactionRepository;
-import org.jds.edgar4j.repository.insider.TransactionTypeRepository;
+import org.jds.edgar4j.port.InsiderCompanyDataPort;
+import org.jds.edgar4j.port.InsiderDataPort;
+import org.jds.edgar4j.port.InsiderTransactionDataPort;
+import org.jds.edgar4j.port.TransactionTypeDataPort;
 import org.jds.edgar4j.service.analytics.InsiderAnalyticsService;
 import org.jds.edgar4j.service.enrichment.CompanyEnrichmentService;
 import org.jds.edgar4j.service.provider.MarketDataProvider;
 import org.jds.edgar4j.service.provider.MarketDataService;
+import org.springframework.context.annotation.Profile;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
@@ -35,14 +36,15 @@ import java.util.concurrent.CompletableFuture;
  */
 @Slf4j
 @RestController
+@Profile("resource-high & !resource-low")
 @RequestMapping("/api/v1/insider")
 @RequiredArgsConstructor
 public class InsiderController {
 
-    private final CompanyRepository companyRepository;
-    private final InsiderRepository insiderRepository;
-    private final InsiderTransactionRepository transactionRepository;
-    private final TransactionTypeRepository transactionTypeRepository;
+    private final InsiderCompanyDataPort companyRepository;
+    private final InsiderDataPort insiderRepository;
+    private final InsiderTransactionDataPort transactionRepository;
+    private final TransactionTypeDataPort transactionTypeRepository;
     
     // Phase 3: Market Data and Analytics Services
     private final MarketDataService marketDataService;

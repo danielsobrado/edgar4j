@@ -4,15 +4,14 @@ import java.util.List;
 import java.util.Optional;
 
 import org.jds.edgar4j.model.Company;
-import org.jds.edgar4j.port.CompanyDataPort;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
-import org.springframework.stereotype.Repository;
+import org.springframework.context.annotation.Profile;
 
-@Repository
-public interface CompanyRepository extends MongoRepository<Company, String>, CompanyDataPort {
+@Profile("resource-high & !resource-low")
+public interface CompanyRepository extends MongoRepository<Company, String> {
 
     Optional<Company> findByCik(String cik);
 
@@ -31,4 +30,3 @@ public interface CompanyRepository extends MongoRepository<Company, String>, Com
 
     long countByTaxonomy(String taxonomy);
 }
-

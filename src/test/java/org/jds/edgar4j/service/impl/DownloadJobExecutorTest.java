@@ -18,7 +18,7 @@ import org.jds.edgar4j.dto.request.RemoteFilingSearchRequest;
 import org.jds.edgar4j.model.DownloadJob;
 import org.jds.edgar4j.model.DownloadJob.JobStatus;
 import org.jds.edgar4j.model.DownloadJob.JobType;
-import org.jds.edgar4j.repository.DownloadJobRepository;
+import org.jds.edgar4j.port.DownloadJobDataPort;
 import org.jds.edgar4j.service.DownloadBulkDataService;
 import org.jds.edgar4j.service.DownloadSubmissionsService;
 import org.jds.edgar4j.service.DownloadTickersService;
@@ -35,7 +35,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class DownloadJobExecutorTest {
 
     @Mock
-    private DownloadJobRepository downloadJobRepository;
+    private DownloadJobDataPort downloadJobRepository;
 
     @Mock
     private DownloadTickersService downloadTickersService;

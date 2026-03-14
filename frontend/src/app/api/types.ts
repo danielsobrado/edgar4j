@@ -363,6 +363,257 @@ export interface MarketPriceHistory {
   prices: MarketPriceBar[];
 }
 
+// Dividend Analysis Types
+export type DividendRating = 'SAFE' | 'STABLE' | 'WATCH' | 'AT_RISK';
+export type DividendAlertSeverity = 'LOW' | 'MEDIUM' | 'HIGH';
+export type DividendMetricConfidence = 'HIGH' | 'MEDIUM' | 'LOW_MEDIUM' | 'LOW';
+export type DividendHistoryTrendDirection = 'UP' | 'FLAT' | 'DOWN' | 'VOLATILE' | 'INSUFFICIENT_DATA';
+export type DividendEventType = 'DECLARATION' | 'SPECIAL' | 'INCREASE' | 'DECREASE' | 'SUSPENSION' | 'REINSTATEMENT' | 'POLICY_CHANGE';
+export type DividendEventDividendType = 'REGULAR' | 'SPECIAL' | 'QUARTERLY' | 'MONTHLY' | 'ANNUAL' | 'INTERIM' | 'UNKNOWN';
+export type DividendEventConfidence = 'HIGH' | 'MEDIUM' | 'LOW';
+
+export interface DividendCompanySummary {
+  cik: string;
+  ticker?: string | null;
+  name?: string | null;
+  sector?: string | null;
+  fiscalYearEnd?: string | null;
+  lastFilingDate?: string | null;
+  dataFreshness?: string | null;
+}
+
+export interface DividendViabilitySummary {
+  rating: DividendRating;
+  activeAlerts: number;
+  score: number;
+}
+
+export interface DividendSnapshot {
+  dpsLatest: number | null;
+  dpsCagr5y: number | null;
+  fcfPayoutRatio: number | null;
+  uninterruptedYears: number | null;
+  consecutiveRaises: number | null;
+  netDebtToEbitda: number | null;
+  interestCoverage: number | null;
+  currentRatio: number | null;
+  fcfMargin: number | null;
+  dividendYield: number | null;
+}
+
+export interface DividendAlert {
+  id: string;
+  severity: DividendAlertSeverity;
+  title: string;
+  description: string;
+}
+
+export interface DividendAlertEvent extends DividendAlert {
+  periodEnd?: string | null;
+  filingDate?: string | null;
+  accessionNumber?: string | null;
+  active: boolean;
+}
+
+export interface DividendCoverage {
+  revenue: number | null;
+  operatingCashFlow: number | null;
+  capitalExpenditures: number | null;
+  freeCashFlow: number | null;
+  dividendsPaid: number | null;
+  cashCoverage: number | null;
+  retainedCash: number | null;
+}
+
+export interface DividendBalance {
+  cash: number | null;
+  grossDebt: number | null;
+  netDebt: number | null;
+  ebitdaProxy: number | null;
+  netDebtToEbitda: number | null;
+  currentRatio: number | null;
+  interestCoverage: number | null;
+}
+
+export interface DividendTrendPoint {
+  periodEnd?: string | null;
+  filingDate?: string | null;
+  accessionNumber?: string | null;
+  dividendsPerShare: number | null;
+  earningsPerShare: number | null;
+}
+
+export interface DividendSourceFiling {
+  formType?: string | null;
+  accessionNumber?: string | null;
+  filingDate?: string | null;
+  url?: string | null;
+}
+
+export interface DividendEvidenceSources {
+  latestAnnualReport?: DividendSourceFiling | null;
+  latestCurrentReport?: DividendSourceFiling | null;
+}
+
+export interface DividendOverview {
+  company: DividendCompanySummary;
+  viability: DividendViabilitySummary;
+  snapshot: DividendSnapshot;
+  confidence: Record<string, DividendMetricConfidence>;
+  alerts: DividendAlert[];
+  coverage: DividendCoverage;
+  balance: DividendBalance;
+  trend: DividendTrendPoint[];
+  evidence: DividendEvidenceSources;
+  referencePrice: number | null;
+  warnings: string[];
+}
+
+export interface DividendHistoryMetricPoint {
+  periodEnd?: string | null;
+  filingDate?: string | null;
+  accessionNumber?: string | null;
+  value: number | null;
+}
+
+export interface DividendHistoryMetricSeries {
+  metric: string;
+  label: string;
+  unit: string;
+  latestValue: number | null;
+  cagr: number | null;
+  volatility: number | null;
+  trend: DividendHistoryTrendDirection;
+  points: DividendHistoryMetricPoint[];
+}
+
+export interface DividendHistoryRow {
+  periodEnd?: string | null;
+  filingDate?: string | null;
+  accessionNumber?: string | null;
+  metrics: Record<string, number | null>;
+}
+
+export interface DividendHistory {
+  company: DividendCompanySummary;
+  period: string;
+  yearsRequested: number;
+  metrics: string[];
+  series: DividendHistoryMetricSeries[];
+  rows: DividendHistoryRow[];
+  warnings: string[];
+}
+
+export interface DividendAlerts {
+  company: DividendCompanySummary;
+  activeOnly: boolean;
+  activeAlerts: DividendAlert[];
+  historicalAlerts: DividendAlertEvent[];
+  warnings: string[];
+}
+
+export interface DividendEvent {
+  id: string;
+  eventType: DividendEventType;
+  formType?: string | null;
+  accessionNumber?: string | null;
+  filedDate?: string | null;
+  declarationDate?: string | null;
+  recordDate?: string | null;
+  payableDate?: string | null;
+  amountPerShare: number | null;
+  dividendType?: DividendEventDividendType | null;
+  confidence: DividendEventConfidence;
+  extractionMethod?: string | null;
+  sourceSection?: string | null;
+  textSnippet?: string | null;
+  policyLanguage?: string | null;
+  url?: string | null;
+}
+
+export interface DividendEvents {
+  company: DividendCompanySummary;
+  events: DividendEvent[];
+  warnings: string[];
+}
+
+export interface DividendMetricDefinition {
+  id: string;
+  label: string;
+  unit: string;
+  formatHint: string;
+  group: string;
+  description: string;
+}
+
+export interface DividendComparisonRow {
+  company: DividendCompanySummary;
+  viability: DividendViabilitySummary;
+  values: Record<string, number | null>;
+  warnings: string[];
+}
+
+export interface DividendComparison {
+  metrics: DividendMetricDefinition[];
+  companies: DividendComparisonRow[];
+  warnings: string[];
+}
+
+export interface DividendScreenMetricRange {
+  min?: number;
+  max?: number;
+}
+
+export interface DividendScreenFilters {
+  metrics?: Record<string, DividendScreenMetricRange>;
+  viabilityRatings?: DividendRating[];
+  sectors?: string[];
+}
+
+export interface DividendScreenRequest {
+  tickersOrCiks?: string[];
+  searchTerm?: string;
+  filters?: DividendScreenFilters;
+  metrics?: string[];
+  sort?: string;
+  direction?: string;
+  page?: number;
+  size?: number;
+  candidateLimit?: number;
+}
+
+export interface DividendScreenResult {
+  company: DividendCompanySummary;
+  viability: DividendViabilitySummary;
+  values: Record<string, number | null>;
+  warnings: string[];
+}
+
+export interface DividendScreen {
+  metrics: DividendMetricDefinition[];
+  results: PaginatedResponse<DividendScreenResult>;
+  candidatesEvaluated: number;
+  warnings: string[];
+}
+
+export interface DividendEvidenceHighlight {
+  id: string;
+  eventType: DividendEventType;
+  confidence: DividendEventConfidence;
+  sourceSection?: string | null;
+  snippet?: string | null;
+  policyLanguage?: string | null;
+}
+
+export interface DividendFilingEvidence {
+  company: DividendCompanySummary;
+  filing?: DividendSourceFiling | null;
+  highlights: DividendEvidenceHighlight[];
+  cleanedText?: string | null;
+  truncated: boolean;
+  warnings: string[];
+}
+
 // Export Types
 export type ExportFormat = 'CSV' | 'JSON';
 

@@ -1,46 +1,33 @@
-# Stage 1: Build
 FROM maven:3.9.12-eclipse-temurin-25-alpine AS builder
 
 WORKDIR /app
 
-# Copy pom.xml and download dependencies (cached layer)
-COPY pom.xml .
-RUN mvn dependency:go-offline -B
-
-# Copy source code and build
+COPY pom.xml ./
 COPY src ./src
-RUN mvn clean package -DskipTests -B
 
-# Stage 2: Runtime
+RUN mvn -q -DskipTests package
+
 FROM eclipse-temurin:25-jre-alpine
 
 WORKDIR /app
 
-# Add non-root user for security
-RUN addgroup -g 1001 -S edgar4j && \
-    adduser -u 1001 -S edgar4j -G edgar4j
+RUN addgroup -S edgar4j && adduser -S edgar4j -G edgar4j
+RUN mkdir -p /app/data
 
-# Copy the built JAR from builder stage
-COPY --from=builder /app/target/*.jar app.jar
+COPY --from=builder /app/target/*.jar /app/app.jar
 
-# Set ownership
 RUN chown -R edgar4j:edgar4j /app
 
-# Switch to non-root user
 USER edgar4j
 
-# Expose port
+VOLUME /app/data
 EXPOSE 8080
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health/readiness || exit 1
-
-# JVM tuning for containers  
 ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
+ENV EDGAR4J_RESOURCE_MODE=high
+ENV SPRING_CLOUD_CONFIG_ENABLED=false
 
-# Activate docker profile (MongoDB URI should be provided via MONGODB_URI env var)
-ENV SPRING_PROFILES_ACTIVE=docker
+HEALTHCHECK --interval=30s --timeout=5s --start-period=45s --retries=5 \
+  CMD wget -qO- http://localhost:8080/actuator/health || exit 1
 
-# Run the application
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/app.jar --edgar4j.resource-mode=${EDGAR4J_RESOURCE_MODE}"]

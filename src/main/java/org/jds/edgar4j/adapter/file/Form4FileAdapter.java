@@ -19,6 +19,10 @@ import org.springframework.stereotype.Component;
 @Profile("resource-low")
 public class Form4FileAdapter extends AbstractFileDataPort<Form4> implements Form4DataPort {
 
+    private static final String INDEX_ACCESSION_NUMBER = "accessionNumber";
+    private static final String INDEX_CIK = "cik";
+    private static final String INDEX_TRADING_SYMBOL = "tradingSymbol";
+
     public Form4FileAdapter(FileStorageEngine storageEngine) {
         super(storageEngine.registerCollection(
                 "form4",
@@ -26,11 +30,14 @@ public class Form4FileAdapter extends AbstractFileDataPort<Form4> implements For
                 FileFormat.JSONL,
                 Form4::getId,
                 Form4::setId));
+        registerExactIndex(INDEX_ACCESSION_NUMBER, Form4::getAccessionNumber);
+        registerExactIndex(INDEX_CIK, Form4::getCik);
+        registerIgnoreCaseIndex(INDEX_TRADING_SYMBOL, Form4::getTradingSymbol);
     }
 
     @Override
     public Optional<Form4> findByAccessionNumber(String accessionNumber) {
-        return findFirst(value -> accessionNumber != null && accessionNumber.equals(value.getAccessionNumber()));
+        return findFirstByIndex(INDEX_ACCESSION_NUMBER, accessionNumber);
     }
 
     @Override
@@ -38,17 +45,21 @@ public class Form4FileAdapter extends AbstractFileDataPort<Form4> implements For
         if (accessionNumbers == null || accessionNumbers.isEmpty()) {
             return List.of();
         }
-        return findMatching(value -> accessionNumbers.contains(value.getAccessionNumber()));
+        java.util.LinkedHashMap<String, Form4> matches = new java.util.LinkedHashMap<>();
+        for (String accessionNumber : accessionNumbers) {
+            findAllByIndex(INDEX_ACCESSION_NUMBER, accessionNumber).forEach(value -> matches.putIfAbsent(value.getId(), value));
+        }
+        return List.copyOf(matches.values());
     }
 
     @Override
     public Page<Form4> findByTradingSymbol(String tradingSymbol, Pageable pageable) {
-        return findMatching(value -> equalsIgnoreCase(value.getTradingSymbol(), tradingSymbol), pageable);
+        return org.jds.edgar4j.storage.file.FilePageSupport.page(findAllByIndex(INDEX_TRADING_SYMBOL, tradingSymbol), pageable);
     }
 
     @Override
     public Page<Form4> findByCik(String cik, Pageable pageable) {
-        return findMatching(value -> cik != null && cik.equals(value.getCik()), pageable);
+        return org.jds.edgar4j.storage.file.FilePageSupport.page(findAllByIndex(INDEX_CIK, cik), pageable);
     }
 
     @Override
@@ -87,7 +98,7 @@ public class Form4FileAdapter extends AbstractFileDataPort<Form4> implements For
 
     @Override
     public boolean existsByAccessionNumber(String accessionNumber) {
-        return exists(value -> accessionNumber != null && accessionNumber.equals(value.getAccessionNumber()));
+        return existsByIndex(INDEX_ACCESSION_NUMBER, accessionNumber);
     }
 
     private boolean between(LocalDate value, LocalDate startDate, LocalDate endDate) {

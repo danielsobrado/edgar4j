@@ -20,6 +20,7 @@ public class Form20FFileAdapter extends AbstractSimpleFilingFileAdapter<Form20F>
                 FileFormat.JSONL,
                 Form20F::getId,
                 Form20F::setId));
+        registerCommonFilingIndexes();
     }
 
     @Override

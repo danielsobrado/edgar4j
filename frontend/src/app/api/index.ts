@@ -20,6 +20,7 @@ export { form6kApi } from './endpoints/form6k';
 export { remoteEdgarApi } from './endpoints/remoteEdgar';
 export { marketDataApi } from './endpoints/marketData';
 export { insiderPurchasesApi } from './endpoints/insiderPurchases';
+export { dividendApi } from './endpoints/dividend';
 export type {
   XbrlSummary,
   SecFilingMetadata,

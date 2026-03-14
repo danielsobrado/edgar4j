@@ -1,6 +1,7 @@
 package org.jds.edgar4j.storage.file;
 
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
@@ -33,6 +34,24 @@ public class FileStorageEngine {
         collections.values().forEach(FileCollection::flush);
     }
 
+    public FileStorageProperties getProperties() {
+        return properties;
+    }
+
+    public List<String> getRegisteredCollectionNames() {
+        return collections.keySet().stream().sorted().toList();
+    }
+
+    public int getRegisteredCollectionCount() {
+        return collections.size();
+    }
+
+    public long getTotalRecordsInMemory() {
+        return collections.values().stream()
+                .mapToLong(FileCollection::count)
+                .sum();
+    }
+
     private <T> FileCollection<T> createCollection(
             String name,
             Class<T> type,
@@ -48,6 +67,7 @@ public class FileStorageEngine {
                 format,
                 idGetter,
                 idSetter,
+            properties.isIndexOnStartup(),
                 properties.isFlushOnWrite());
     }
 }

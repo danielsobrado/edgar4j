@@ -30,8 +30,8 @@ import org.jds.edgar4j.model.Form5;
 import org.jds.edgar4j.model.Form6K;
 import org.jds.edgar4j.model.Form8K;
 import org.jds.edgar4j.model.FormType;
-import org.jds.edgar4j.repository.AppSettingsRepository;
-import org.jds.edgar4j.repository.FillingRepository;
+import org.jds.edgar4j.port.AppSettingsDataPort;
+import org.jds.edgar4j.port.FillingDataPort;
 import org.jds.edgar4j.service.DownloadSubmissionsService;
 import org.jds.edgar4j.service.Form13DGService;
 import org.jds.edgar4j.service.Form13FService;
@@ -59,10 +59,10 @@ class RealtimeFilingSyncJobTest {
     private DownloadSubmissionsService downloadSubmissionsService;
 
     @Mock
-    private FillingRepository fillingRepository;
+    private FillingDataPort fillingRepository;
 
     @Mock
-    private AppSettingsRepository appSettingsRepository;
+    private AppSettingsDataPort appSettingsRepository;
 
     @Mock
     private Form3Service form3Service;
