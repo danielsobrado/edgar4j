@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Database, Search, Building2, Download, Settings, LayoutDashboard, Radio, Briefcase, Users, FileText, UserPlus, FileCheck, Globe, FileBarChart, TrendingUp, ChevronDown, Bell, ShoppingCart } from 'lucide-react';
+import { Database, Search, Building2, Download, Settings, LayoutDashboard, Radio, Briefcase, Users, FileText, UserPlus, FileCheck, Globe, FileBarChart, TrendingUp, ChevronDown, Bell, ShoppingCart, LineChart } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -9,7 +9,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   const primaryNavItems = [
     { path: '/', label: 'Dashboard', icon: LayoutDashboard },
-    { path: '/insider-purchases', label: 'Insider Buys', icon: ShoppingCart },
     { path: '/search', label: 'Search', icon: Search },
     { path: '/companies', label: 'Companies', icon: Building2 },
     { path: '/remote-edgar', label: 'Remote', icon: Radio },
@@ -28,6 +27,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { path: '/form13dg', label: '13D/G', icon: Users },
   ]), [location.pathname, searchParams]);
 
+  const analysisNavItems = React.useMemo(() => ([
+    { path: '/companies', label: 'Fundamentals', icon: LineChart },
+    { path: '/insider-purchases', label: 'Insider Buys', icon: ShoppingCart },
+  ]), []);
+
   const secondaryNavItems = [
     { path: '/alerts', label: 'Alerts', icon: Bell },
     { path: '/downloads', label: 'Downloads', icon: Download },
@@ -37,6 +41,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const isFormActive = React.useMemo(
     () => formNavItems.some(item => item.isActive ?? location.pathname === item.path),
     [formNavItems, location.pathname]
+  );
+  const isAnalysisActive = React.useMemo(
+    () => analysisNavItems.some(item => item.path === '/companies'
+      ? location.pathname.startsWith('/companies')
+      : location.pathname === item.path),
+    [analysisNavItems, location.pathname]
   );
   const navItems = [...primaryNavItems, ...secondaryNavItems];
   
@@ -102,6 +112,35 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 </DropdownMenuContent>
               </DropdownMenu>
 
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className={`flex items-center gap-2 px-3 py-2 rounded-md transition-colors shrink-0 whitespace-nowrap ${
+                      isAnalysisActive
+                        ? 'bg-white/10 text-white'
+                        : 'text-gray-300 hover:bg-white/5 hover:text-white'
+                    }`}
+                  >
+                    <LineChart className="w-4 h-4" />
+                    <span>Analysis</span>
+                    <ChevronDown className="w-4 h-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-52">
+                  {analysisNavItems.map(item => {
+                    const Icon = item.icon;
+                    return (
+                      <DropdownMenuItem key={item.path} asChild>
+                        <Link to={item.path} className="flex items-center gap-2">
+                          <Icon className="w-4 h-4" />
+                          <span>{item.label}</span>
+                        </Link>
+                      </DropdownMenuItem>
+                    );
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
               {secondaryNavItems.map(item => {
                 const Icon = item.icon;
                 const isActive = location.pathname === item.path;
@@ -109,14 +148,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   <Link
                     key={item.path}
                     to={item.path}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-md transition-colors shrink-0 whitespace-nowrap ${
+                    aria-label={item.label}
+                    title={item.label}
+                    className={`flex h-10 w-10 items-center justify-center rounded-md transition-colors shrink-0 ${
                       isActive 
                         ? 'bg-white/10 text-white' 
                         : 'text-gray-300 hover:bg-white/5 hover:text-white'
                     }`}
                   >
                     <Icon className="w-4 h-4" />
-                    <span>{item.label}</span>
+                    <span className="sr-only">{item.label}</span>
                   </Link>
                 );
               })}
@@ -171,6 +212,32 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   return (
                     <DropdownMenuItem key={item.to ?? item.path} asChild>
                       <Link to={item.to ?? item.path} className="flex items-center gap-2">
+                        <Icon className="w-4 h-4" />
+                        <span>{item.label}</span>
+                      </Link>
+                    </DropdownMenuItem>
+                  );
+                })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className={`flex flex-col items-center gap-1 py-3 ${
+                    isAnalysisActive ? 'text-white' : 'text-gray-400'
+                  }`}
+                >
+                  <LineChart className="w-5 h-5" />
+                  <span className="text-xs">Analysis</span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-48">
+                {analysisNavItems.map(item => {
+                  const Icon = item.icon;
+                  return (
+                    <DropdownMenuItem key={item.path} asChild>
+                      <Link to={item.path} className="flex items-center gap-2">
                         <Icon className="w-4 h-4" />
                         <span>{item.label}</span>
                       </Link>
