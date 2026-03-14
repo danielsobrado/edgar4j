@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Optional;
 
 import org.jds.edgar4j.model.Company;
+import org.jds.edgar4j.port.CompanyDataPort;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
@@ -11,7 +12,7 @@ import org.springframework.data.mongodb.repository.Query;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface CompanyRepository extends MongoRepository<Company, String> {
+public interface CompanyRepository extends MongoRepository<Company, String>, CompanyDataPort {
 
     Optional<Company> findByCik(String cik);
 

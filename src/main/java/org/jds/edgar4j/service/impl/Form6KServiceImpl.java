@@ -9,7 +9,7 @@ import java.util.concurrent.CompletableFuture;
 import org.jds.edgar4j.integration.Form6KParser;
 import org.jds.edgar4j.integration.SecApiClient;
 import org.jds.edgar4j.model.Form6K;
-import org.jds.edgar4j.repository.Form6KRepository;
+import org.jds.edgar4j.port.Form6KDataPort;
 import org.jds.edgar4j.service.Form6KService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -28,7 +28,7 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class Form6KServiceImpl implements Form6KService {
 
-    private final Form6KRepository form6KRepository;
+    private final Form6KDataPort form6KRepository;
     private final Form6KParser form6KParser;
     private final SecApiClient secApiClient;
 
@@ -94,6 +94,16 @@ public class Form6KServiceImpl implements Form6KService {
         if (form6KList == null || form6KList.isEmpty()) {
             return List.of();
         }
+        AccessionedFilingBulkSaveSupport.alignExistingIds(
+                form6KList,
+                Form6K::getAccessionNumber,
+                form6KRepository::findByAccessionNumber,
+                (current, existing) -> {
+                    current.setId(existing.getId());
+                    if (current.getCreatedAt() == null) {
+                        current.setCreatedAt(existing.getCreatedAt());
+                    }
+                });
         Instant now = Instant.now();
         for (Form6K f : form6KList) {
             if (f.getCreatedAt() == null) f.setCreatedAt(now);

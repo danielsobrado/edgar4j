@@ -8,7 +8,7 @@ import java.util.stream.Collectors;
 import org.jds.edgar4j.model.Ticker;
 import org.jds.edgar4j.integration.SecApiClient;
 import org.jds.edgar4j.integration.SecResponseParser;
-import org.jds.edgar4j.repository.TickerRepository;
+import org.jds.edgar4j.port.TickerDataPort;
 import org.jds.edgar4j.service.DownloadTickersService;
 import org.springframework.stereotype.Service;
 
@@ -27,7 +27,7 @@ public class DownloadTickersServiceImpl implements DownloadTickersService {
 
     private final SecApiClient secApiClient;
     private final SecResponseParser responseParser;
-    private final TickerRepository tickerRepository;
+    private final TickerDataPort tickerRepository;
 
     @Override
     public int downloadTickers() {

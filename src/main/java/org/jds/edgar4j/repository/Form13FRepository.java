@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Optional;
 
 import org.jds.edgar4j.model.Form13F;
+import org.jds.edgar4j.port.Form13FDataPort;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.Aggregation;
@@ -16,7 +17,7 @@ import org.springframework.stereotype.Repository;
  * Repository for Form 13F SEC filings (institutional holdings).
  */
 @Repository
-public interface Form13FRepository extends MongoRepository<Form13F, String> {
+public interface Form13FRepository extends MongoRepository<Form13F, String>, Form13FDataPort {
 
     // Find by accession number (unique identifier)
     Optional<Form13F> findByAccessionNumber(String accessionNumber);

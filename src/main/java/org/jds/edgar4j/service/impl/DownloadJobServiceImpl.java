@@ -12,8 +12,8 @@ import org.jds.edgar4j.dto.response.DownloadSummaryResponse;
 import org.jds.edgar4j.model.DownloadJob;
 import org.jds.edgar4j.model.DownloadJob.JobStatus;
 import org.jds.edgar4j.model.DownloadJob.JobType;
-import org.jds.edgar4j.repository.DownloadJobRepository;
-import org.jds.edgar4j.repository.TickerRepository;
+import org.jds.edgar4j.port.DownloadJobDataPort;
+import org.jds.edgar4j.port.TickerDataPort;
 import org.jds.edgar4j.service.DownloadJobService;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -26,8 +26,8 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class DownloadJobServiceImpl implements DownloadJobService {
 
-    private final DownloadJobRepository downloadJobRepository;
-    private final TickerRepository tickerRepository;
+    private final DownloadJobDataPort downloadJobRepository;
+    private final TickerDataPort tickerRepository;
     private final DownloadJobExecutor downloadJobExecutor;
 
     @Override

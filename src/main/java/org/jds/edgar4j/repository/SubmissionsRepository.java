@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Optional;
 
 import org.jds.edgar4j.model.Submissions;
+import org.jds.edgar4j.port.SubmissionsDataPort;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
@@ -11,7 +12,7 @@ import org.springframework.data.mongodb.repository.Query;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface SubmissionsRepository extends MongoRepository<Submissions, String> {
+public interface SubmissionsRepository extends MongoRepository<Submissions, String>, SubmissionsDataPort {
 
     Optional<Submissions> findByCik(String cik);
 

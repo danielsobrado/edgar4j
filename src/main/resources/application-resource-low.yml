@@ -1,0 +1,52 @@
+spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.data.mongodb.autoconfigure.DataMongoAutoConfiguration
+      - org.springframework.boot.data.mongodb.autoconfigure.DataMongoRepositoriesAutoConfiguration
+      - org.springframework.boot.data.mongodb.autoconfigure.DataMongoReactiveAutoConfiguration
+      - org.springframework.boot.data.mongodb.autoconfigure.DataMongoReactiveRepositoriesAutoConfiguration
+      - org.springframework.boot.mongodb.autoconfigure.MongoAutoConfiguration
+      - org.springframework.boot.mongodb.autoconfigure.MongoReactiveAutoConfiguration
+      - org.springframework.boot.data.elasticsearch.autoconfigure.DataElasticsearchAutoConfiguration
+      - org.springframework.boot.data.elasticsearch.autoconfigure.DataElasticsearchRepositoriesAutoConfiguration
+      - org.springframework.boot.data.elasticsearch.autoconfigure.DataElasticsearchReactiveRepositoriesAutoConfiguration
+      - org.springframework.boot.elasticsearch.autoconfigure.ElasticsearchClientAutoConfiguration
+      - org.springframework.boot.elasticsearch.autoconfigure.ElasticsearchRestClientAutoConfiguration
+  datasource:
+    url: jdbc:h2:file:${edgar4j.storage.file.base-path:./data}/batch/edgar4j;MODE=PostgreSQL;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  data:
+    mongodb:
+      repositories:
+        enabled: false
+    redis:
+      repositories:
+        enabled: false
+    elasticsearch:
+      repositories:
+        enabled: false
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+  batch:
+    jdbc:
+      initialize-schema: always
+  cache:
+    type: caffeine
+
+logging:
+  level:
+    org.jds.edgar4j.adapter.file: INFO
+
+edgar4j:
+  storage:
+    file:
+      base-path: ${EDGAR4J_DATA_PATH:./data}
+      collections-path: collections
+      index-on-startup: true
+      flush-on-write: true

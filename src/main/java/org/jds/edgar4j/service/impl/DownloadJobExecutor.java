@@ -8,7 +8,7 @@ import org.jds.edgar4j.dto.request.DownloadRequest;
 import org.jds.edgar4j.dto.request.RemoteFilingSearchRequest;
 import org.jds.edgar4j.model.DownloadJob;
 import org.jds.edgar4j.model.DownloadJob.JobStatus;
-import org.jds.edgar4j.repository.DownloadJobRepository;
+import org.jds.edgar4j.port.DownloadJobDataPort;
 import org.jds.edgar4j.service.DownloadBulkDataService;
 import org.jds.edgar4j.service.DownloadSubmissionsService;
 import org.jds.edgar4j.service.DownloadTickersService;
@@ -24,7 +24,7 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class DownloadJobExecutor {
 
-    private final DownloadJobRepository downloadJobRepository;
+    private final DownloadJobDataPort downloadJobRepository;
     private final DownloadTickersService downloadTickersService;
     private final DownloadSubmissionsService downloadSubmissionsService;
     private final DownloadBulkDataService downloadBulkDataService;

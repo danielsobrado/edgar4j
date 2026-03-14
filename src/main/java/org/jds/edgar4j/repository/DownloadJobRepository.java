@@ -6,13 +6,14 @@ import java.util.Optional;
 import org.jds.edgar4j.model.DownloadJob;
 import org.jds.edgar4j.model.DownloadJob.JobStatus;
 import org.jds.edgar4j.model.DownloadJob.JobType;
+import org.jds.edgar4j.port.DownloadJobDataPort;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface DownloadJobRepository extends MongoRepository<DownloadJob, String> {
+public interface DownloadJobRepository extends MongoRepository<DownloadJob, String>, DownloadJobDataPort {
 
     List<DownloadJob> findByStatus(JobStatus status);
 

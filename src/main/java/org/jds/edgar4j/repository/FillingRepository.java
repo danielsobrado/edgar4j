@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Optional;
 
 import org.jds.edgar4j.model.Filling;
+import org.jds.edgar4j.port.FillingDataPort;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
@@ -12,7 +13,7 @@ import org.springframework.data.mongodb.repository.Query;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface FillingRepository extends MongoRepository<Filling, String> {
+public interface FillingRepository extends MongoRepository<Filling, String>, FillingDataPort {
 
     List<Filling> findByCik(String cik);
 

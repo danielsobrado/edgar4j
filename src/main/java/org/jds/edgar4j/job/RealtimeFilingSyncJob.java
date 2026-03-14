@@ -31,8 +31,8 @@ import org.jds.edgar4j.model.Form4;
 import org.jds.edgar4j.model.Form5;
 import org.jds.edgar4j.model.Form6K;
 import org.jds.edgar4j.model.Form8K;
-import org.jds.edgar4j.repository.AppSettingsRepository;
-import org.jds.edgar4j.repository.FillingRepository;
+import org.jds.edgar4j.port.AppSettingsDataPort;
+import org.jds.edgar4j.port.FillingDataPort;
 import org.jds.edgar4j.service.DownloadSubmissionsService;
 import org.jds.edgar4j.service.Form13DGService;
 import org.jds.edgar4j.service.Form13FService;
@@ -64,8 +64,8 @@ public class RealtimeFilingSyncJob {
 
     private final SecApiClient secApiClient;
     private final DownloadSubmissionsService downloadSubmissionsService;
-    private final FillingRepository fillingRepository;
-    private final AppSettingsRepository appSettingsRepository;
+    private final FillingDataPort fillingRepository;
+    private final AppSettingsDataPort appSettingsRepository;
     private final Form3Service form3Service;
     private final Form4Service form4Service;
     private final Form5Service form5Service;
@@ -91,8 +91,8 @@ public class RealtimeFilingSyncJob {
     public RealtimeFilingSyncJob(
             SecApiClient secApiClient,
             DownloadSubmissionsService downloadSubmissionsService,
-            FillingRepository fillingRepository,
-            AppSettingsRepository appSettingsRepository,
+            FillingDataPort fillingRepository,
+            AppSettingsDataPort appSettingsRepository,
             Form3Service form3Service,
             Form4Service form4Service,
             Form5Service form5Service,

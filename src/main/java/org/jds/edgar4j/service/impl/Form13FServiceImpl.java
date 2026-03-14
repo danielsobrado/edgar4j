@@ -12,6 +12,7 @@ import org.jds.edgar4j.integration.Form13FParser;
 import org.jds.edgar4j.integration.SecApiClient;
 import org.jds.edgar4j.model.Form13F;
 import org.jds.edgar4j.model.Form13FHolding;
+import org.jds.edgar4j.port.Form13FDataPort;
 import org.jds.edgar4j.repository.Form13FRepository;
 import org.jds.edgar4j.repository.Form13FRepository.FilerSummary;
 import org.jds.edgar4j.repository.Form13FRepository.HoldingSummary;
@@ -34,7 +35,7 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class Form13FServiceImpl implements Form13FService {
 
-    private final Form13FRepository form13FRepository;
+    private final Form13FDataPort form13FRepository;
     private final Form13FParser form13FParser;
     private final SecApiClient secApiClient;
 
@@ -109,7 +110,15 @@ public class Form13FServiceImpl implements Form13FService {
 
     @Override
     public List<Form13F> saveAll(List<Form13F> form13FList) {
+        if (form13FList == null || form13FList.isEmpty()) {
+            return List.of();
+        }
         log.info("Saving {} Form 13F filings", form13FList.size());
+        AccessionedFilingBulkSaveSupport.alignExistingIds(
+                form13FList,
+                Form13F::getAccessionNumber,
+                form13FRepository::findByAccessionNumber,
+                (current, existing) -> current.setId(existing.getId()));
         return form13FRepository.saveAll(form13FList);
     }
 

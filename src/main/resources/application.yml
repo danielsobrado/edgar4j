@@ -4,6 +4,17 @@ server:
 spring:
   application:
     name: edgar4j
+  profiles:
+    active: ${EDGAR4J_RESOURCE_MODE:high}
+    group:
+      low:
+        - resource-low
+      high:
+        - resource-high
+      test:
+        - resource-high
+      test-low:
+        - resource-low
   cloud:
     config:
       enabled: ${SPRING_CLOUD_CONFIG_ENABLED:false}
@@ -72,6 +83,7 @@ spring:
       pool:
         size: 5
 edgar4j:
+    resource-mode: ${EDGAR4J_RESOURCE_MODE:high}
     sec:
         user-agent: ${SEC_USER_AGENT:}
     urls:

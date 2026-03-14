@@ -29,6 +29,7 @@ import org.mockito.Answers;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.springframework.data.mongodb.core.MongoTemplate;
 
 @ExtendWith(MockitoExtension.class)
@@ -60,9 +61,11 @@ class SettingsServiceImplTest {
                 appSettingsRepository,
                 marketDataProviderProperties,
                 tiingoEnvProperties);
+        StaticListableBeanFactory beanFactory = new StaticListableBeanFactory();
+        beanFactory.addBean("mongoTemplate", mongoTemplate);
         settingsService = new SettingsServiceImpl(
                 appSettingsRepository,
-                mongoTemplate,
+                beanFactory.getBeanProvider(MongoTemplate.class),
                 tiingoEnvProperties,
                 edgar4JProperties,
                 marketDataProviderProperties,

@@ -1,8 +1,8 @@
 package org.jds.edgar4j.job;
 
-import org.jds.edgar4j.repository.CompanyRepository;
-import org.jds.edgar4j.repository.FillingRepository;
-import org.jds.edgar4j.repository.TickerRepository;
+import org.jds.edgar4j.port.CompanyDataPort;
+import org.jds.edgar4j.port.FillingDataPort;
+import org.jds.edgar4j.port.TickerDataPort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,9 +22,9 @@ public class DataIntegrityJob {
 
     private static final Logger log = LoggerFactory.getLogger(DataIntegrityJob.class);
 
-    private final CompanyRepository companyRepository;
-    private final FillingRepository fillingRepository;
-    private final TickerRepository tickerRepository;
+    private final CompanyDataPort companyRepository;
+    private final FillingDataPort fillingRepository;
+    private final TickerDataPort tickerRepository;
     private final AtomicBoolean isRunning = new AtomicBoolean(false);
 
     private Map<String, Object> lastReport = new HashMap<>();
@@ -33,9 +33,9 @@ public class DataIntegrityJob {
     @Value("${edgar4j.jobs.data-integrity.enabled:true}")
     private boolean enabled;
 
-    public DataIntegrityJob(CompanyRepository companyRepository,
-                            FillingRepository fillingRepository,
-                            TickerRepository tickerRepository) {
+    public DataIntegrityJob(CompanyDataPort companyRepository,
+                            FillingDataPort fillingRepository,
+                            TickerDataPort tickerRepository) {
         this.companyRepository = companyRepository;
         this.fillingRepository = fillingRepository;
         this.tickerRepository = tickerRepository;

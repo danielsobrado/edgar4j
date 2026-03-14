@@ -10,8 +10,8 @@ import org.jds.edgar4j.dto.response.CompanyResponse;
 import org.jds.edgar4j.dto.response.PaginatedResponse;
 import org.jds.edgar4j.model.CompanyTicker;
 import org.jds.edgar4j.model.Submissions;
-import org.jds.edgar4j.repository.CompanyTickerRepository;
-import org.jds.edgar4j.repository.SubmissionsRepository;
+import org.jds.edgar4j.port.CompanyTickerDataPort;
+import org.jds.edgar4j.port.SubmissionsDataPort;
 import org.jds.edgar4j.service.CompanyService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -36,8 +36,8 @@ public class CompanyServiceImpl implements CompanyService {
     );
     private static final String DEFAULT_SORT_FIELD = "name";
 
-    private final SubmissionsRepository    submissionsRepository;
-    private final CompanyTickerRepository  companyTickerRepository;
+    private final SubmissionsDataPort      submissionsRepository;
+    private final CompanyTickerDataPort    companyTickerRepository;
 
     // ─── Company search ───────────────────────────────────────────────────────
 

@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Optional;
 
 import org.jds.edgar4j.model.Form5;
+import org.jds.edgar4j.port.Form5DataPort;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
@@ -15,7 +16,7 @@ import org.springframework.stereotype.Repository;
  * Repository for Form 5 SEC filings.
  */
 @Repository
-public interface Form5Repository extends MongoRepository<Form5, String> {
+public interface Form5Repository extends MongoRepository<Form5, String>, Form5DataPort {
 
     Optional<Form5> findByAccessionNumber(String accessionNumber);
 

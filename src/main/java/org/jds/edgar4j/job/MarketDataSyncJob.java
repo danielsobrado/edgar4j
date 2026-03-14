@@ -12,7 +12,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.jds.edgar4j.dto.response.MarketCapBackfillResponse;
 import org.jds.edgar4j.model.Form4;
 import org.jds.edgar4j.model.Form4Transaction;
-import org.jds.edgar4j.repository.Form4Repository;
+import org.jds.edgar4j.port.Form4DataPort;
 import org.jds.edgar4j.service.CompanyMarketDataService;
 import org.jds.edgar4j.service.Sp500Service;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,7 +28,7 @@ public class MarketDataSyncJob {
 
     private final CompanyMarketDataService companyMarketDataService;
     private final Sp500Service sp500Service;
-    private final Form4Repository form4Repository;
+    private final Form4DataPort form4Repository;
     private final boolean enabled;
     private final int batchSize;
     private final AtomicBoolean isRunning = new AtomicBoolean(false);
@@ -37,7 +37,7 @@ public class MarketDataSyncJob {
     public MarketDataSyncJob(
             CompanyMarketDataService companyMarketDataService,
             Sp500Service sp500Service,
-            Form4Repository form4Repository,
+            Form4DataPort form4Repository,
             @Value("${edgar4j.jobs.market-data-sync.enabled:true}") boolean enabled,
             @Value("${edgar4j.jobs.market-data-sync.batch-size:50}") int batchSize) {
         this.companyMarketDataService = companyMarketDataService;

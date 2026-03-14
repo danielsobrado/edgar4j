@@ -9,8 +9,8 @@ import org.jds.edgar4j.model.Submissions;
 import org.jds.edgar4j.integration.SecApiClient;
 import org.jds.edgar4j.integration.SecResponseParser;
 import org.jds.edgar4j.integration.model.SecSubmissionResponse;
-import org.jds.edgar4j.repository.FillingRepository;
-import org.jds.edgar4j.repository.SubmissionsRepository;
+import org.jds.edgar4j.port.FillingDataPort;
+import org.jds.edgar4j.port.SubmissionsDataPort;
 import org.jds.edgar4j.service.DownloadSubmissionsService;
 import org.springframework.stereotype.Service;
 
@@ -29,8 +29,8 @@ public class DownloadSubmissionsServiceImpl implements DownloadSubmissionsServic
 
     private final SecApiClient secApiClient;
     private final SecResponseParser responseParser;
-    private final SubmissionsRepository submissionsRepository;
-    private final FillingRepository fillingRepository;
+    private final SubmissionsDataPort submissionsRepository;
+    private final FillingDataPort fillingRepository;
 
     @Override
     public long downloadSubmissions(String cik) {

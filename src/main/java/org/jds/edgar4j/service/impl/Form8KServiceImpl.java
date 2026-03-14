@@ -9,7 +9,7 @@ import java.util.concurrent.CompletableFuture;
 import org.jds.edgar4j.integration.Form8KParser;
 import org.jds.edgar4j.integration.SecApiClient;
 import org.jds.edgar4j.model.Form8K;
-import org.jds.edgar4j.repository.Form8KRepository;
+import org.jds.edgar4j.port.Form8KDataPort;
 import org.jds.edgar4j.service.Form8KService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -28,7 +28,7 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class Form8KServiceImpl implements Form8KService {
 
-    private final Form8KRepository form8KRepository;
+    private final Form8KDataPort form8KRepository;
     private final Form8KParser form8KParser;
     private final SecApiClient secApiClient;
 
@@ -94,6 +94,16 @@ public class Form8KServiceImpl implements Form8KService {
         if (form8KList == null || form8KList.isEmpty()) {
             return List.of();
         }
+        AccessionedFilingBulkSaveSupport.alignExistingIds(
+                form8KList,
+                Form8K::getAccessionNumber,
+                form8KRepository::findByAccessionNumber,
+                (current, existing) -> {
+                    current.setId(existing.getId());
+                    if (current.getCreatedAt() == null) {
+                        current.setCreatedAt(existing.getCreatedAt());
+                    }
+                });
         Instant now = Instant.now();
         for (Form8K f : form8KList) {
             if (f.getCreatedAt() == null) f.setCreatedAt(now);

@@ -4,8 +4,8 @@ import java.time.Duration;
 
 import org.jds.edgar4j.config.TiingoEnvProperties;
 import org.jds.edgar4j.model.AppSettings;
+import org.jds.edgar4j.port.AppSettingsDataPort;
 import org.jds.edgar4j.properties.MarketDataProviderProperties;
-import org.jds.edgar4j.repository.AppSettingsRepository;
 import org.springframework.stereotype.Component;
 
 import lombok.RequiredArgsConstructor;
@@ -17,7 +17,7 @@ public class MarketDataProviderSettingsResolver {
     private static final String DEFAULT_SETTINGS_ID = "default";
     private static final String DEFAULT_TIINGO_BASE_URL = "https://api.tiingo.com";
 
-    private final AppSettingsRepository appSettingsRepository;
+    private final AppSettingsDataPort appSettingsRepository;
     private final MarketDataProviderProperties properties;
     private final TiingoEnvProperties tiingoEnvProperties;
 

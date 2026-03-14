@@ -5,6 +5,7 @@ import java.util.Optional;
 
 import org.jds.edgar4j.model.Exchange;
 import org.jds.edgar4j.model.Ticker;
+import org.jds.edgar4j.port.TickerDataPort;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
@@ -12,7 +13,7 @@ import org.springframework.data.mongodb.repository.Query;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface TickerRepository extends MongoRepository<Ticker, String> {
+public interface TickerRepository extends MongoRepository<Ticker, String>, TickerDataPort {
 
     Optional<Ticker> findByCode(String code);
 

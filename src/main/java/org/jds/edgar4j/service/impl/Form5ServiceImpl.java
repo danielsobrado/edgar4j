@@ -9,7 +9,7 @@ import java.util.concurrent.CompletableFuture;
 import org.jds.edgar4j.integration.Form5Parser;
 import org.jds.edgar4j.integration.SecApiClient;
 import org.jds.edgar4j.model.Form5;
-import org.jds.edgar4j.repository.Form5Repository;
+import org.jds.edgar4j.port.Form5DataPort;
 import org.jds.edgar4j.service.Form5Service;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -28,7 +28,7 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class Form5ServiceImpl implements Form5Service {
 
-    private final Form5Repository form5Repository;
+    private final Form5DataPort form5Repository;
     private final Form5Parser form5Parser;
     private final SecApiClient secApiClient;
 
@@ -92,6 +92,16 @@ public class Form5ServiceImpl implements Form5Service {
         if (form5List == null || form5List.isEmpty()) {
             return List.of();
         }
+        AccessionedFilingBulkSaveSupport.alignExistingIds(
+                form5List,
+                Form5::getAccessionNumber,
+                form5Repository::findByAccessionNumber,
+                (current, existing) -> {
+                    current.setId(existing.getId());
+                    if (current.getCreatedAt() == null) {
+                        current.setCreatedAt(existing.getCreatedAt());
+                    }
+                });
         Instant now = Instant.now();
         for (Form5 f : form5List) {
             if (f.getCreatedAt() == null) f.setCreatedAt(now);

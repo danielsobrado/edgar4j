@@ -8,12 +8,13 @@ import org.jds.edgar4j.dto.request.SettingsRequest;
 import org.jds.edgar4j.dto.response.SettingsResponse;
 import org.jds.edgar4j.integration.SecUserAgentPolicy;
 import org.jds.edgar4j.model.AppSettings;
+import org.jds.edgar4j.port.AppSettingsDataPort;
 import org.jds.edgar4j.properties.Edgar4JProperties;
 import org.jds.edgar4j.properties.MarketDataProviderProperties;
-import org.jds.edgar4j.repository.AppSettingsRepository;
 import org.jds.edgar4j.service.SettingsService;
 import org.jds.edgar4j.service.provider.MarketDataProviderSettingsResolver;
 import org.jds.edgar4j.service.provider.MarketDataProviders;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.stereotype.Service;
@@ -34,8 +35,8 @@ public class SettingsServiceImpl implements SettingsService {
     private static final int DEFAULT_REALTIME_SYNC_PAGE_SIZE = 100;
     private static final String MASKED_SECRET_VALUE = "********";
 
-    private final AppSettingsRepository appSettingsRepository;
-    private final MongoTemplate mongoTemplate;
+    private final AppSettingsDataPort appSettingsRepository;
+    private final ObjectProvider<MongoTemplate> mongoTemplateProvider;
     private final TiingoEnvProperties tiingoEnvProperties;
     private final Edgar4JProperties edgar4JProperties;
     private final MarketDataProviderProperties marketDataProviderProperties;
@@ -138,6 +139,15 @@ public class SettingsServiceImpl implements SettingsService {
 
     @Override
     public SettingsResponse.ConnectionStatus checkMongoDbConnection() {
+        MongoTemplate mongoTemplate = mongoTemplateProvider.getIfAvailable();
+        if (mongoTemplate == null) {
+            return SettingsResponse.ConnectionStatus.builder()
+                    .connected(false)
+                    .message("MongoDB is disabled in low resource mode")
+                    .latencyMs(-1)
+                    .build();
+        }
+
         try {
             long startTime = System.currentTimeMillis();
             mongoTemplate.getDb().runCommand(new org.bson.Document("ping", 1));

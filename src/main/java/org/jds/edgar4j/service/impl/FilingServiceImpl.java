@@ -10,9 +10,9 @@ import org.jds.edgar4j.dto.response.FilingDetailResponse;
 import org.jds.edgar4j.dto.response.FilingResponse;
 import org.jds.edgar4j.dto.response.PaginatedResponse;
 import org.jds.edgar4j.model.Filling;
-import org.jds.edgar4j.repository.CompanyTickerRepository;
-import org.jds.edgar4j.repository.FillingRepository;
-import org.jds.edgar4j.repository.TickerRepository;
+import org.jds.edgar4j.port.CompanyTickerDataPort;
+import org.jds.edgar4j.port.FillingDataPort;
+import org.jds.edgar4j.port.TickerDataPort;
 import org.jds.edgar4j.service.FilingService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -27,9 +27,9 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class FilingServiceImpl implements FilingService {
 
-    private final FillingRepository fillingRepository;
-    private final CompanyTickerRepository companyTickerRepository;
-    private final TickerRepository tickerRepository;
+    private final FillingDataPort fillingRepository;
+    private final CompanyTickerDataPort companyTickerRepository;
+    private final TickerDataPort tickerRepository;
 
     @Override
     public PaginatedResponse<FilingResponse> searchFilings(FilingSearchRequest request) {

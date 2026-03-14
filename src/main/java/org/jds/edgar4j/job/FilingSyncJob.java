@@ -1,7 +1,7 @@
 package org.jds.edgar4j.job;
 
 import org.jds.edgar4j.model.Company;
-import org.jds.edgar4j.repository.CompanyRepository;
+import org.jds.edgar4j.port.CompanyDataPort;
 import org.jds.edgar4j.service.DownloadSubmissionsService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,7 +24,7 @@ public class FilingSyncJob {
 
     private static final Logger log = LoggerFactory.getLogger(FilingSyncJob.class);
 
-    private final CompanyRepository companyRepository;
+    private final CompanyDataPort companyRepository;
     private final DownloadSubmissionsService downloadSubmissionsService;
     private final AtomicBoolean isRunning = new AtomicBoolean(false);
     private final AtomicInteger processedCount = new AtomicInteger(0);
@@ -39,7 +39,7 @@ public class FilingSyncJob {
     @Value("${edgar4j.jobs.filing-sync.delay-between-companies-ms:1000}")
     private long delayBetweenCompanies;
 
-    public FilingSyncJob(CompanyRepository companyRepository,
+    public FilingSyncJob(CompanyDataPort companyRepository,
                          DownloadSubmissionsService downloadSubmissionsService) {
         this.companyRepository = companyRepository;
         this.downloadSubmissionsService = downloadSubmissionsService;

@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Optional;
 
 import org.jds.edgar4j.model.Form8K;
+import org.jds.edgar4j.port.Form8KDataPort;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
@@ -15,7 +16,7 @@ import org.springframework.stereotype.Repository;
  * Repository for Form 8-K SEC filings.
  */
 @Repository
-public interface Form8KRepository extends MongoRepository<Form8K, String> {
+public interface Form8KRepository extends MongoRepository<Form8K, String>, Form8KDataPort {
 
     Optional<Form8K> findByAccessionNumber(String accessionNumber);
 

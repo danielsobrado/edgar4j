@@ -9,7 +9,7 @@ import java.util.concurrent.CompletableFuture;
 import org.jds.edgar4j.integration.Form3Parser;
 import org.jds.edgar4j.integration.SecApiClient;
 import org.jds.edgar4j.model.Form3;
-import org.jds.edgar4j.repository.Form3Repository;
+import org.jds.edgar4j.port.Form3DataPort;
 import org.jds.edgar4j.service.Form3Service;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -28,7 +28,7 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class Form3ServiceImpl implements Form3Service {
 
-    private final Form3Repository form3Repository;
+    private final Form3DataPort form3Repository;
     private final Form3Parser form3Parser;
     private final SecApiClient secApiClient;
 
@@ -92,6 +92,16 @@ public class Form3ServiceImpl implements Form3Service {
         if (form3List == null || form3List.isEmpty()) {
             return List.of();
         }
+        AccessionedFilingBulkSaveSupport.alignExistingIds(
+                form3List,
+                Form3::getAccessionNumber,
+                form3Repository::findByAccessionNumber,
+                (current, existing) -> {
+                    current.setId(existing.getId());
+                    if (current.getCreatedAt() == null) {
+                        current.setCreatedAt(existing.getCreatedAt());
+                    }
+                });
         Instant now = Instant.now();
         for (Form3 f : form3List) {
             if (f.getCreatedAt() == null) f.setCreatedAt(now);

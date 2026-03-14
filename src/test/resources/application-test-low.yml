@@ -1,0 +1,8 @@
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+
+edgar4j:
+  security:
+    enabled: false

@@ -21,7 +21,7 @@ import org.jds.edgar4j.model.CompanyMarketData;
 import org.jds.edgar4j.model.Form4;
 import org.jds.edgar4j.model.Form4Transaction;
 import org.jds.edgar4j.model.MarketCapSource;
-import org.jds.edgar4j.repository.Form4Repository;
+import org.jds.edgar4j.port.Form4DataPort;
 import org.jds.edgar4j.service.CompanyMarketDataService;
 import org.jds.edgar4j.service.InsiderPurchaseService;
 import org.jds.edgar4j.service.Sp500Service;
@@ -40,21 +40,21 @@ public class InsiderPurchaseServiceImpl implements InsiderPurchaseService {
     private static final int DEFAULT_PAGE_SIZE = 50;
     private static final String DEFAULT_SORT_BY = "percentChange";
 
-    private final Form4Repository form4Repository;
+    private final Form4DataPort form4Repository;
     private final CompanyMarketDataService companyMarketDataService;
     private final Sp500Service sp500Service;
     private final Clock clock;
 
     @Autowired
     public InsiderPurchaseServiceImpl(
-            Form4Repository form4Repository,
+            Form4DataPort form4Repository,
             CompanyMarketDataService companyMarketDataService,
             Sp500Service sp500Service) {
         this(form4Repository, companyMarketDataService, sp500Service, Clock.systemDefaultZone());
     }
 
     InsiderPurchaseServiceImpl(
-            Form4Repository form4Repository,
+            Form4DataPort form4Repository,
             CompanyMarketDataService companyMarketDataService,
             Sp500Service sp500Service,
             Clock clock) {

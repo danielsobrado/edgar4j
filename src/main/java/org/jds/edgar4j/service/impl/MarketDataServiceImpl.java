@@ -35,7 +35,7 @@ import static java.time.temporal.TemporalAdjusters.lastInMonth;
 import org.jds.edgar4j.config.TiingoEnvProperties;
 import org.jds.edgar4j.dto.response.MarketDataResponse;
 import org.jds.edgar4j.model.AppSettings;
-import org.jds.edgar4j.repository.AppSettingsRepository;
+import org.jds.edgar4j.port.AppSettingsDataPort;
 import org.jds.edgar4j.service.MarketDataService;
 import org.jds.edgar4j.service.SettingsService;
 import org.jds.edgar4j.service.provider.MarketDataProvider;
@@ -59,7 +59,7 @@ public class MarketDataServiceImpl implements MarketDataService {
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ISO_LOCAL_DATE;
     private static final Duration TIINGO_TIMEOUT = Duration.ofSeconds(30);
 
-    private final AppSettingsRepository appSettingsRepository;
+    private final AppSettingsDataPort appSettingsRepository;
     private final SettingsService settingsService;
     private final ObjectMapper objectMapper;
     private final TiingoEnvProperties tiingoEnvProperties;

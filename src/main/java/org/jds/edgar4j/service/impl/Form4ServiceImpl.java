@@ -30,9 +30,9 @@ import org.jds.edgar4j.model.Filling;
 import org.jds.edgar4j.model.Form4;
 import org.jds.edgar4j.storage.DownloadedResourceStore;
 import org.jds.edgar4j.model.Ticker;
-import org.jds.edgar4j.repository.FillingRepository;
-import org.jds.edgar4j.repository.Form4Repository;
-import org.jds.edgar4j.repository.TickerRepository;
+import org.jds.edgar4j.port.FillingDataPort;
+import org.jds.edgar4j.port.Form4DataPort;
+import org.jds.edgar4j.port.TickerDataPort;
 import org.jds.edgar4j.service.Form4Service;
 import org.jds.edgar4j.service.SettingsService;
 import org.springframework.beans.factory.annotation.Value;
@@ -59,12 +59,12 @@ public class Form4ServiceImpl implements Form4Service {
 
     private static final String CACHE_NAMESPACE = "sec-filings";
 
-    private final Form4Repository form4Repository;
+    private final Form4DataPort form4Repository;
     private final Form4Parser form4Parser;
     private final SettingsService settingsService;
     private final SecApiClient secApiClient;
-    private final TickerRepository tickerRepository;
-    private final FillingRepository fillingRepository;
+    private final TickerDataPort tickerRepository;
+    private final FillingDataPort fillingRepository;
     private final DownloadedResourceStore downloadedResourceStore;
     private final HttpClient httpClient;
 
@@ -188,6 +188,17 @@ public class Form4ServiceImpl implements Form4Service {
         if (form4List == null || form4List.isEmpty()) {
             return List.of();
         }
+
+        AccessionedFilingBulkSaveSupport.alignExistingIds(
+                form4List,
+                Form4::getAccessionNumber,
+                form4Repository::findByAccessionNumber,
+                (current, existing) -> {
+                    current.setId(existing.getId());
+                    if (current.getCreatedAt() == null) {
+                        current.setCreatedAt(existing.getCreatedAt());
+                    }
+                });
 
         Instant now = Instant.now();
         form4List.forEach(f -> {

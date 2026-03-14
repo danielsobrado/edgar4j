@@ -28,9 +28,9 @@ import org.jds.edgar4j.model.CompanyTicker;
 import org.jds.edgar4j.model.Filling;
 import org.jds.edgar4j.model.MarketCapSource;
 import org.jds.edgar4j.model.Ticker;
-import org.jds.edgar4j.repository.CompanyMarketDataRepository;
-import org.jds.edgar4j.repository.CompanyTickerRepository;
-import org.jds.edgar4j.repository.FillingRepository;
+import org.jds.edgar4j.port.CompanyMarketDataDataPort;
+import org.jds.edgar4j.port.CompanyTickerDataPort;
+import org.jds.edgar4j.port.FillingDataPort;
 import org.jds.edgar4j.service.CompanyMarketDataService;
 import org.jds.edgar4j.service.MarketDataService;
 import org.jds.edgar4j.service.provider.MarketDataProvider;
@@ -72,9 +72,9 @@ public class CompanyMarketDataServiceImpl implements CompanyMarketDataService {
             "6-K",
             "6-K/A");
 
-    private final CompanyMarketDataRepository marketDataRepository;
-    private final CompanyTickerRepository companyTickerRepository;
-    private final FillingRepository fillingRepository;
+    private final CompanyMarketDataDataPort marketDataRepository;
+    private final CompanyTickerDataPort companyTickerRepository;
+    private final FillingDataPort fillingRepository;
     private final MarketDataService historicalMarketDataService;
     private final org.jds.edgar4j.service.provider.MarketDataService providerMarketDataService;
     private final CacheManager cacheManager;

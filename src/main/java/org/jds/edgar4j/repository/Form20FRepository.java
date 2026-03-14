@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Optional;
 
 import org.jds.edgar4j.model.Form20F;
+import org.jds.edgar4j.port.Form20FDataPort;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
@@ -15,7 +16,7 @@ import org.springframework.stereotype.Repository;
  * Repository for Form 20-F SEC filings.
  */
 @Repository
-public interface Form20FRepository extends MongoRepository<Form20F, String> {
+public interface Form20FRepository extends MongoRepository<Form20F, String>, Form20FDataPort {
 
     Optional<Form20F> findByAccessionNumber(String accessionNumber);
 

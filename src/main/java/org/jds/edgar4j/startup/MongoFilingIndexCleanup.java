@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.jds.edgar4j.model.Filling;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.context.annotation.Profile;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.index.IndexInfo;
 import org.springframework.data.mongodb.core.index.IndexOperations;
@@ -14,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Component
+@Profile("resource-high")
 @RequiredArgsConstructor
 public class MongoFilingIndexCleanup implements ApplicationRunner {
 

@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Optional;
 
 import org.jds.edgar4j.model.Form6K;
+import org.jds.edgar4j.port.Form6KDataPort;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
@@ -15,7 +16,7 @@ import org.springframework.stereotype.Repository;
  * Repository for Form 6-K SEC filings.
  */
 @Repository
-public interface Form6KRepository extends MongoRepository<Form6K, String> {
+public interface Form6KRepository extends MongoRepository<Form6K, String>, Form6KDataPort {
 
     Optional<Form6K> findByAccessionNumber(String accessionNumber);
 

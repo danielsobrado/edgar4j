@@ -9,7 +9,7 @@ import java.util.concurrent.CompletableFuture;
 import org.jds.edgar4j.integration.Form20FParser;
 import org.jds.edgar4j.integration.SecApiClient;
 import org.jds.edgar4j.model.Form20F;
-import org.jds.edgar4j.repository.Form20FRepository;
+import org.jds.edgar4j.port.Form20FDataPort;
 import org.jds.edgar4j.service.Form20FService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -28,7 +28,7 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class Form20FServiceImpl implements Form20FService {
 
-    private final Form20FRepository form20FRepository;
+    private final Form20FDataPort form20FRepository;
     private final Form20FParser form20FParser;
     private final SecApiClient secApiClient;
 
@@ -98,6 +98,16 @@ public class Form20FServiceImpl implements Form20FService {
         if (form20FList == null || form20FList.isEmpty()) {
             return List.of();
         }
+        AccessionedFilingBulkSaveSupport.alignExistingIds(
+                form20FList,
+                Form20F::getAccessionNumber,
+                form20FRepository::findByAccessionNumber,
+                (current, existing) -> {
+                    current.setId(existing.getId());
+                    if (current.getCreatedAt() == null) {
+                        current.setCreatedAt(existing.getCreatedAt());
+                    }
+                });
         Instant now = Instant.now();
         for (Form20F f : form20FList) {
             if (f.getCreatedAt() == null) f.setCreatedAt(now);

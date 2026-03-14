@@ -10,6 +10,7 @@ import java.util.concurrent.CompletableFuture;
 import org.jds.edgar4j.integration.Form13DGParser;
 import org.jds.edgar4j.integration.SecApiClient;
 import org.jds.edgar4j.model.Form13DG;
+import org.jds.edgar4j.port.Form13DGDataPort;
 import org.jds.edgar4j.repository.Form13DGRepository;
 import org.jds.edgar4j.repository.Form13DGRepository.BeneficialOwnerSummary;
 import org.jds.edgar4j.repository.Form13DGRepository.OwnerPortfolioEntry;
@@ -33,7 +34,7 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class Form13DGServiceImpl implements Form13DGService {
 
-    private final Form13DGRepository form13DGRepository;
+    private final Form13DGDataPort form13DGRepository;
     private final Form13DGParser form13DGParser;
     private final SecApiClient secApiClient;
 
@@ -92,7 +93,15 @@ public class Form13DGServiceImpl implements Form13DGService {
 
     @Override
     public List<Form13DG> saveAll(List<Form13DG> form13DGList) {
+        if (form13DGList == null || form13DGList.isEmpty()) {
+            return List.of();
+        }
         log.info("Saving {} Schedule 13D/G filings", form13DGList.size());
+        AccessionedFilingBulkSaveSupport.alignExistingIds(
+                form13DGList,
+                Form13DG::getAccessionNumber,
+                form13DGRepository::findByAccessionNumber,
+                (current, existing) -> current.setId(existing.getId()));
         return form13DGRepository.saveAll(form13DGList);
     }
 

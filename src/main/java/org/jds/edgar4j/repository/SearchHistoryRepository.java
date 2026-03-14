@@ -4,11 +4,12 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import org.jds.edgar4j.model.SearchHistory;
+import org.jds.edgar4j.port.SearchHistoryDataPort;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface SearchHistoryRepository extends MongoRepository<SearchHistory, String> {
+public interface SearchHistoryRepository extends MongoRepository<SearchHistory, String>, SearchHistoryDataPort {
 
     List<SearchHistory> findTop10ByOrderByTimestampDesc();
 

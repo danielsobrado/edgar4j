@@ -1,6 +1,7 @@
 package org.jds.edgar4j.repository;
 
 import org.jds.edgar4j.model.CompanyTicker;
+import org.jds.edgar4j.port.CompanyTickerDataPort;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
 import org.springframework.stereotype.Repository;
@@ -15,7 +16,7 @@ import java.util.Optional;
  * {@code submissions} documents.
  */
 @Repository
-public interface CompanyTickerRepository extends MongoRepository<CompanyTicker, String> {
+public interface CompanyTickerRepository extends MongoRepository<CompanyTicker, String>, CompanyTickerDataPort {
 
     /** Find by exact ticker (case-sensitive, as stored in the collection). */
     Optional<CompanyTicker> findByTicker(String ticker);

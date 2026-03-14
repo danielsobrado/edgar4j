@@ -1,0 +1,46 @@
+package org.jds.edgar4j.adapter.file;
+
+import java.util.List;
+import java.util.Optional;
+
+import org.jds.edgar4j.model.Submissions;
+import org.jds.edgar4j.port.SubmissionsDataPort;
+import org.jds.edgar4j.storage.file.FileFormat;
+import org.jds.edgar4j.storage.file.FileStorageEngine;
+import org.springframework.context.annotation.Profile;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Component;
+
+@Component
+@Profile("resource-low")
+public class SubmissionsFileAdapter extends AbstractFileDataPort<Submissions> implements SubmissionsDataPort {
+
+    public SubmissionsFileAdapter(FileStorageEngine storageEngine) {
+        super(storageEngine.registerCollection(
+                "submissions",
+                Submissions.class,
+                FileFormat.JSONL,
+                Submissions::getId,
+                Submissions::setId));
+    }
+
+    @Override
+    public Optional<Submissions> findByCik(String cik) {
+        return findFirst(value -> cik != null && cik.equals(value.getCik()));
+    }
+
+    @Override
+    public Page<Submissions> searchByCompanyNameOrCik(String searchTerm, Pageable pageable) {
+        return findMatching(value ->
+                (value.getCompanyName() != null && containsIgnoreCase(value.getCompanyName(), searchTerm))
+                        || (searchTerm != null && searchTerm.equals(value.getCik())), pageable);
+    }
+
+    @Override
+    public List<Submissions> findByTickersContaining(String ticker) {
+        return findMatching(value -> value.getTickers() != null
+                && ticker != null
+                && value.getTickers().stream().anyMatch(existingTicker -> existingTicker != null && existingTicker.equalsIgnoreCase(ticker)));
+    }
+}

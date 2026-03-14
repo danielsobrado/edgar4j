@@ -18,8 +18,8 @@ import java.util.stream.Collectors;
 import org.jds.edgar4j.config.CacheConfig;
 import org.jds.edgar4j.model.CompanyTicker;
 import org.jds.edgar4j.model.Sp500Constituent;
-import org.jds.edgar4j.repository.CompanyTickerRepository;
-import org.jds.edgar4j.repository.Sp500ConstituentRepository;
+import org.jds.edgar4j.port.CompanyTickerDataPort;
+import org.jds.edgar4j.port.Sp500ConstituentDataPort;
 import org.jds.edgar4j.service.SettingsService;
 import org.jds.edgar4j.service.Sp500Service;
 import org.jsoup.Jsoup;
@@ -55,8 +55,8 @@ public class Sp500ServiceImpl implements Sp500Service {
     private static final DateTimeFormatter SHORT_MONTH_DATE_FORMAT =
             DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.ENGLISH);
 
-    private final Sp500ConstituentRepository sp500Repository;
-    private final CompanyTickerRepository companyTickerRepository;
+    private final Sp500ConstituentDataPort sp500Repository;
+    private final CompanyTickerDataPort companyTickerRepository;
     private final SettingsService settingsService;
 
     @Override

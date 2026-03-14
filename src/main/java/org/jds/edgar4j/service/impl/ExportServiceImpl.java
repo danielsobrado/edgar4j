@@ -19,7 +19,7 @@ import org.jds.edgar4j.dto.request.FilingSearchRequest;
 import org.jds.edgar4j.dto.response.FilingResponse;
 import org.jds.edgar4j.dto.response.PaginatedResponse;
 import org.jds.edgar4j.model.Filling;
-import org.jds.edgar4j.repository.FillingRepository;
+import org.jds.edgar4j.port.FillingDataPort;
 import org.jds.edgar4j.service.ExportService;
 import org.jds.edgar4j.service.FilingService;
 import org.springframework.beans.factory.annotation.Value;
@@ -36,7 +36,7 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class ExportServiceImpl implements ExportService {
 
-    private final FillingRepository fillingRepository;
+    private final FillingDataPort fillingRepository;
     private final FilingService filingService;
     private final ObjectMapper objectMapper;
 

@@ -8,9 +8,9 @@ import org.jds.edgar4j.dto.response.DashboardStatsResponse;
 import org.jds.edgar4j.dto.response.FilingResponse;
 import org.jds.edgar4j.dto.response.RecentSearchResponse;
 import org.jds.edgar4j.model.SearchHistory;
-import org.jds.edgar4j.repository.FillingRepository;
-import org.jds.edgar4j.repository.SearchHistoryRepository;
-import org.jds.edgar4j.repository.SubmissionsRepository;
+import org.jds.edgar4j.port.FillingDataPort;
+import org.jds.edgar4j.port.SearchHistoryDataPort;
+import org.jds.edgar4j.port.SubmissionsDataPort;
 import org.jds.edgar4j.service.DashboardService;
 import org.jds.edgar4j.service.FilingService;
 import org.springframework.stereotype.Service;
@@ -23,9 +23,9 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class DashboardServiceImpl implements DashboardService {
 
-    private final FillingRepository fillingRepository;
-    private final SubmissionsRepository submissionsRepository;
-    private final SearchHistoryRepository searchHistoryRepository;
+    private final FillingDataPort fillingRepository;
+    private final SubmissionsDataPort submissionsRepository;
+    private final SearchHistoryDataPort searchHistoryRepository;
     private final FilingService filingService;
 
     @Override
