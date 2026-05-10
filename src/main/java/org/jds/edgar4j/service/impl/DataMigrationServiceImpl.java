@@ -378,7 +378,7 @@ public class DataMigrationServiceImpl implements DataMigrationService {
         return handlers;
     }
 
-        private <T> void registerJsonl(
+    private <T> void registerJsonl(
             String name,
             FileFormat format,
             Class<T> type,
@@ -569,10 +569,7 @@ public class DataMigrationServiceImpl implements DataMigrationService {
         }
 
         private long exportCsv(Path outputFile) throws IOException {
-            if (csvCodec == null) {
-                throw new UnsupportedOperationException("No CSV codec registered for " + name);
-            }
-
+            requireCsvCodec();
             List<T> records = pagingRepository.findAll(PageRequest.of(0, Integer.MAX_VALUE)).getContent();
             try (BufferedWriter writer = Files.newBufferedWriter(outputFile, StandardCharsets.UTF_8)) {
                 writer.write(String.join(",", csvCodec.headers()));
@@ -586,9 +583,7 @@ public class DataMigrationServiceImpl implements DataMigrationService {
         }
 
         private long importCsv(Path inputFile) throws IOException {
-            if (csvCodec == null) {
-                throw new UnsupportedOperationException("No CSV codec registered for " + name);
-            }
+            requireCsvCodec();
 
             List<T> batch = new ArrayList<>(PAGE_SIZE);
             long totalRecords = 0;
@@ -615,6 +610,13 @@ public class DataMigrationServiceImpl implements DataMigrationService {
                 crudRepository.saveAll(batch);
             }
             return totalRecords;
+        }
+
+        private void requireCsvCodec() {
+            if (csvCodec == null) {
+                throw new IllegalStateException(
+                        "CSV codec is required for collection '" + name + "' but was not registered");
+            }
         }
     }
 
