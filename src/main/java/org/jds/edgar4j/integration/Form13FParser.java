@@ -432,6 +432,14 @@ public class Form13FParser {
         try {
             // Handle different date formats
             String cleaned = dateStr.trim();
+            String dateOnly = cleaned.length() >= 10 ? cleaned.substring(0, 10) : cleaned;
+            if (dateOnly.length() >= 10 && dateOnly.charAt(4) == '-' && dateOnly.charAt(7) == '-') {
+                LocalDate dashedDate = parseWithFormatter(dateOnly, "yyyy-MM-dd");
+                if (dashedDate != null) {
+                    return dashedDate;
+                }
+            }
+
             if (cleaned.contains("/")) {
                 LocalDate slashDate = parseWithFormatter(cleaned, "MM/dd/yyyy");
                 if (slashDate != null) {

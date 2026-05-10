@@ -458,6 +458,13 @@ public class Form13DGParser {
         }
         try {
             String cleaned = dateStr.trim();
+            String dateOnly = cleaned.length() >= 10 ? cleaned.substring(0, 10) : cleaned;
+            if (dateOnly.length() >= 10 && dateOnly.charAt(4) == '-' && dateOnly.charAt(7) == '-') {
+                LocalDate dashedDate = parseWithFormatter(dateOnly, DATE_FORMATTER);
+                if (dashedDate != null) {
+                    return dashedDate;
+                }
+            }
 
             // Try standard format first: yyyy-MM-dd
             if (cleaned.length() == 10 && cleaned.contains("-")) {

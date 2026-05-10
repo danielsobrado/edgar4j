@@ -99,9 +99,7 @@ public class StreamingXbrlParser {
             Map<String, XbrlUnit> units = new HashMap<>();
             Map<String, String> namespaces = new HashMap<>();
 
-            try {
-                XMLStreamReader reader = xmlInputFactory.createXMLStreamReader(inputStream);
-
+            try (XMLStreamReader reader = xmlInputFactory.createXMLStreamReader(inputStream)) {
                 while (reader.hasNext()) {
                     int event = reader.next();
 
@@ -142,8 +140,6 @@ public class StreamingXbrlParser {
                         }
                     }
                 }
-
-                reader.close();
             } catch (XMLStreamException e) {
                 log.error("Error parsing metadata: {}", e.getMessage());
             }
@@ -164,9 +160,7 @@ public class StreamingXbrlParser {
         return Mono.fromCallable(() -> {
             AtomicInteger count = new AtomicInteger(0);
 
-            try {
-                XMLStreamReader reader = xmlInputFactory.createXMLStreamReader(inputStream);
-
+            try (XMLStreamReader reader = xmlInputFactory.createXMLStreamReader(inputStream)) {
                 while (reader.hasNext()) {
                     int event = reader.next();
 
@@ -177,8 +171,6 @@ public class StreamingXbrlParser {
                         }
                     }
                 }
-
-                reader.close();
             } catch (XMLStreamException e) {
                 log.error("Error counting facts: {}", e.getMessage());
             }
@@ -207,9 +199,7 @@ public class StreamingXbrlParser {
         AtomicInteger factCount = new AtomicInteger(0);
         AtomicInteger errorCount = new AtomicInteger(0);
 
-        try {
-            XMLStreamReader reader = xmlInputFactory.createXMLStreamReader(inputStream);
-
+        try (XMLStreamReader reader = xmlInputFactory.createXMLStreamReader(inputStream)) {
             while (reader.hasNext()) {
                 int event = reader.next();
 
@@ -273,8 +263,6 @@ public class StreamingXbrlParser {
                     }
                 }
             }
-
-            reader.close();
 
         } catch (XMLStreamException e) {
             log.error("Stream parsing error: {}", e.getMessage());

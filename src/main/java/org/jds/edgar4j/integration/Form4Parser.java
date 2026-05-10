@@ -496,8 +496,21 @@ public class Form4Parser {
         if (dateStr == null || dateStr.trim().isEmpty()) {
             return null;
         }
+
+        String trimmed = dateStr.trim();
+
         try {
-            return LocalDate.parse(dateStr.trim(), DATE_FORMAT);
+            return LocalDate.parse(trimmed, DATE_FORMAT);
+        } catch (DateTimeParseException ignored) {
+            if (trimmed.length() < 10) {
+                log.warn("Failed to parse date: {}", dateStr);
+                return null;
+            }
+        }
+
+        String dateOnly = trimmed.substring(0, Math.min(trimmed.length(), 10));
+        try {
+            return LocalDate.parse(dateOnly, DATE_FORMAT);
         } catch (DateTimeParseException e) {
             log.warn("Failed to parse date: {}", dateStr);
             return null;
