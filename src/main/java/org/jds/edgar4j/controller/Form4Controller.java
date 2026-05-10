@@ -119,7 +119,9 @@ public class Form4Controller {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        PageRequest pageRequest = PaginationUtils.pageRequest(page, size, "transactionDate");
+        int safePage = PaginationUtils.normalizePage(page);
+        int safeSize = PaginationUtils.normalizeSize(size);
+        PageRequest pageRequest = PaginationUtils.pageRequest(safePage, safeSize, "transactionDate");
         Page<Form4> results = form4Service.findByCik(cik, pageRequest);
         return ResponseEntity.ok(results);
     }
@@ -149,7 +151,9 @@ public class Form4Controller {
             if (!isValidDateRange(start, end)) {
                 return ResponseEntity.badRequest().build();
             }
-            PageRequest pageRequest = PaginationUtils.pageRequest(page, size, "transactionDate");
+            int safePage = PaginationUtils.normalizePage(page);
+            int safeSize = PaginationUtils.normalizeSize(size);
+            PageRequest pageRequest = PaginationUtils.pageRequest(safePage, safeSize, "transactionDate");
             Page<Form4> results = form4Service.findByDateRange(start, end, pageRequest);
             return ResponseEntity.ok(results);
         } catch (DateTimeParseException e) {
@@ -175,7 +179,9 @@ public class Form4Controller {
             if (!isValidDateRange(start, end)) {
                 return ResponseEntity.badRequest().build();
             }
-            PageRequest pageRequest = PaginationUtils.pageRequest(page, size, "transactionDate");
+            int safePage = PaginationUtils.normalizePage(page);
+            int safeSize = PaginationUtils.normalizeSize(size);
+            PageRequest pageRequest = PaginationUtils.pageRequest(safePage, safeSize, "transactionDate");
             Page<Form4> results = form4Service.findBySymbolAndDateRange(symbol.toUpperCase(), start, end, pageRequest);
             return ResponseEntity.ok(results);
         } catch (DateTimeParseException e) {

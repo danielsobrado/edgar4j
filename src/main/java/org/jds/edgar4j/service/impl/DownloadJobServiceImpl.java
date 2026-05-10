@@ -125,13 +125,25 @@ public class DownloadJobServiceImpl implements DownloadJobService {
     }
 
     @Override
-    public void cancelJob(String jobId) {
-        DownloadJob job = downloadJobRepository.findById(jobId)
-                .orElseThrow(() -> new RuntimeException("Job not found: " + jobId));
+    public boolean cancelJob(String jobId) {
+        return downloadJobRepository.findById(jobId)
+                .map(this::attemptCancelJob)
+                .orElse(false);
+    }
+
+    private boolean attemptCancelJob(DownloadJob job) {
+        if (job.getStatus() == JobStatus.CANCELLED) {
+            return false;
+        }
+
+        if (job.getStatus() == JobStatus.COMPLETED || job.getStatus() == JobStatus.FAILED) {
+            return false;
+        }
 
         job.setStatus(JobStatus.CANCELLED);
         job.setCompletedAt(LocalDateTime.now());
         downloadJobRepository.save(job);
+        return true;
     }
 
     private JobType mapToJobType(DownloadRequest.DownloadType type) {

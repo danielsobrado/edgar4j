@@ -9,6 +9,7 @@ import org.jds.edgar4j.dto.response.DownloadJobResponse;
 import org.jds.edgar4j.dto.response.DownloadSummaryResponse;
 import org.jds.edgar4j.service.DownloadJobService;
 import org.jds.edgar4j.util.PaginationUtils;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -129,13 +130,18 @@ public class DownloadController {
         log.info("GET /api/downloads/jobs/{}", id);
         return downloadJobService.getJobById(id)
                 .map(job -> ResponseEntity.ok(ApiResponse.success(job)))
-                .orElse(ResponseEntity.notFound().build());
+                .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(ApiResponse.error("Download job not found")));
     }
 
     @DeleteMapping("/jobs/{id}")
     public ResponseEntity<ApiResponse<Void>> cancelJob(@PathVariable String id) {
         log.info("DELETE /api/downloads/jobs/{}", id);
-        downloadJobService.cancelJob(id);
+        boolean cancelled = downloadJobService.cancelJob(id);
+        if (!cancelled) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(ApiResponse.error("Unable to cancel job: not found or already in terminal state"));
+        }
         return ResponseEntity.ok(ApiResponse.success(null, "Job cancelled"));
     }
 

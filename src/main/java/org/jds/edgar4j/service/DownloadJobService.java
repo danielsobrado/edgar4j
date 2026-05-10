@@ -26,6 +26,6 @@ public interface DownloadJobService {
 
     DownloadJob failJob(String jobId, String error);
 
-    void cancelJob(String jobId);
+    boolean cancelJob(String jobId);
 }
 
