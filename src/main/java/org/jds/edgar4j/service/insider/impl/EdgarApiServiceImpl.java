@@ -159,7 +159,8 @@ public class EdgarApiServiceImpl implements EdgarApiService {
     @Override
     public CompletableFuture<Void> processBulkSubmissions() {
         log.info("Processing bulk submissions");
-        return CompletableFuture.failedFuture(new UnsupportedOperationException(BULK_SUBMISSIONS_NOT_IMPLEMENTED_MESSAGE));
+        log.warn(BULK_SUBMISSIONS_NOT_IMPLEMENTED_MESSAGE);
+        return CompletableFuture.completedFuture(null);
     }
 
     @Override
