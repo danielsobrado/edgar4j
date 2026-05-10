@@ -39,7 +39,9 @@ import org.jds.edgar4j.service.CompanyMarketDataService;
 import org.jds.edgar4j.service.CompanyService;
 import org.jds.edgar4j.service.dividend.DividendAlertsService;
 import org.jds.edgar4j.service.dividend.DividendEventExtractor;
+import org.jds.edgar4j.service.dividend.DividendEvidenceService;
 import org.jds.edgar4j.service.dividend.DividendMetricsService;
+import org.jds.edgar4j.service.dividend.DividendScreeningService;
 import org.jds.edgar4j.validation.UrlAllowlistValidator;
 import org.jds.edgar4j.xbrl.XbrlService;
 import org.jds.edgar4j.xbrl.model.XbrlInstance;
@@ -83,11 +85,18 @@ class DividendAnalysisServiceImplTest {
     private UrlAllowlistValidator urlAllowlistValidator;
 
     private DividendAnalysisServiceImpl dividendAnalysisService;
-    private DividendEventExtractor dividendEventExtractor;
+    private DividendEvidenceService dividendEvidenceService;
+    private DividendScreeningService dividendScreeningService;
 
     @BeforeEach
     void setUp() {
-        dividendEventExtractor = new DividendEventExtractor(new org.jds.edgar4j.integration.Form8KParser());
+        DividendEventExtractor dividendEventExtractor = new DividendEventExtractor(new org.jds.edgar4j.integration.Form8KParser());
+        dividendEvidenceService = new DividendEvidenceService(
+                secApiClient,
+                secApiConfig,
+                urlAllowlistValidator,
+                dividendEventExtractor);
+        dividendScreeningService = new DividendScreeningService();
         dividendAnalysisService = new DividendAnalysisServiceImpl(
                 companyService,
                 fillingRepository,
@@ -97,9 +106,10 @@ class DividendAnalysisServiceImplTest {
                 secApiConfig,
                 xbrlService,
                 urlAllowlistValidator,
-                dividendEventExtractor,
                 new DividendMetricsService(),
-                new DividendAlertsService());
+                new DividendAlertsService(),
+                dividendScreeningService,
+                dividendEvidenceService);
     }
 
     @Test

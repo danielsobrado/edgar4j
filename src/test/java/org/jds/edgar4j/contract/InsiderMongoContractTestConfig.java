@@ -24,7 +24,6 @@ import org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfigur
 import org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration;
 import org.springframework.boot.jdbc.autoconfigure.DataSourceTransactionManagerAutoConfiguration;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.FullyQualifiedAnnotationBeanNameGenerator;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Profile;
 import org.springframework.data.mongodb.repository.config.EnableMongoRepositories;
@@ -48,7 +47,7 @@ import org.springframework.data.mongodb.repository.config.EnableMongoRepositorie
         InsiderCompanyRelationshipRepository.class,
         InsiderTransactionRepository.class,
         TransactionTypeRepository.class
-}, nameGenerator = FullyQualifiedAnnotationBeanNameGenerator.class)
+})
 @Import({
         EmbeddedMongoConfig.class,
         MongoSequenceService.class,

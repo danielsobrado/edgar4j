@@ -43,8 +43,9 @@ import org.jds.edgar4j.service.CompanyMarketDataService;
 import org.jds.edgar4j.service.CompanyService;
 import org.jds.edgar4j.service.DividendAnalysisService;
 import org.jds.edgar4j.service.dividend.DividendAlertsService;
-import org.jds.edgar4j.service.dividend.DividendEventExtractor;
 import org.jds.edgar4j.service.dividend.DividendMetricsService;
+import org.jds.edgar4j.service.dividend.DividendEvidenceService;
+import org.jds.edgar4j.service.dividend.DividendScreeningService;
 import org.jds.edgar4j.validation.UrlAllowlistValidator;
 import org.jds.edgar4j.xbrl.XbrlService;
 import org.jds.edgar4j.xbrl.model.XbrlInstance;
@@ -66,8 +67,6 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
     private static final int RECENT_FILING_LIMIT = 80;
     private static final int ANALYSIS_ANNUAL_LIMIT = 6;
     private static final int ANALYSIS_QUARTERLY_LIMIT = 2;
-    private static final int MAX_EVIDENCE_TEXT_LENGTH = 12_000;
-    private static final int MAX_SCREEN_CANDIDATES = 100;
 
     private static final Set<String> ANNUAL_FORMS = Set.of(
             "10-K", "10-K/A", "20-F", "20-F/A", "40-F", "40-F/A");
@@ -106,9 +105,10 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
     private final SecApiConfig secApiConfig;
     private final XbrlService xbrlService;
     private final UrlAllowlistValidator urlAllowlistValidator;
-    private final DividendEventExtractor dividendEventExtractor;
     private final DividendMetricsService dividendMetricsService;
     private final DividendAlertsService dividendAlertsService;
+    private final DividendScreeningService dividendScreeningService;
+    private final DividendEvidenceService dividendEvidenceService;
 
     @Override
     public DividendOverviewResponse getOverview(String tickerOrCik) {
@@ -173,39 +173,13 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
         List<Filling> currentReports = selectFilings(filings, CURRENT_REPORT_FORMS, false, 12);
         List<Filling> annualReports = selectFilings(filings, ANNUAL_FORMS, false, 2);
 
-        List<DividendEventsResponse.DividendEvent> events = new ArrayList<>();
-        List<String> warnings = new ArrayList<>();
-
-        if (currentReports.isEmpty()) {
-            warnings.add("No recent 8-K filings were available for dividend event extraction.");
-        }
-
-        for (Filling filing : currentReports) {
-            extractDividendEvents(events, warnings, filing);
-        }
-
-        for (Filling filing : annualReports) {
-            extractDividendEvents(events, warnings, filing);
-        }
-
-        List<DividendEventsResponse.DividendEvent> filteredEvents = events.stream()
-                .filter(event -> since == null || !resolveEventDate(event).isBefore(since))
-                .sorted(Comparator
-                        .comparing(this::resolveEventDate, Comparator.reverseOrder())
-                        .thenComparing(DividendEventsResponse.DividendEvent::getFiledDate,
-                                Comparator.nullsLast(Comparator.reverseOrder()))
-                        .thenComparing(DividendEventsResponse.DividendEvent::getId))
-                .toList();
-
-        if (filteredEvents.isEmpty()) {
-            warnings.add("No dividend declaration or policy events were extracted from the currently available filing text.");
-        }
-
-        return DividendEventsResponse.builder()
-                .company(buildCompanySummary(company, ticker, filings))
-                .events(filteredEvents)
-                .warnings(warnings.stream().distinct().toList())
-                .build();
+        return dividendEvidenceService.buildEvents(
+                buildCompanySummary(company, ticker, filings),
+                ticker,
+                currentReports,
+                annualReports,
+                filings,
+                since);
     }
 
     @Override
@@ -219,44 +193,19 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
                 companyService.getTickerByCik(cik).orElse(null));
 
         List<Filling> filings = loadRecentFilings(cik);
-        Filling filing = filings.stream()
-                .filter(candidate -> accessionMatches(candidate.getAccessionNumber(), accessionNumber))
-                .findFirst()
+        Filling filing = dividendEvidenceService.resolveFilingByAccession(filings, accessionNumber)
                 .orElseThrow(() -> new ResourceNotFoundException("Filing evidence", "accessionNumber", accessionNumber));
 
-        String rawDocument = loadFilingDocument(filing)
-                .orElseThrow(() -> new ResourceNotFoundException("Filing text", "accessionNumber", accessionNumber));
-        String filingUrl = resolveFilingUrl(filing);
-        List<String> warnings = new ArrayList<>();
-
-        List<DividendEvidenceResponse.EvidenceHighlight> highlights = dividendEventExtractor
-                .extract(rawDocument, filing, filingUrl).stream()
-                .map(this::toEvidenceHighlight)
-                .toList();
-        if (highlights.isEmpty()) {
-            warnings.add("No dividend highlights were extracted from the filing text.");
+        DividendEvidenceResponse response = dividendEvidenceService.buildEvidence(
+                buildCompanySummary(company, ticker, filings),
+                filings,
+                filing,
+                accessionNumber);
+        if (response == null) {
+            throw new ResourceNotFoundException("Filing text", "accessionNumber", accessionNumber);
         }
 
-        String cleanedDocument = dividendEventExtractor.cleanDocumentText(rawDocument);
-        boolean truncated = cleanedDocument.length() > MAX_EVIDENCE_TEXT_LENGTH;
-        String cleanedPreview = truncated
-                ? cleanedDocument.substring(0, MAX_EVIDENCE_TEXT_LENGTH).trim()
-                : cleanedDocument;
-        if (cleanedPreview.isBlank()) {
-            warnings.add("The filing document did not produce usable cleaned text.");
-        }
-        if (truncated) {
-            warnings.add("Cleaned filing text preview was truncated to the first 12000 characters.");
-        }
-
-        return DividendEvidenceResponse.builder()
-                .company(buildCompanySummary(company, ticker, filings))
-                .filing(toSourceFiling(filing, filingUrl))
-                .highlights(highlights)
-                .cleanedText(blankToNull(cleanedPreview))
-                .truncated(truncated)
-                .warnings(warnings.stream().distinct().toList())
-                .build();
+        return response;
     }
 
     @Override
@@ -308,7 +257,9 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
         DividendScreenRequest normalizedRequest = request != null ? request : DividendScreenRequest.builder().build();
         int page = Math.max(0, normalizedRequest.getPage());
         int size = Math.max(1, normalizedRequest.getSize());
-        int candidateLimit = Math.max(1, Math.min(normalizedRequest.getCandidateLimit(), MAX_SCREEN_CANDIDATES));
+        int candidateLimit = Math.max(1, Math.min(
+                normalizedRequest.getCandidateLimit(),
+                DividendScreeningService.DEFAULT_SCREEN_CANDIDATES));
         List<String> warnings = new ArrayList<>();
         List<String> identifiers = resolveScreenIdentifiers(normalizedRequest, candidateLimit, warnings);
         if (identifiers.isEmpty()) {
@@ -316,22 +267,33 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
         }
 
         List<String> requestedMetrics = resolveScreenMetrics(normalizedRequest);
+        Map<String, String> metricFormatHints = METRIC_DEFINITIONS.entrySet().stream()
+                .collect(
+                        LinkedHashMap::new,
+                        (map, entry) -> map.put(entry.getKey(), entry.getValue().formatHint()),
+                        Map::putAll);
         List<DividendScreenResponse.ScreenResult> results = new ArrayList<>();
 
         for (String identifier : identifiers) {
             try {
                 AnalysisContext context = analyze(identifier);
-                if (matchesScreenFilters(context, normalizedRequest.getFilters())) {
-                    results.add(buildScreenResult(context, requestedMetrics));
+                DividendScreeningService.ScreeningCandidate screeningCandidate = toScreeningCandidate(context);
+                if (dividendScreeningService.matchesScreenFilters(
+                        screeningCandidate,
+                        normalizedRequest.getFilters(),
+                        METRIC_DEFINITIONS.keySet(),
+                        metricFormatHints)) {
+                    results.add(dividendScreeningService.buildScreenResult(screeningCandidate, requestedMetrics));
                 }
             } catch (RuntimeException e) {
                 warnings.add("Could not analyze " + identifier + ": " + e.getMessage());
             }
         }
 
-        Comparator<DividendScreenResponse.ScreenResult> comparator = buildScreenComparator(
+        Comparator<DividendScreenResponse.ScreenResult> comparator = dividendScreeningService.buildScreenComparator(
                 blankToNull(normalizedRequest.getSort()),
-                normalizedRequest.getDirection());
+                normalizedRequest.getDirection(),
+                METRIC_DEFINITIONS.keySet());
         List<DividendScreenResponse.ScreenResult> sortedResults = results.stream()
                 .sorted(comparator)
                 .toList();
@@ -708,131 +670,22 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
                 .toList();
     }
 
-    private boolean matchesScreenFilters(
-            AnalysisContext context,
-            DividendScreenRequest.DividendScreenFilters filters) {
-        if (context == null || filters == null) {
-            return true;
-        }
-
-        if (filters.getViabilityRatings() != null
-                && !filters.getViabilityRatings().isEmpty()
-                && !filters.getViabilityRatings().contains(context.rating())) {
-            return false;
-        }
-
-        if (filters.getSectors() != null && !filters.getSectors().isEmpty()) {
-            String sector = blankToNull(context.companySummary().getSector());
-            boolean sectorMatch = filters.getSectors().stream()
-                    .map(this::blankToNull)
-                    .filter(Objects::nonNull)
-                    .anyMatch(candidate -> sector != null && sector.equalsIgnoreCase(candidate));
-            if (!sectorMatch) {
-                return false;
-            }
-        }
-
-        if (filters.getMetrics() == null || filters.getMetrics().isEmpty()) {
-            return true;
-        }
-
-        for (Map.Entry<String, DividendScreenRequest.MetricRange> entry : filters.getMetrics().entrySet()) {
-            String metric = blankToNull(entry.getKey());
-            if (metric == null) {
-                continue;
-            }
-
-            String normalizedMetric = metric.toLowerCase(Locale.ROOT);
-            if (!METRIC_DEFINITIONS.containsKey(normalizedMetric)) {
-                throw new IllegalArgumentException(
-                        "Unsupported dividend screen metric: " + metric
-                                + ". Supported metrics: " + String.join(", ", METRIC_DEFINITIONS.keySet()));
-            }
-
-            Double actualValue = getComparisonMetricValue(context, normalizedMetric);
-            Double minValue = normalizeScreenBound(normalizedMetric, entry.getValue() != null ? entry.getValue().getMin() : null);
-            Double maxValue = normalizeScreenBound(normalizedMetric, entry.getValue() != null ? entry.getValue().getMax() : null);
-
-            if (minValue != null && (actualValue == null || actualValue < minValue)) {
-                return false;
-            }
-            if (maxValue != null && (actualValue == null || actualValue > maxValue)) {
-                return false;
-            }
-        }
-
-        return true;
+    private Map<String, Double> buildComparisonMetricValues(AnalysisContext context) {
+        return METRIC_DEFINITIONS.keySet().stream()
+                .collect(
+                        LinkedHashMap::new,
+                        (map, metric) -> map.put(metric, getComparisonMetricValue(context, metric)),
+                        Map::putAll);
     }
 
-    private Double normalizeScreenBound(String metric, Double rawValue) {
-        if (rawValue == null) {
-            return null;
-        }
-
-        MetricDefinitionData definition = METRIC_DEFINITIONS.get(metric);
-        if (definition != null
-                && "percent".equalsIgnoreCase(definition.formatHint())
-                && Math.abs(rawValue) > 1d) {
-            return rawValue / 100d;
-        }
-        return rawValue;
-    }
-
-    private Comparator<DividendScreenResponse.ScreenResult> buildScreenComparator(String sort, String direction) {
-        String normalizedSort = sort != null ? sort.toLowerCase(Locale.ROOT) : "score";
-        boolean descending = direction == null || !"asc".equalsIgnoreCase(direction);
-
-        if ("name".equals(normalizedSort)) {
-            return (left, right) -> compareNullableStrings(
-                    firstNonBlank(left.getCompany().getName(), left.getCompany().getTicker(), left.getCompany().getCik()),
-                    firstNonBlank(right.getCompany().getName(), right.getCompany().getTicker(), right.getCompany().getCik()),
-                    descending);
-        }
-
-        if ("ticker".equals(normalizedSort)) {
-            return (left, right) -> compareNullableStrings(
-                    left.getCompany().getTicker(),
-                    right.getCompany().getTicker(),
-                    descending);
-        }
-
-        if (!METRIC_DEFINITIONS.containsKey(normalizedSort)) {
-            throw new IllegalArgumentException(
-                    "Unsupported dividend screen sort field: " + sort
-                            + ". Supported fields: " + String.join(", ", METRIC_DEFINITIONS.keySet()) + ", name, ticker");
-        }
-        return (left, right) -> compareNullableDoubles(
-                left.getValues().get(normalizedSort),
-                right.getValues().get(normalizedSort),
-                descending);
-    }
-
-    private int compareNullableStrings(String left, String right, boolean descending) {
-        if (left == null && right == null) {
-            return 0;
-        }
-        if (left == null) {
-            return 1;
-        }
-        if (right == null) {
-            return -1;
-        }
-        int comparison = String.CASE_INSENSITIVE_ORDER.compare(left, right);
-        return descending ? -comparison : comparison;
-    }
-
-    private int compareNullableDoubles(Double left, Double right, boolean descending) {
-        if (left == null && right == null) {
-            return 0;
-        }
-        if (left == null) {
-            return 1;
-        }
-        if (right == null) {
-            return -1;
-        }
-        int comparison = Double.compare(left, right);
-        return descending ? -comparison : comparison;
+    private DividendScreeningService.ScreeningCandidate toScreeningCandidate(AnalysisContext context) {
+        return new DividendScreeningService.ScreeningCandidate(
+                context.companySummary(),
+                context.alerts(),
+                context.score(),
+                context.rating(),
+                context.warnings(),
+                buildComparisonMetricValues(context));
     }
 
     private List<HistoryRowData> limitHistoryRows(List<HistoryRowData> historyRows, int years) {
@@ -1253,105 +1106,6 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
         return new MetricDefinitionData(id, label, unit, formatHint, group, description);
     }
 
-    private void extractDividendEvents(
-            List<DividendEventsResponse.DividendEvent> events,
-            List<String> warnings,
-            Filling filing) {
-        Optional<String> rawDocument = loadFilingDocument(filing);
-        if (rawDocument.isEmpty()) {
-            warnings.add("Filing text could not be loaded for accession "
-                    + firstNonBlank(filing != null ? filing.getAccessionNumber() : null, "(unknown)")
-                    + ".");
-            return;
-        }
-
-        String filingUrl = resolveFilingUrl(filing);
-        List<DividendEventsResponse.DividendEvent> extracted = dividendEventExtractor.extract(rawDocument.get(), filing, filingUrl).stream()
-                .map(this::toDividendEventResponse)
-                .toList();
-        extracted.forEach(event -> putIfAbsent(events, event));
-    }
-
-    private Optional<String> loadFilingDocument(Filling filing) {
-        if (filing == null) {
-            return Optional.empty();
-        }
-
-        String cik = normalizeCik(filing.getCik()).orElse(null);
-        String accessionNumber = blankToNull(filing.getAccessionNumber());
-        String primaryDocument = firstNonBlank(
-                filing.getPrimaryDocument(),
-                extractDocumentNameFromUrl(filing.getUrl()));
-        if (cik == null || accessionNumber == null || primaryDocument == null) {
-            return Optional.empty();
-        }
-
-        try {
-            return Optional.ofNullable(secApiClient.fetchFiling(cik, accessionNumber, primaryDocument));
-        } catch (Exception e) {
-            log.debug("Could not load filing document for {}", accessionNumber, e);
-            return Optional.empty();
-        }
-    }
-
-    private String extractDocumentNameFromUrl(String url) {
-        String normalized = blankToNull(url);
-        if (normalized == null) {
-            return null;
-        }
-
-        int queryIndex = normalized.indexOf('?');
-        String withoutQuery = queryIndex >= 0 ? normalized.substring(0, queryIndex) : normalized;
-        int slashIndex = withoutQuery.lastIndexOf('/');
-        if (slashIndex < 0 || slashIndex == withoutQuery.length() - 1) {
-            return null;
-        }
-
-        String candidate = withoutQuery.substring(slashIndex + 1);
-        return blankToNull(candidate);
-    }
-
-    private DividendEventsResponse.DividendEvent toDividendEventResponse(
-            DividendEventExtractor.ExtractedDividendEvent event) {
-        LocalDate eventDate = event.eventDate();
-        String sourceSection = blankToNull(event.sourceSection());
-        return DividendEventsResponse.DividendEvent.builder()
-                .id(String.join(":",
-                        firstNonBlank(event.accessionNumber(), "unknown"),
-                        Objects.toString(event.eventType(), "event"),
-                        firstNonBlank(sourceSection, "document"),
-                        Objects.toString(eventDate, "undated")))
-                .eventType(event.eventType())
-                .formType(event.formType())
-                .accessionNumber(event.accessionNumber())
-                .filedDate(event.filedDate())
-                .declarationDate(event.declarationDate())
-                .recordDate(event.recordDate())
-                .payableDate(event.payableDate())
-                .amountPerShare(event.amountPerShare() != null ? event.amountPerShare().doubleValue() : null)
-                .dividendType(event.dividendType())
-                .confidence(event.confidence())
-                .extractionMethod(event.extractionMethod())
-                .sourceSection(sourceSection)
-                .textSnippet(blankToNull(event.textSnippet()))
-                .policyLanguage(blankToNull(event.policyLanguage()))
-                .url(blankToNull(event.url()))
-                .build();
-    }
-
-    private DividendEvidenceResponse.EvidenceHighlight toEvidenceHighlight(
-            DividendEventExtractor.ExtractedDividendEvent event) {
-        DividendEventsResponse.DividendEvent response = toDividendEventResponse(event);
-        return DividendEvidenceResponse.EvidenceHighlight.builder()
-                .id(response.getId())
-                .eventType(response.getEventType())
-                .confidence(response.getConfidence())
-                .sourceSection(response.getSourceSection())
-                .snippet(response.getTextSnippet())
-                .policyLanguage(response.getPolicyLanguage())
-                .build();
-    }
-
     private DividendMetricDefinitionResponse toMetricDefinitionResponse(MetricDefinitionData definition) {
         return DividendMetricDefinitionResponse.builder()
                 .id(definition.id())
@@ -1361,31 +1115,6 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
                 .group(definition.group())
                 .description(definition.description())
                 .build();
-    }
-
-    private LocalDate resolveEventDate(DividendEventsResponse.DividendEvent event) {
-        return firstNonNull(
-                event.getDeclarationDate(),
-                event.getPayableDate(),
-                event.getRecordDate(),
-                event.getFiledDate(),
-                LocalDate.MIN);
-    }
-
-    private void putIfAbsent(
-            List<DividendEventsResponse.DividendEvent> events,
-            DividendEventsResponse.DividendEvent candidate) {
-        boolean duplicate = events.stream().anyMatch(existing ->
-                Objects.equals(existing.getEventType(), candidate.getEventType())
-                        && Objects.equals(existing.getAccessionNumber(), candidate.getAccessionNumber())
-                        && Objects.equals(existing.getSourceSection(), candidate.getSourceSection())
-                        && Objects.equals(existing.getAmountPerShare(), candidate.getAmountPerShare())
-                        && Objects.equals(existing.getDeclarationDate(), candidate.getDeclarationDate())
-                        && Objects.equals(existing.getRecordDate(), candidate.getRecordDate())
-                        && Objects.equals(existing.getPayableDate(), candidate.getPayableDate()));
-        if (!duplicate) {
-            events.add(candidate);
-        }
     }
 
     private Optional<CompanyResponse> resolveCompany(String tickerOrCik) {
@@ -1435,24 +1164,6 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
             return null;
         }
         return context.historyRows().get(context.historyRows().size() - 1);
-    }
-
-    private boolean accessionMatches(String candidate, String requested) {
-        String normalizedCandidate = normalizeAccession(candidate);
-        String normalizedRequested = normalizeAccession(requested);
-        return normalizedCandidate != null
-                && normalizedRequested != null
-                && normalizedCandidate.equals(normalizedRequested);
-    }
-
-    private String normalizeAccession(String accessionNumber) {
-        String normalized = blankToNull(accessionNumber);
-        if (normalized == null) {
-            return null;
-        }
-
-        String digits = normalized.replaceAll("[^0-9]", "");
-        return digits.isEmpty() ? null : digits;
     }
 
     private List<Filling> loadRecentFilings(String cik) {

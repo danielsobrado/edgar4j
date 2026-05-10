@@ -2,6 +2,10 @@
 spring:
   main:
     allow-bean-definition-overriding: true
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.DataRedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.DataRedisReactiveAutoConfiguration
   cache:
     type: caffeine
   datasource:

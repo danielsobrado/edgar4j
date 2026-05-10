@@ -4,11 +4,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.Delegate;
 import org.jds.edgar4j.port.AppSettingsDataPort;
 import org.jds.edgar4j.repository.AppSettingsRepository;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 @Component
 @Profile("resource-high")
+@ConditionalOnProperty(prefix = "edgar4j", name = "resource-mode", havingValue = "high", matchIfMissing = true)
 @RequiredArgsConstructor
 public class AppSettingsMongoAdapter implements AppSettingsDataPort {
 
