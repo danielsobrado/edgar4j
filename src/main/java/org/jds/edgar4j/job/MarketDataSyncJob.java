@@ -3,11 +3,14 @@ package org.jds.edgar4j.job;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 import org.jds.edgar4j.dto.response.MarketCapBackfillResponse;
 import org.jds.edgar4j.model.Form4;
@@ -48,7 +51,7 @@ public class MarketDataSyncJob {
         this.sp500Service = sp500Service;
         this.form4Repository = form4Repository;
         this.enabled = enabled;
-        this.batchSize = batchSize;
+        this.batchSize = Math.max(1, batchSize);
     }
 
     @Scheduled(cron = "${edgar4j.jobs.market-data-sync.cron:0 0 */2 * * MON-FRI}")
@@ -67,7 +70,7 @@ public class MarketDataSyncJob {
             log.info("Starting market data sync job at {}", LocalDateTime.now());
             long startTime = System.currentTimeMillis();
 
-            Set<String> sp500Tickers = new LinkedHashSet<>(sp500Service.getAllTickers());
+            Set<String> sp500Tickers = normalizeTickerSet(sp500Service.getAllTickers());
             LocalDate since = LocalDate.now().minusDays(30);
             Set<String> insiderTickers = loadRecentInsiderTickers(since);
 
@@ -160,13 +163,26 @@ public class MarketDataSyncJob {
     }
 
     private Set<String> loadRecentInsiderTickers(LocalDate since) {
-        return form4Repository.findRecentAcquisitions(since).stream()
+        return Optional.ofNullable(form4Repository.findRecentAcquisitions(since))
+                .orElse(List.of())
+                .stream()
                 .filter(Objects::nonNull)
                 .filter(form4 -> hasRecentPurchaseActivity(form4, since))
                 .map(Form4::getTradingSymbol)
                 .map(this::normalizeTicker)
                 .filter(Objects::nonNull)
-                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private Set<String> normalizeTickerSet(Collection<String> rawTickers) {
+        if (rawTickers == null || rawTickers.isEmpty()) {
+            return new LinkedHashSet<>();
+        }
+
+        return rawTickers.stream()
+                .map(this::normalizeTicker)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     private boolean hasRecentPurchaseActivity(Form4 form4, LocalDate since) {
@@ -182,7 +198,7 @@ public class MarketDataSyncJob {
     }
 
     private Set<String> loadTrackedTickers(LocalDate since) {
-        Set<String> trackedTickers = new LinkedHashSet<>(sp500Service.getAllTickers());
+        Set<String> trackedTickers = new LinkedHashSet<>(normalizeTickerSet(sp500Service.getAllTickers()));
         trackedTickers.addAll(loadRecentInsiderTickers(since));
         return trackedTickers;
     }

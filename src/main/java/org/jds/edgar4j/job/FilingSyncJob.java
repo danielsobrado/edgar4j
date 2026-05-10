@@ -26,6 +26,7 @@ public class FilingSyncJob {
 
     private final CompanyDataPort companyRepository;
     private final DownloadSubmissionsService downloadSubmissionsService;
+    private static final int MIN_DELAY_MILLISECONDS = 0;
     private final AtomicBoolean isRunning = new AtomicBoolean(false);
     private final AtomicInteger processedCount = new AtomicInteger(0);
     private final AtomicInteger totalCount = new AtomicInteger(0);
@@ -68,14 +69,20 @@ public class FilingSyncJob {
 
             // Get total count of companies
             long total = companyRepository.count();
-            totalCount.set((int) total);
+            totalCount.set(total > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) total);
             log.info("Processing {} companies for filing sync", total);
+
+            if (total == 0) {
+                log.info("No companies found for filing sync");
+                return;
+            }
 
             int page = 0;
             Page<Company> companies;
+            int effectiveBatchSize = Math.max(1, batchSize);
 
             do {
-                companies = companyRepository.findAll(PageRequest.of(page, batchSize));
+                companies = companyRepository.findAll(PageRequest.of(page, effectiveBatchSize));
 
                 for (Company company : companies.getContent()) {
                     try {
@@ -83,7 +90,7 @@ public class FilingSyncJob {
                         processedCount.incrementAndGet();
 
                         // Rate limiting - delay between companies
-                        if (delayBetweenCompanies > 0) {
+                        if (delayBetweenCompanies > MIN_DELAY_MILLISECONDS) {
                             Thread.sleep(delayBetweenCompanies);
                         }
                     } catch (InterruptedException e) {
@@ -111,10 +118,23 @@ public class FilingSyncJob {
     }
 
     private void syncCompanyFilings(Company company) {
+        if (company == null || company.getCik() == null || company.getCik().isBlank()) {
+            log.warn("Skipping filing sync for incomplete company record");
+            return;
+        }
+
+        String cik = company.getCik().trim();
+        if (cik.isBlank()) {
+            log.warn("Skipping filing sync for company '{}' with blank CIK", company.getName());
+            return;
+        }
+
         try {
-            downloadSubmissionsService.downloadSubmissions(company.getCik());
+            downloadSubmissionsService.downloadSubmissions(cik);
         } catch (Exception e) {
-            log.warn("Failed to sync filings for company: {} (CIK: {})", company.getName(), company.getCik());
+            String companyName = company != null ? company.getName() : "<unknown>";
+            String companyCik = company != null ? company.getCik() : "<unknown>";
+            log.warn("Failed to sync filings for company: {} (CIK: {})", companyName, companyCik, e);
             throw e;
         }
     }
@@ -123,9 +143,13 @@ public class FilingSyncJob {
      * Sync filings for a specific company by CIK.
      */
     public void syncCompanyFilings(String cik) {
+        if (cik == null || cik.isBlank()) {
+            log.warn("Manual filing sync skipped because CIK is blank");
+            return;
+        }
         log.info("Manual filing sync triggered for CIK: {}", cik);
         try {
-            downloadSubmissionsService.downloadSubmissions(cik);
+            downloadSubmissionsService.downloadSubmissions(cik.trim());
         } catch (Exception e) {
             log.error("Error syncing filings for CIK: {}", cik, e);
         }
