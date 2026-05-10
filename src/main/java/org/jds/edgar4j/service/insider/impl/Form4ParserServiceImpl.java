@@ -3,6 +3,7 @@ package org.jds.edgar4j.service.insider.impl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jds.edgar4j.model.insider.*;
+import org.jds.edgar4j.port.InsiderCompanyRelationshipDataPort;
 import org.jds.edgar4j.service.insider.CompanyService;
 import org.jds.edgar4j.service.insider.Form4ParserService;
 import org.jds.edgar4j.service.insider.InsiderService;
@@ -37,6 +38,7 @@ public class Form4ParserServiceImpl implements Form4ParserService {
 
     private final CompanyService companyService;
     private final InsiderService insiderService;
+    private final InsiderCompanyRelationshipDataPort relationshipRepository;
     
     private static final DateTimeFormatter[] DATE_FORMATTERS = {
         DateTimeFormatter.ofPattern("yyyy-MM-dd"),
@@ -381,17 +383,80 @@ public class Form4ParserServiceImpl implements Form4ParserService {
     }
 
     private void createOrUpdateRelationship(Insider insider, Company company, ReportingOwnerInfo ownerInfo) {
-        InsiderCompanyRelationship relationship = InsiderCompanyRelationship.builder()
-            .insider(insider)
-            .company(company)
-            .isDirector(ownerInfo.isDirector())
-            .isOfficer(ownerInfo.isOfficer())
-            .isTenPercentOwner(ownerInfo.isTenPercentOwner())
-            .isOther(ownerInfo.isOther())
-            .officerTitle(ownerInfo.getOfficerTitle())
-            .otherText(ownerInfo.getOtherText())
-            .isActive(true)
-            .build();
+        if (insider == null || company == null) {
+            return;
+        }
+
+        String insiderCik = insider.getCik();
+        String companyCik = company.getCik();
+        if (insiderCik == null || companyCik == null) {
+            return;
+        }
+
+        List<InsiderCompanyRelationship> activeRelationships =
+                relationshipRepository.findByInsiderCikAndCompanyCikAndIsActiveTrue(insiderCik, companyCik);
+
+        InsiderCompanyRelationship relationship;
+        if (activeRelationships == null || activeRelationships.isEmpty()) {
+            relationship = InsiderCompanyRelationship.builder()
+                .insider(insider)
+                .company(company)
+                .startDate(LocalDate.now())
+                .build();
+        } else {
+            relationship = activeRelationships.get(0);
+        }
+
+        boolean changed = false;
+        if (!relationship.getIsDirector() && ownerInfo.isDirector()) {
+            relationship.setIsDirector(true);
+            changed = true;
+        }
+        if (!relationship.getIsOfficer() && ownerInfo.isOfficer()) {
+            relationship.setIsOfficer(true);
+            changed = true;
+        }
+        if (!relationship.getIsTenPercentOwner() && ownerInfo.isTenPercentOwner()) {
+            relationship.setIsTenPercentOwner(true);
+            changed = true;
+        }
+        if (!relationship.getIsOther() && ownerInfo.isOther()) {
+            relationship.setIsOther(true);
+            changed = true;
+        }
+
+        String officerTitle = cleanText(ownerInfo.getOfficerTitle());
+        if (officerTitle != null && !officerTitle.equals(relationship.getOfficerTitle())) {
+            relationship.setOfficerTitle(officerTitle);
+            changed = true;
+        }
+
+        String otherText = cleanText(ownerInfo.getOtherText());
+        if (otherText != null && !otherText.equals(relationship.getOtherText())) {
+            relationship.setOtherText(otherText);
+            changed = true;
+        }
+
+        if (relationship.getStartDate() == null) {
+            relationship.setStartDate(LocalDate.now());
+            changed = true;
+        }
+
+        relationship.setIsActive(true);
+        if (!activeRelationships.isEmpty() && activeRelationships.size() > 1) {
+            for (int i = 1; i < activeRelationships.size(); i++) {
+                InsiderCompanyRelationship duplicate = activeRelationships.get(i);
+                if (duplicate != null && Boolean.TRUE.equals(duplicate.getIsActive())) {
+                    duplicate.setIsActive(false);
+                    duplicate.setEndDate(LocalDate.now());
+                    relationshipRepository.save(duplicate);
+                }
+            }
+        }
+
+        if (changed || activeRelationships == null || activeRelationships.isEmpty()) {
+            relationshipRepository.save(relationship);
+        }
     }
 
     private InsiderTransaction convertNonDerivativeTransaction(NonDerivativeTransaction nonDeriv, 
