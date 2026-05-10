@@ -38,6 +38,8 @@ import lombok.extern.slf4j.Slf4j;
 public class EdgarApiServiceImpl implements EdgarApiService {
 
     private static final String DEFAULT_USER_AGENT = "Edgar4J/1.0";
+    private static final String BULK_SUBMISSIONS_NOT_IMPLEMENTED_MESSAGE =
+            "Bulk submissions processing requires a ZIP download/extraction pipeline and is not implemented yet";
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final HttpClient httpClient = HttpClient.newBuilder()
@@ -157,8 +159,7 @@ public class EdgarApiServiceImpl implements EdgarApiService {
     @Override
     public CompletableFuture<Void> processBulkSubmissions() {
         log.info("Processing bulk submissions");
-        return CompletableFuture.failedFuture(new UnsupportedOperationException(
-            "Bulk submissions processing requires a ZIP download/extraction pipeline and is not implemented yet"));
+        return CompletableFuture.failedFuture(new UnsupportedOperationException(BULK_SUBMISSIONS_NOT_IMPLEMENTED_MESSAGE));
     }
 
     @Override
