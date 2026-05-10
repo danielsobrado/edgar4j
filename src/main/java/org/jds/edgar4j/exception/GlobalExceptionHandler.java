@@ -7,8 +7,10 @@ import java.util.Map;
 import org.jds.edgar4j.dto.response.ApiResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.server.ServerWebExchange;
@@ -71,6 +73,47 @@ public class GlobalExceptionHandler {
         ApiResponse<Map<String, String>> response = ApiResponse.<Map<String, String>>builder()
                 .success(false)
                 .message("Validation failed")
+                .data(errors)
+                .timestamp(LocalDateTime.now())
+                .path(exchange.getRequest().getPath().value())
+                .build();
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiResponse<Map<String, String>>> handleMethodArgumentTypeMismatchException(
+            MethodArgumentTypeMismatchException ex, ServerWebExchange exchange) {
+        Map<String, String> errors = new HashMap<>();
+        String field = ex.getName() != null ? ex.getName() : "request";
+        String message;
+        if ("LocalDate".equals(ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : null)) {
+            message = String.format("Invalid date format for '%s'. Expected yyyy-MM-dd", field);
+        } else {
+            message = String.format("Invalid value for '%s': %s", field, ex.getValue());
+        }
+        errors.put(field, message);
+
+        log.warn("Type mismatch: {}", errors);
+        ApiResponse<Map<String, String>> response = ApiResponse.<Map<String, String>>builder()
+                .success(false)
+                .message("Bad request")
+                .data(errors)
+                .timestamp(LocalDateTime.now())
+                .path(exchange.getRequest().getPath().value())
+                .build();
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ApiResponse<Map<String, String>>> handleMissingServletRequestParameterException(
+            MissingServletRequestParameterException ex, ServerWebExchange exchange) {
+        Map<String, String> errors = new HashMap<>();
+        errors.put(ex.getParameterName(), "Missing required parameter");
+
+        log.warn("Missing required request param: {}", ex.getParameterName());
+        ApiResponse<Map<String, String>> response = ApiResponse.<Map<String, String>>builder()
+                .success(false)
+                .message("Bad request")
                 .data(errors)
                 .timestamp(LocalDateTime.now())
                 .path(exchange.getRequest().getPath().value())

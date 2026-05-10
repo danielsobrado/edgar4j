@@ -1,8 +1,6 @@
 package org.jds.edgar4j.controller;
 
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.util.List;
 
 import org.jds.edgar4j.model.Form20F;
@@ -10,6 +8,7 @@ import org.jds.edgar4j.service.Form20FService;
 import org.jds.edgar4j.util.PaginationUtils;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -33,8 +32,6 @@ import lombok.extern.slf4j.Slf4j;
 public class Form20FController {
 
     private final Form20FService form20FService;
-
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     @GetMapping("/{id}")
     public ResponseEntity<Form20F> getById(@PathVariable String id) {
@@ -72,20 +69,12 @@ public class Form20FController {
 
     @GetMapping("/date-range")
     public ResponseEntity<Page<Form20F>> getByDateRange(
-            @RequestParam String startDate,
-            @RequestParam String endDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-
-        try {
-            LocalDate start = parseDate(startDate);
-            LocalDate end = parseDate(endDate);
-            PageRequest pageRequest = PaginationUtils.pageRequest(page, size, "filedDate");
-            return ResponseEntity.ok(form20FService.findByFiledDateRange(start, end, pageRequest));
-        } catch (DateTimeParseException e) {
-            log.warn("Invalid date format: {} or {}", startDate, endDate);
-            return ResponseEntity.badRequest().build();
-        }
+        PageRequest pageRequest = PaginationUtils.pageRequest(page, size, "filedDate");
+        return ResponseEntity.ok(form20FService.findByFiledDateRange(startDate, endDate, pageRequest));
     }
 
     @GetMapping("/recent")
@@ -99,8 +88,8 @@ public class Form20FController {
             @RequestParam String accessionNumber,
             @RequestParam String primaryDocument,
             @RequestParam(required = false) String companyName,
-            @RequestParam(required = false) String filedDate,
-            @RequestParam(required = false) String reportDate) {
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate filedDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate reportDate) {
 
         if (form20FService.existsByAccessionNumber(accessionNumber)) {
             return form20FService.findByAccessionNumber(accessionNumber)
@@ -117,19 +106,16 @@ public class Form20FController {
             if (companyName != null && !companyName.isBlank()) {
                 form20F.setCompanyName(companyName);
             }
-            if (filedDate != null && !filedDate.isBlank()) {
-                form20F.setFiledDate(parseDate(filedDate));
+            if (filedDate != null) {
+                form20F.setFiledDate(filedDate);
             }
-            if (reportDate != null && !reportDate.isBlank()) {
-                form20F.setReportDate(parseDate(reportDate));
+            if (reportDate != null) {
+                form20F.setReportDate(reportDate);
             }
 
             Form20F saved = form20FService.save(form20F);
             return ResponseEntity.ok(saved);
 
-        } catch (DateTimeParseException e) {
-            log.warn("Invalid date format in request: filedDate={}, reportDate={}", filedDate, reportDate);
-            return ResponseEntity.badRequest().build();
         } catch (Exception e) {
             log.error("Failed to download/parse Form 20-F: {}", accessionNumber, e);
             return ResponseEntity.internalServerError().build();
@@ -151,8 +137,5 @@ public class Form20FController {
         return ResponseEntity.noContent().build();
     }
 
-    private LocalDate parseDate(String dateStr) {
-        return LocalDate.parse(dateStr, DATE_FORMATTER);
-    }
 }
 
