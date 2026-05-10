@@ -8,6 +8,7 @@ import org.jds.edgar4j.dto.response.MarketDataResponse;
 import org.jds.edgar4j.job.MarketDataSyncJob;
 import org.jds.edgar4j.service.MarketDataService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -35,13 +36,14 @@ public class MarketDataController {
     @GetMapping("/prices/{ticker}")
     public ResponseEntity<ApiResponse<MarketDataResponse>> getDailyPrices(
             @PathVariable String ticker,
-            @RequestParam String startDate,
-            @RequestParam String endDate) {
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        if (startDate.isAfter(endDate)) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("startDate must be before or equal to endDate"));
+        }
+
         try {
-            MarketDataResponse response = marketDataService.getDailyPrices(
-                    ticker,
-                    LocalDate.parse(startDate),
-                    LocalDate.parse(endDate));
+            MarketDataResponse response = marketDataService.getDailyPrices(ticker, startDate, endDate);
             return ResponseEntity.ok(ApiResponse.success(response));
         } catch (IllegalArgumentException | IllegalStateException e) {
             log.warn("Failed to get market data for {}: {}", ticker, e.getMessage());
@@ -60,14 +62,6 @@ public class MarketDataController {
             @Parameter(description = "Lookback window used to include insider-active tickers")
             @RequestParam(defaultValue = "30") int lookbackDays) {
         log.info("POST /api/market-data/backfill/market-cap?maxTickers={}&lookbackDays={}", maxTickers, lookbackDays);
-
-        if (maxTickers < 1) {
-            return ResponseEntity.badRequest().body(ApiResponse.error("maxTickers must be greater than 0"));
-        }
-
-        if (lookbackDays < 1) {
-            return ResponseEntity.badRequest().body(ApiResponse.error("lookbackDays must be greater than 0"));
-        }
 
         try {
             MarketCapBackfillResponse response = marketDataSyncJob.triggerMarketCapBackfill(maxTickers, lookbackDays);

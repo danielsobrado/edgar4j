@@ -4,10 +4,16 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+
+import java.time.LocalDate;
+import java.util.List;
 
 import org.jds.edgar4j.dto.response.ApiResponse;
 import org.jds.edgar4j.dto.response.MarketCapBackfillResponse;
+import org.jds.edgar4j.dto.response.MarketDataResponse;
 import org.jds.edgar4j.job.MarketDataSyncJob;
 import org.jds.edgar4j.service.MarketDataService;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,13 +42,22 @@ class MarketDataControllerTest {
     }
 
     @Test
-    @DisplayName("backfillMarketCaps should reject non-positive maxTickers")
-    void backfillMarketCapsShouldRejectInvalidMaxTickers() {
+    @DisplayName("backfillMarketCaps should allow zero maxTickers and delegate to job")
+    void backfillMarketCapsAllowsZeroMaxTickers() {
+        MarketCapBackfillResponse expected = MarketCapBackfillResponse.builder()
+                .trackedTickers(1)
+                .candidateTickers(1)
+                .processedTickers(1)
+                .updatedTickers(1)
+                .build();
+        when(marketDataSyncJob.triggerMarketCapBackfill(0, 30)).thenReturn(expected);
+
         ResponseEntity<ApiResponse<MarketCapBackfillResponse>> response = marketDataController.backfillMarketCaps(0, 30);
 
-        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-        assertFalse(response.getBody().isSuccess());
-        assertEquals("maxTickers must be greater than 0", response.getBody().getMessage());
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertTrue(response.getBody().isSuccess());
+        assertEquals("Market-cap backfill completed", response.getBody().getMessage());
+        verify(marketDataSyncJob).triggerMarketCapBackfill(0, 30);
     }
 
     @Test
@@ -77,5 +92,46 @@ class MarketDataControllerTest {
         assertTrue(response.getBody().isSuccess());
         assertSame(expected, response.getBody().getData());
         assertEquals("Market-cap backfill completed", response.getBody().getMessage());
+    }
+
+    @Test
+    @DisplayName("getDailyPrices should delegate when date range is valid")
+    void getDailyPricesShouldDelegateWhenDateRangeIsValid() {
+        String ticker = "AAPL";
+        LocalDate startDate = LocalDate.of(2026, 5, 1);
+        LocalDate endDate = LocalDate.of(2026, 5, 10);
+        MarketDataResponse expected = MarketDataResponse.builder()
+                .ticker(ticker)
+                .provider("unit-test")
+                .startDate(startDate)
+                .endDate(endDate)
+                .prices(List.of())
+                .build();
+
+        when(marketDataService.getDailyPrices(ticker, startDate, endDate)).thenReturn(expected);
+
+        ResponseEntity<ApiResponse<MarketDataResponse>> response =
+                marketDataController.getDailyPrices(ticker, startDate, endDate);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertTrue(response.getBody().isSuccess());
+        assertEquals(expected, response.getBody().getData());
+        verify(marketDataService).getDailyPrices(ticker, startDate, endDate);
+    }
+
+    @Test
+    @DisplayName("getDailyPrices should reject invalid date range")
+    void getDailyPricesShouldRejectInvalidDateRange() {
+        String ticker = "AAPL";
+        LocalDate startDate = LocalDate.of(2026, 5, 10);
+        LocalDate endDate = LocalDate.of(2026, 5, 1);
+
+        ResponseEntity<ApiResponse<MarketDataResponse>> response =
+                marketDataController.getDailyPrices(ticker, startDate, endDate);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertFalse(response.getBody().isSuccess());
+        assertEquals("startDate must be before or equal to endDate", response.getBody().getMessage());
+        verify(marketDataService, never()).getDailyPrices(ticker, startDate, endDate);
     }
 }
