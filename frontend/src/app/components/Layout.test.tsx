@@ -1,4 +1,3 @@
-import { describe, expect, it } from 'vitest';
 import { render, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { Layout } from './Layout';
@@ -40,3 +39,4 @@ describe('Layout', () => {
     expect(nav.getByRole('button', { name: 'Analysis' })).toHaveClass('bg-white/10');
   });
 });
+

@@ -1,4 +1,3 @@
-import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { EmptyState } from './EmptyState';
 
@@ -90,3 +89,4 @@ describe('EmptyState', () => {
     expect(container.firstChild).toHaveClass('flex', 'flex-col', 'items-center', 'justify-center', 'text-center');
   });
 });
+

@@ -1,4 +1,3 @@
-import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ErrorMessage, ErrorBanner, ErrorPage } from './ErrorMessage';
 
@@ -124,3 +123,4 @@ describe('ErrorPage', () => {
     expect(container.firstChild).toHaveClass('min-h-[400px]');
   });
 });
+

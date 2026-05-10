@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DividendViabilityDashboard } from './DividendViabilityDashboard';
 
 vi.mock('recharts', () => ({
@@ -731,3 +730,4 @@ describe('DividendViabilityDashboard', () => {
     expect(within(screen.getByRole('table')).getAllByRole('button', { name: 'Analyze' })).toHaveLength(2);
   });
 });
+

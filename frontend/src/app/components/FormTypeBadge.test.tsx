@@ -1,4 +1,3 @@
-import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { FormTypeBadge } from './FormTypeBadge';
 
@@ -74,3 +73,4 @@ describe('FormTypeBadge', () => {
     expect(badge).toHaveClass('inline-flex', 'items-center', 'px-2.5', 'py-0.5', 'rounded', 'text-xs');
   });
 });
+

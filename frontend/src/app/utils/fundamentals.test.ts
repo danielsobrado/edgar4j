@@ -1,4 +1,3 @@
-import { describe, expect, it } from 'vitest';
 import type { ComprehensiveAnalysis, Filing, MarketPriceHistory } from '../api';
 import {
   buildAnnualTrendPoints,
@@ -329,3 +328,4 @@ describe('fundamentals utils', () => {
     expect(points[1].dividendsPerShare).toBe(3.5);
   });
 });
+

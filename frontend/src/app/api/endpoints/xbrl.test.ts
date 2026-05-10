@@ -1,4 +1,3 @@
-import { describe, expect, it } from 'vitest';
 import { normalizeFactsPayload } from './xbrl';
 
 describe('normalizeFactsPayload', () => {
@@ -36,3 +35,4 @@ describe('normalizeFactsPayload', () => {
     expect(normalizeFactsPayload(null)).toEqual([]);
   });
 });
+

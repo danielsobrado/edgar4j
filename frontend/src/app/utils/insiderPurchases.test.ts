@@ -1,4 +1,3 @@
-import { describe, expect, it } from 'vitest';
 import { buildForm4SearchUrl } from './insiderPurchases';
 
 describe('buildForm4SearchUrl', () => {
@@ -14,3 +13,4 @@ describe('buildForm4SearchUrl', () => {
     expect(buildForm4SearchUrl({})).toBe('/search?formType=4&autoSearch=1');
   });
 });
+

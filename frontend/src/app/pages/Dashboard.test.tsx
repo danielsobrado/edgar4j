@@ -1,4 +1,3 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { Dashboard } from './Dashboard';
@@ -89,3 +88,4 @@ describe('Dashboard', () => {
     expect(screen.getByText('Top purchases unavailable')).toBeInTheDocument();
   });
 });
+

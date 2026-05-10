@@ -1,4 +1,3 @@
-import { describe, expect, it } from 'vitest';
 import type { ComprehensiveAnalysis, MarketPriceHistory } from '../api';
 import type { FilingSnapshot } from './fundamentals';
 import { buildDividendViabilityOverview } from './dividendViability';
@@ -189,3 +188,4 @@ describe('dividend viability utils', () => {
     expect(overview.warnings).toHaveLength(1);
   });
 });
+

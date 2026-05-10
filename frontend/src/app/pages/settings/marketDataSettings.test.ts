@@ -1,4 +1,3 @@
-import { describe, expect, it } from 'vitest';
 import {
   buildLegacySelectedMarketDataFields,
   buildMarketDataProvidersRequest,
@@ -123,3 +122,4 @@ describe('marketDataSettings', () => {
     expect(hint).toContain('will not remove');
   });
 });
+

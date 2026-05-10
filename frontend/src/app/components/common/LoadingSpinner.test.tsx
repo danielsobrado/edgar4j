@@ -1,4 +1,3 @@
-import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { LoadingSpinner, LoadingOverlay, LoadingPage } from './LoadingSpinner';
 
@@ -76,3 +75,4 @@ describe('LoadingPage', () => {
     expect(container.firstChild).toHaveClass('min-h-[400px]');
   });
 });
+

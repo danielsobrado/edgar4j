@@ -1,4 +1,3 @@
-import { describe, expect, it } from 'vitest';
 import { buildInsiderPurchasesQuery } from './insiderPurchases';
 
 describe('buildInsiderPurchasesQuery', () => {
@@ -38,3 +37,4 @@ describe('buildInsiderPurchasesQuery', () => {
     expect(query.has('sp500Only')).toBe(false);
   });
 });
+
