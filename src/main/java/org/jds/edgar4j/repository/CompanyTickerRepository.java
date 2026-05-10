@@ -14,7 +14,7 @@ import java.util.Optional;
  * <p>Provides fast CIK Ã¢â€ â€ Ticker cross-lookups without loading the full
  * {@code submissions} documents.
  */
-@Profile("resource-high & !resource-low")
+@Profile("resource-high")
 public interface CompanyTickerRepository extends MongoRepository<CompanyTicker, String> {
 
     /** Find by exact ticker (case-sensitive, as stored in the collection). */
@@ -37,3 +37,4 @@ public interface CompanyTickerRepository extends MongoRepository<CompanyTicker, 
     /** Full-text-style title search for autocomplete. */
     List<CompanyTicker> findByTitleContainingIgnoreCase(String title);
 }
+

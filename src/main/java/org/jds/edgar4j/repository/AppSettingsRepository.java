@@ -4,6 +4,7 @@ import org.jds.edgar4j.model.AppSettings;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.context.annotation.Profile;
 
-@Profile("resource-high & !resource-low")
+@Profile("resource-high")
 public interface AppSettingsRepository extends MongoRepository<AppSettings, String> {
 }
+

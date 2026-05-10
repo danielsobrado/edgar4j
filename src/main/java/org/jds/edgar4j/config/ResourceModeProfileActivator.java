@@ -1,6 +1,7 @@
 package org.jds.edgar4j.config;
 
 import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.Locale;
 
 import org.springframework.boot.SpringApplication;
@@ -17,9 +18,13 @@ public class ResourceModeProfileActivator implements EnvironmentPostProcessor, O
             return;
         }
 
-        if (!Arrays.asList(environment.getActiveProfiles()).contains(derivedProfile)) {
-            environment.addActiveProfile(derivedProfile);
+        LinkedHashSet<String> activeProfiles = new LinkedHashSet<>(Arrays.asList(environment.getActiveProfiles()));
+        activeProfiles.remove("resource-high");
+        activeProfiles.remove("resource-low");
+        if (!activeProfiles.contains(derivedProfile)) {
+            activeProfiles.add(derivedProfile);
         }
+        environment.setActiveProfiles(activeProfiles.toArray(String[]::new));
     }
 
     @Override
@@ -33,11 +38,16 @@ public class ResourceModeProfileActivator implements EnvironmentPostProcessor, O
             return resolveProfile(environment.getProperty("edgar4j.resource-mode", "high"));
         }
 
-        for (String activeProfile : activeProfiles) {
-            String resolvedProfile = resolveProfile(activeProfile);
-            if (resolvedProfile != null) {
-                return resolvedProfile;
-            }
+        boolean hasLowProfile = Arrays.stream(activeProfiles)
+                .anyMatch(this::isLowProfile);
+        if (hasLowProfile) {
+            return "resource-low";
+        }
+
+        boolean hasHighProfile = Arrays.stream(activeProfiles)
+                .anyMatch(this::isHighProfile);
+        if (hasHighProfile) {
+            return "resource-high";
         }
 
         return resolveProfile(environment.getProperty("edgar4j.resource-mode", "high"));
@@ -50,5 +60,17 @@ public class ResourceModeProfileActivator implements EnvironmentPostProcessor, O
             case "resource-high", "high", "test" -> "resource-high";
             default -> null;
         };
+    }
+
+    private boolean isLowProfile(String profile) {
+        String normalizedProfile = profile == null ? null : profile.trim().toLowerCase(Locale.ROOT);
+        return "resource-low".equals(normalizedProfile) || "low".equals(normalizedProfile)
+                || "test-low".equals(normalizedProfile);
+    }
+
+    private boolean isHighProfile(String profile) {
+        String normalizedProfile = profile == null ? null : profile.trim().toLowerCase(Locale.ROOT);
+        return "resource-high".equals(normalizedProfile) || "high".equals(normalizedProfile)
+                || "test".equals(normalizedProfile);
     }
 }

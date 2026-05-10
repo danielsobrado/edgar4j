@@ -11,7 +11,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
 
-@Profile("resource-high & !resource-low")
+@Profile("resource-high")
 public interface TickerRepository extends MongoRepository<Ticker, String> {
 
     @Query(value = "{ 'code': ?0 }", collation = "{ 'locale': 'en', 'strength': 2 }")
@@ -46,4 +46,5 @@ public interface TickerRepository extends MongoRepository<Ticker, String> {
     @Query(value = "{ 'exchange.code': ?0 }", count = true)
     long countByExchangeCode(String exchangeCode);
 }
+
 

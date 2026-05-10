@@ -15,7 +15,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.Delegate;
 
 @Component
-@Profile("resource-high & !resource-low")
+@Profile("resource-high")
 @RequiredArgsConstructor
 public class InsiderMongoAdapter implements InsiderDataPort {
 

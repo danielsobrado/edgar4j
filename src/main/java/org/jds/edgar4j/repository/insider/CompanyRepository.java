@@ -16,7 +16,7 @@ import org.springframework.data.mongodb.repository.Query;
  * @version 1.0
  * @since 2025-01-01
  */
-@Profile("resource-high & !resource-low")
+@Profile("resource-high")
 public interface CompanyRepository extends MongoRepository<Company, Long> {
 
     /**
@@ -75,3 +75,4 @@ public interface CompanyRepository extends MongoRepository<Company, Long> {
     @Query(value = "{ 'isActive': true }", count = true)
     Long countActiveCompanies();
 }
+

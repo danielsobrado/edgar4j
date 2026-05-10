@@ -25,7 +25,7 @@ import java.util.concurrent.CompletableFuture;
  */
 @Slf4j
 @Service
-@Profile("resource-high & !resource-low")
+@Profile("resource-high")
 @RequiredArgsConstructor
 public class CompanyEnrichmentService {
 
@@ -237,3 +237,4 @@ public class CompanyEnrichmentService {
         public LocalDateTime getLastUpdate() { return lastUpdate; }
     }
 }
+

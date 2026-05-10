@@ -15,7 +15,7 @@ import org.springframework.data.mongodb.repository.Query;
  * @version 1.0
  * @since 2025-01-01
  */
-@Profile("resource-high & !resource-low")
+@Profile("resource-high")
 public interface TransactionTypeRepository extends MongoRepository<TransactionType, Long> {
 
     /**
@@ -67,3 +67,4 @@ public interface TransactionTypeRepository extends MongoRepository<TransactionTy
     @Query("{ 'isActive': true, 'transactionCategory': 'EXERCISE' }")
     List<TransactionType> findDerivativeTransactionTypes();
 }
+

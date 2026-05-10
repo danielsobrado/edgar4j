@@ -11,7 +11,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.context.annotation.Profile;
 
-@Profile("resource-high & !resource-low")
+@Profile("resource-high")
 public interface DownloadJobRepository extends MongoRepository<DownloadJob, String> {
 
     List<DownloadJob> findByStatus(JobStatus status);
@@ -30,3 +30,4 @@ public interface DownloadJobRepository extends MongoRepository<DownloadJob, Stri
 
     Optional<DownloadJob> findFirstByTypeInAndStatusOrderByCompletedAtDesc(List<JobType> types, JobStatus status);
 }
+

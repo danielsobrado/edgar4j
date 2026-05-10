@@ -19,7 +19,7 @@ import org.springframework.data.mongodb.repository.Query;
  * @version 1.0
  * @since 2025-01-01
  */
-@Profile("resource-high & !resource-low")
+@Profile("resource-high")
 public interface InsiderTransactionRepository extends MongoRepository<InsiderTransaction, Long> {
 
     /**
@@ -152,3 +152,4 @@ public interface InsiderTransactionRepository extends MongoRepository<InsiderTra
         return findByCompanyCikOrderByTransactionDateDesc(cik, pageable).getContent();
     }
 }
+

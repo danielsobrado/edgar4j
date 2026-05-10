@@ -15,7 +15,7 @@ import org.springframework.data.mongodb.repository.Query;
  * @version 1.0
  * @since 2025-01-01
  */
-@Profile("resource-high & !resource-low")
+@Profile("resource-high")
 public interface InsiderCompanyRelationshipRepository extends MongoRepository<InsiderCompanyRelationship, Long> {
 
     /**
@@ -124,3 +124,4 @@ public interface InsiderCompanyRelationshipRepository extends MongoRepository<In
     @Query("{ 'isActive': true, $or: [ { 'isDirector': true }, { 'isOfficer': true }, { 'isTenPercentOwner': true } ] }")
     List<InsiderCompanyRelationship> findRelationshipsWithInsiderStatus();
 }
+

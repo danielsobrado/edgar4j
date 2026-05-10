@@ -40,7 +40,7 @@ import jakarta.validation.constraints.Min;
  */
 @Slf4j
 @RestController
-@Profile("resource-high & !resource-low")
+@Profile("resource-high")
 @RequestMapping("/api/v1/insider")
 @RequiredArgsConstructor
 @Validated
@@ -443,3 +443,4 @@ public class InsiderController {
         public long getTransactionTypeCount() { return transactionTypeCount; }
     }
 }
+

@@ -28,7 +28,7 @@ import jakarta.validation.Valid;
 
 @Slf4j
 @RestController
-@Profile("resource-high & !resource-low")
+@Profile("resource-high")
 @RequestMapping("/api/admin/migration")
 @RequiredArgsConstructor
 public class DataMigrationController {
@@ -136,3 +136,4 @@ public class DataMigrationController {
         return request.getPath().trim();
     }
 }
+

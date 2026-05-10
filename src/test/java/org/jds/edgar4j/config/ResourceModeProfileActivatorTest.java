@@ -38,4 +38,14 @@ class ResourceModeProfileActivatorTest {
 
         assertThat(environment.getActiveProfiles()).containsExactly("test-low", "resource-low");
     }
+
+    @Test
+    void lowProfileWinsWhenBothResourceSignalsPresent() {
+        MockEnvironment environment = new MockEnvironment();
+        environment.setActiveProfiles("test", "test-low");
+
+        activator.postProcessEnvironment(environment, new SpringApplication(Object.class));
+
+        assertThat(environment.getActiveProfiles()).containsExactly("test", "test-low", "resource-low");
+    }
 }

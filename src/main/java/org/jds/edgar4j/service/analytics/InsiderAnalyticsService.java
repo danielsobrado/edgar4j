@@ -28,7 +28,7 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Service
-@Profile("resource-high & !resource-low")
+@Profile("resource-high")
 @RequiredArgsConstructor
 public class InsiderAnalyticsService {
 
@@ -635,3 +635,4 @@ public class InsiderAnalyticsService {
         public void setOverallPerformance(double overallPerformance) { this.overallPerformance = overallPerformance; }
     }
 }
+

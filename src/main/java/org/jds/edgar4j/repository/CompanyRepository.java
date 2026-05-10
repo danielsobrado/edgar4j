@@ -10,7 +10,7 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
 import org.springframework.context.annotation.Profile;
 
-@Profile("resource-high & !resource-low")
+@Profile("resource-high")
 public interface CompanyRepository extends MongoRepository<Company, String> {
 
     Optional<Company> findByCik(String cik);
@@ -30,3 +30,4 @@ public interface CompanyRepository extends MongoRepository<Company, String> {
 
     long countByTaxonomy(String taxonomy);
 }
+

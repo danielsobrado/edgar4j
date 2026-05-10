@@ -14,7 +14,7 @@ import org.springframework.context.annotation.Profile;
 /**
  * Repository for Form 3 SEC filings.
  */
-@Profile("resource-high & !resource-low")
+@Profile("resource-high")
 public interface Form3Repository extends MongoRepository<Form3, String> {
 
     Optional<Form3> findByAccessionNumber(String accessionNumber);
@@ -32,3 +32,4 @@ public interface Form3Repository extends MongoRepository<Form3, String> {
 
     void deleteByAccessionNumber(String accessionNumber);
 }
+

@@ -8,7 +8,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 @Component
-@Profile("resource-high & !resource-low")
+@Profile("resource-high")
 @RequiredArgsConstructor
 public class Sp500ConstituentMongoAdapter implements Sp500ConstituentDataPort {
 

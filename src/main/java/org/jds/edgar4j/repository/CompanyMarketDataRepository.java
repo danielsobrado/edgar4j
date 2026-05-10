@@ -7,7 +7,7 @@ import org.jds.edgar4j.model.CompanyMarketData;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.context.annotation.Profile;
 
-@Profile("resource-high & !resource-low")
+@Profile("resource-high")
 public interface CompanyMarketDataRepository extends MongoRepository<CompanyMarketData, String> {
 
     Optional<CompanyMarketData> findByTickerIgnoreCase(String ticker);
@@ -18,3 +18,4 @@ public interface CompanyMarketDataRepository extends MongoRepository<CompanyMark
 
     boolean existsByTickerIgnoreCase(String ticker);
 }
+
