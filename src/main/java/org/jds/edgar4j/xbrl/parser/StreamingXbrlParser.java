@@ -6,13 +6,13 @@ import org.jds.edgar4j.xbrl.model.*;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.publisher.Sinks;
 
 import javax.xml.stream.*;
 import java.io.*;
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.ZonedDateTime;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
@@ -37,13 +37,11 @@ import java.util.function.Consumer;
 @RequiredArgsConstructor
 public class StreamingXbrlParser {
 
-    private final NamespaceResolver namespaceResolver;
     private final ValueTransformer valueTransformer;
 
     private final XMLInputFactory xmlInputFactory;
 
     public StreamingXbrlParser() {
-        this.namespaceResolver = new NamespaceResolver();
         this.valueTransformer = new ValueTransformer();
         this.xmlInputFactory = XMLInputFactory.newInstance();
         xmlInputFactory.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false);
@@ -99,23 +97,28 @@ public class StreamingXbrlParser {
             Map<String, XbrlUnit> units = new HashMap<>();
             Map<String, String> namespaces = new HashMap<>();
 
-            try (XMLStreamReader reader = xmlInputFactory.createXMLStreamReader(inputStream)) {
+            XMLStreamReader reader = null;
+            try {
+                reader = xmlInputFactory.createXMLStreamReader(inputStream);
                 while (reader.hasNext()) {
                     int event = reader.next();
 
                     if (event == XMLStreamConstants.START_ELEMENT) {
-                        String localName = reader.getLocalName().toLowerCase();
+                        String localName = reader.getLocalName();
+                        if (localName == null) {
+                            localName = reader.getName().getLocalPart();
+                        }
+                        localName = localName.toLowerCase();
 
-                        // Collect namespace declarations
                         for (int i = 0; i < reader.getNamespaceCount(); i++) {
                             String prefix = reader.getNamespacePrefix(i);
                             String uri = reader.getNamespaceURI(i);
-                            if (prefix != null && uri != null) {
-                                namespaces.put(prefix, uri);
+                            if (uri != null) {
+                                String normalizedPrefix = prefix == null ? "" : prefix;
+                                namespaces.put(normalizedPrefix, uri);
                             }
                         }
 
-                        // Parse context
                         if (localName.equals("context")) {
                             XbrlContext context = parseContext(reader);
                             if (context != null) {
@@ -123,7 +126,6 @@ public class StreamingXbrlParser {
                             }
                         }
 
-                        // Parse unit
                         if (localName.equals("unit")) {
                             XbrlUnit unit = parseUnit(reader);
                             if (unit != null) {
@@ -131,7 +133,6 @@ public class StreamingXbrlParser {
                             }
                         }
 
-                        // Parse schemaRef
                         if (localName.equals("schemaref")) {
                             String href = getAttributeValue(reader, "href", "xlink:href");
                             if (href != null) {
@@ -142,6 +143,8 @@ public class StreamingXbrlParser {
                 }
             } catch (XMLStreamException e) {
                 log.error("Error parsing metadata: {}", e.getMessage());
+            } finally {
+                closeQuietly(reader);
             }
 
             return builder
@@ -160,7 +163,9 @@ public class StreamingXbrlParser {
         return Mono.fromCallable(() -> {
             AtomicInteger count = new AtomicInteger(0);
 
-            try (XMLStreamReader reader = xmlInputFactory.createXMLStreamReader(inputStream)) {
+            XMLStreamReader reader = null;
+            try {
+                reader = xmlInputFactory.createXMLStreamReader(inputStream);
                 while (reader.hasNext()) {
                     int event = reader.next();
 
@@ -173,6 +178,8 @@ public class StreamingXbrlParser {
                 }
             } catch (XMLStreamException e) {
                 log.error("Error counting facts: {}", e.getMessage());
+            } finally {
+                closeQuietly(reader);
             }
 
             return (long) count.get();
@@ -199,21 +206,19 @@ public class StreamingXbrlParser {
         AtomicInteger factCount = new AtomicInteger(0);
         AtomicInteger errorCount = new AtomicInteger(0);
 
-        try (XMLStreamReader reader = xmlInputFactory.createXMLStreamReader(inputStream)) {
+        XMLStreamReader reader = null;
+        try {
+            reader = xmlInputFactory.createXMLStreamReader(inputStream);
             while (reader.hasNext()) {
                 int event = reader.next();
 
                 if (event == XMLStreamConstants.START_ELEMENT) {
-                    String localName = reader.getLocalName().toLowerCase();
-
-                    // Collect namespace declarations
-                    for (int i = 0; i < reader.getNamespaceCount(); i++) {
-                        String prefix = reader.getNamespacePrefix(i);
-                        String uri = reader.getNamespaceURI(i);
-                        namespaceResolver.registerNamespace(prefix, uri);
+                    String localName = reader.getLocalName();
+                    if (localName == null) {
+                        localName = reader.getName().getLocalPart();
                     }
+                    localName = localName.toLowerCase();
 
-                    // Parse context
                     if (localName.equals("context")) {
                         try {
                             XbrlContext context = parseContext(reader);
@@ -226,7 +231,6 @@ public class StreamingXbrlParser {
                         continue;
                     }
 
-                    // Parse unit
                     if (localName.equals("unit")) {
                         try {
                             XbrlUnit unit = parseUnit(reader);
@@ -239,8 +243,7 @@ public class StreamingXbrlParser {
                         continue;
                     }
 
-                    // Check if this is a fact element (has contextRef)
-                    String contextRef = reader.getAttributeValue(null, "contextRef");
+                    String contextRef = getAttributeValue(reader, "contextRef");
                     if (contextRef != null) {
                         try {
                             XbrlFact fact = parseFact(reader, localName);
@@ -248,7 +251,6 @@ public class StreamingXbrlParser {
                                 factConsumer.accept(fact);
                                 int count = factCount.incrementAndGet();
 
-                                // Report progress every 1000 facts
                                 if (progressConsumer != null && count % 1000 == 0) {
                                     progressConsumer.accept(new ParseProgress(
                                             count, errorCount.get(),
@@ -267,6 +269,8 @@ public class StreamingXbrlParser {
         } catch (XMLStreamException e) {
             log.error("Stream parsing error: {}", e.getMessage());
             result.setError(e.getMessage());
+        } finally {
+            closeQuietly(reader);
         }
 
         result.setFactCount(factCount.get());
@@ -279,10 +283,10 @@ public class StreamingXbrlParser {
     }
 
     private XbrlFact parseFact(XMLStreamReader reader, String elementName) throws XMLStreamException {
-        String contextRef = reader.getAttributeValue(null, "contextRef");
-        String unitRef = reader.getAttributeValue(null, "unitRef");
-        String decimals = reader.getAttributeValue(null, "decimals");
-        String nilAttr = reader.getAttributeValue(null, "nil");
+        String contextRef = getAttributeValue(reader, "contextRef");
+        String unitRef = getAttributeValue(reader, "unitRef");
+        String decimals = getAttributeValue(reader, "decimals");
+        String nilAttr = getAttributeValue(reader, "nil", "xsi:nil");
 
         // Get the namespace
         String namespaceUri = reader.getNamespaceURI();
@@ -320,7 +324,7 @@ public class StreamingXbrlParser {
         }
 
         // Check nil
-        if ("true".equalsIgnoreCase(nilAttr)) {
+        if ("true".equalsIgnoreCase(nilAttr) || "1".equals(nilAttr)) {
             builder.isNil(true);
         }
 
@@ -356,12 +360,13 @@ public class StreamingXbrlParser {
 
             if (event == XMLStreamConstants.START_ELEMENT) {
                 depth++;
-                currentElement = reader.getLocalName().toLowerCase();
+                String localName = reader.getLocalName();
+                currentElement = localName == null ? "" : localName.toLowerCase();
 
                 if (currentElement.equals("identifier")) {
                     scheme = reader.getAttributeValue(null, "scheme");
                 }
-            } else if (event == XMLStreamConstants.CHARACTERS) {
+            } else if (event == XMLStreamConstants.CHARACTERS || event == XMLStreamConstants.CDATA) {
                 String text = reader.getText().trim();
                 if (!text.isEmpty() && currentElement != null) {
                     switch (currentElement) {
@@ -415,12 +420,13 @@ public class StreamingXbrlParser {
 
             if (event == XMLStreamConstants.START_ELEMENT) {
                 depth++;
-                currentElement = reader.getLocalName().toLowerCase();
+                String localName = reader.getLocalName();
+                currentElement = localName == null ? "" : localName.toLowerCase();
 
                 if (currentElement.equals("divide")) {
                     builder.type(XbrlUnit.UnitType.DIVIDE);
                 }
-            } else if (event == XMLStreamConstants.CHARACTERS) {
+            } else if (event == XMLStreamConstants.CHARACTERS || event == XMLStreamConstants.CDATA) {
                 String text = reader.getText().trim();
                 if (!text.isEmpty() && "measure".equals(currentElement)) {
                     builder.measure(text);
@@ -443,14 +449,36 @@ public class StreamingXbrlParser {
 
     private LocalDate parseDate(String text) {
         if (text == null || text.isEmpty()) return null;
+        text = text.trim();
         try {
+            if (text.length() == 10) {
+                return LocalDate.parse(text);
+            }
+            int spaceIdx = text.indexOf(' ');
+            if (spaceIdx > 0) {
+                return LocalDate.parse(text.substring(0, Math.min(spaceIdx, 10)));
+            }
             if (text.contains("T")) {
                 text = text.substring(0, text.indexOf("T"));
+                return LocalDate.parse(text);
             }
-            return LocalDate.parse(text);
         } catch (Exception e) {
-            return null;
+            // Fall through
         }
+
+        try {
+            return OffsetDateTime.parse(text).toLocalDate();
+        } catch (Exception e) {
+            // Fall through
+        }
+
+        try {
+            return ZonedDateTime.parse(text).toLocalDate();
+        } catch (Exception e) {
+            // Fall through
+        }
+
+        return null;
     }
 
     private String getAttributeValue(XMLStreamReader reader, String... names) {
@@ -471,6 +499,16 @@ public class StreamingXbrlParser {
             }
         }
         return null;
+    }
+
+    private void closeQuietly(XMLStreamReader reader) {
+        if (reader != null) {
+            try {
+                reader.close();
+            } catch (XMLStreamException ignored) {
+                // intentionally ignored
+            }
+        }
     }
 
     // Result classes
