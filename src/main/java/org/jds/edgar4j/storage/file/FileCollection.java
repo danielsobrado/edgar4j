@@ -12,6 +12,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -41,6 +42,7 @@ public class FileCollection<T> {
     private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
     private final JavaType listType;
     private final Map<String, InMemoryIndex<T>> indexes = new LinkedHashMap<>();
+    private static final String SUPPORTED_SERIALIZATION_FORMATS = "JSON, JSONL";
 
     private List<T> records;
     private Map<String, T> recordsById;
@@ -54,15 +56,17 @@ public class FileCollection<T> {
             BiConsumer<T, String> idSetter,
             boolean indexOnStartup,
             boolean flushOnWrite) {
-        this.filePath = filePath;
-        this.type = type;
-        this.objectMapper = objectMapper;
-        this.format = format;
-        this.idGetter = idGetter;
-        this.idSetter = idSetter;
+        this.filePath = Objects.requireNonNull(filePath, "filePath is required");
+        this.type = Objects.requireNonNull(type, "type is required");
+        this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper is required");
+        this.format = Objects.requireNonNull(format, "format is required");
+        this.idGetter = Objects.requireNonNull(idGetter, "idGetter is required");
+        this.idSetter = Objects.requireNonNull(idSetter, "idSetter is required");
         this.indexOnStartup = indexOnStartup;
         this.flushOnWrite = flushOnWrite;
         this.listType = objectMapper.getTypeFactory().constructCollectionType(List.class, type);
+
+        ensureSupportedFormat();
     }
 
     public void registerIndex(String name, Function<T, ?> keyExtractor) {
@@ -297,7 +301,7 @@ public class FileCollection<T> {
 
     private List<T> readRecords() {
         try {
-            Files.createDirectories(filePath.getParent());
+            createParentDirectories();
             if (!Files.exists(filePath)) {
                 return new ArrayList<>();
             }
@@ -326,7 +330,7 @@ public class FileCollection<T> {
     private void writeRecords(List<T> values) {
         Path tempFile = filePath.resolveSibling(filePath.getFileName() + ".tmp");
         try {
-            Files.createDirectories(filePath.getParent());
+            createParentDirectories();
             ensureSupportedFormat();
             if (format == FileFormat.JSONL) {
                 try (BufferedWriter writer = Files.newBufferedWriter(tempFile, StandardCharsets.UTF_8)) {
@@ -347,6 +351,13 @@ public class FileCollection<T> {
         }
     }
 
+    private void createParentDirectories() throws IOException {
+        Path parent = filePath.getParent();
+        if (parent != null) {
+            Files.createDirectories(parent);
+        }
+    }
+
     private void flushIfNeeded() {
         if (flushOnWrite) {
             writeRecords(records);
@@ -354,7 +365,8 @@ public class FileCollection<T> {
     }
 
     private void assignIdIfMissing(T record) {
-        if (idGetter.apply(record) == null || idGetter.apply(record).isBlank()) {
+        String id = idGetter.apply(record);
+        if (id == null || id.isBlank()) {
             idSetter.accept(record, UUID.randomUUID().toString());
         }
     }
@@ -417,7 +429,8 @@ public class FileCollection<T> {
 
     private void ensureSupportedFormat() {
         if (format != FileFormat.JSON && format != FileFormat.JSONL) {
-            throw new UnsupportedOperationException("File format " + format + " is declared but not yet supported by FileCollection serialization");
+            throw new IllegalArgumentException(
+                    "FileCollection only supports " + SUPPORTED_SERIALIZATION_FORMATS + "; got " + format);
         }
     }
 
