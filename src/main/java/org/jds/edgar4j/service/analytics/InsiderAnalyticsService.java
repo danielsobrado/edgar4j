@@ -38,6 +38,10 @@ public class InsiderAnalyticsService {
      * Calculate comprehensive transaction analytics
      */
     public TransactionAnalytics calculateTransactionAnalytics(InsiderTransaction transaction) {
+        if (transaction == null) {
+            throw new IllegalArgumentException("Transaction is required");
+        }
+
         log.debug("Calculating analytics for transaction: {}", transaction.getAccessionNumber());
         
         TransactionAnalytics analytics = new TransactionAnalytics();
@@ -79,7 +83,7 @@ public class InsiderAnalyticsService {
         
         // Filter transactions by date range
         List<InsiderTransaction> relevantTransactions = transactions.stream()
-            .filter(t -> t.getTransactionDate() != null)
+            .filter(t -> t != null && t.getTransactionDate() != null)
             .filter(t -> !t.getTransactionDate().isBefore(startDate) && !t.getTransactionDate().isAfter(endDate))
             .collect(Collectors.toList());
         
@@ -125,7 +129,7 @@ public class InsiderAnalyticsService {
         log.debug("Calculating insider metrics for CIK: {}", insiderCik);
         
         List<InsiderTransaction> relevantTransactions = transactions.stream()
-            .filter(t -> t.getTransactionDate() != null)
+            .filter(t -> t != null && t.getTransactionDate() != null)
             .filter(t -> !t.getTransactionDate().isBefore(startDate) && !t.getTransactionDate().isAfter(endDate))
             .collect(Collectors.toList());
         
@@ -240,13 +244,13 @@ public class InsiderAnalyticsService {
 
     private long countTransactionsByType(List<InsiderTransaction> transactions, String transactionCode) {
         return transactions.stream()
-            .filter(t -> transactionCode.equals(t.getTransactionCode()))
+            .filter(t -> t != null && transactionCode.equals(t.getTransactionCode()))
             .count();
     }
 
     private BigDecimal calculateTotalValueByType(List<InsiderTransaction> transactions, String transactionCode) {
         return transactions.stream()
-            .filter(t -> transactionCode.equals(t.getTransactionCode()))
+            .filter(t -> t != null && transactionCode.equals(t.getTransactionCode()))
             .filter(t -> t.getTransactionValue() != null)
             .map(InsiderTransaction::getTransactionValue)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -254,6 +258,7 @@ public class InsiderAnalyticsService {
 
     private BigDecimal calculateTotalTransactionValue(List<InsiderTransaction> transactions) {
         return transactions.stream()
+            .filter(t -> t != null)
             .filter(t -> t.getTransactionValue() != null)
             .map(InsiderTransaction::getTransactionValue)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -268,6 +273,7 @@ public class InsiderAnalyticsService {
 
     private BigDecimal calculateAverageTransactionValue(List<InsiderTransaction> transactions) {
         List<InsiderTransaction> validTransactions = transactions.stream()
+            .filter(t -> t != null)
             .filter(t -> t.getTransactionValue() != null)
             .collect(Collectors.toList());
         
@@ -311,7 +317,7 @@ public class InsiderAnalyticsService {
         
         // Group transactions by insider
         Map<String, Long> transactionsByInsider = transactions.stream()
-            .filter(t -> t.getInsider() != null && t.getInsider().getCik() != null)
+            .filter(t -> t != null && t.getInsider() != null && t.getInsider().getCik() != null)
             .collect(Collectors.groupingBy(
                 t -> t.getInsider().getCik(),
                 Collectors.counting()
@@ -341,6 +347,7 @@ public class InsiderAnalyticsService {
         }
 
         List<InsiderTransaction> orderedTransactions = transactions.stream()
+            .filter(t -> t != null)
             .filter(t -> t.getTransactionDate() != null)
             .sorted(Comparator.comparing(InsiderTransaction::getTransactionDate))
             .collect(Collectors.toList());
@@ -377,6 +384,7 @@ public class InsiderAnalyticsService {
 
     private String findMostCommonTransactionType(List<InsiderTransaction> transactions) {
         Map<String, Long> typeCount = transactions.stream()
+            .filter(t -> t != null)
             .map(InsiderTransaction::getTransactionCode)
             .filter(Objects::nonNull)
             .collect(Collectors.groupingBy(
@@ -457,13 +465,13 @@ public class InsiderAnalyticsService {
     }
 
     private boolean isPurchase(InsiderTransaction transaction) {
-        return "P".equals(transaction.getTransactionCode())
-            || InsiderTransaction.AcquiredDisposed.ACQUIRED.equals(transaction.getAcquiredDisposed());
+        return transaction != null && ("P".equals(transaction.getTransactionCode())
+            || InsiderTransaction.AcquiredDisposed.ACQUIRED.equals(transaction.getAcquiredDisposed()));
     }
 
     private boolean isSale(InsiderTransaction transaction) {
-        return "S".equals(transaction.getTransactionCode())
-            || InsiderTransaction.AcquiredDisposed.DISPOSED.equals(transaction.getAcquiredDisposed());
+        return transaction != null && ("S".equals(transaction.getTransactionCode())
+            || InsiderTransaction.AcquiredDisposed.DISPOSED.equals(transaction.getAcquiredDisposed()));
     }
 
     /**

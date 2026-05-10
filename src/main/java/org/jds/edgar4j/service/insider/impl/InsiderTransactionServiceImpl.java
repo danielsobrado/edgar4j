@@ -36,6 +36,10 @@ public class InsiderTransactionServiceImpl implements InsiderTransactionService 
 
     @Override
     public InsiderTransaction saveTransaction(InsiderTransaction transaction) {
+        if (transaction == null) {
+            throw new IllegalArgumentException("Transaction is null");
+        }
+
         log.debug("Saving insider transaction: {}", transaction.getAccessionNumber());
         
         // Validate transaction before saving
@@ -58,6 +62,10 @@ public class InsiderTransactionServiceImpl implements InsiderTransactionService 
 
     @Override
     public List<InsiderTransaction> saveAll(List<InsiderTransaction> transactions) {
+        if (transactions == null || transactions.isEmpty()) {
+            return List.of();
+        }
+        
         log.info("Saving {} insider transactions", transactions.size());
         
         List<InsiderTransaction> savedTransactions = new ArrayList<>();
@@ -213,6 +221,10 @@ public class InsiderTransactionServiceImpl implements InsiderTransactionService 
 
     @Override
     public void calculateOwnershipPercentages(InsiderTransaction transaction) {
+        if (transaction == null) {
+            return;
+        }
+        
         log.debug("Calculating ownership percentages for transaction: {}", transaction.getAccessionNumber());
         
         // If company total shares is available, calculate ownership percentages

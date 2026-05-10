@@ -408,19 +408,19 @@ public class Form4ParserServiceImpl implements Form4ParserService {
         }
 
         boolean changed = false;
-        if (!relationship.getIsDirector() && ownerInfo.isDirector()) {
+        if (!isTrue(relationship.getIsDirector()) && ownerInfo.isDirector()) {
             relationship.setIsDirector(true);
             changed = true;
         }
-        if (!relationship.getIsOfficer() && ownerInfo.isOfficer()) {
+        if (!isTrue(relationship.getIsOfficer()) && ownerInfo.isOfficer()) {
             relationship.setIsOfficer(true);
             changed = true;
         }
-        if (!relationship.getIsTenPercentOwner() && ownerInfo.isTenPercentOwner()) {
+        if (!isTrue(relationship.getIsTenPercentOwner()) && ownerInfo.isTenPercentOwner()) {
             relationship.setIsTenPercentOwner(true);
             changed = true;
         }
-        if (!relationship.getIsOther() && ownerInfo.isOther()) {
+        if (!isTrue(relationship.getIsOther()) && ownerInfo.isOther()) {
             relationship.setIsOther(true);
             changed = true;
         }
@@ -457,6 +457,10 @@ public class Form4ParserServiceImpl implements Form4ParserService {
         if (changed || activeRelationships == null || activeRelationships.isEmpty()) {
             relationshipRepository.save(relationship);
         }
+    }
+
+    private boolean isTrue(Boolean value) {
+        return Boolean.TRUE.equals(value);
     }
 
     private InsiderTransaction convertNonDerivativeTransaction(NonDerivativeTransaction nonDeriv, 

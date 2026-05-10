@@ -295,6 +295,7 @@ public class InsiderServiceImpl implements InsiderService {
         
         // Get company count (unique companies from transactions)
         Long totalCompanies = (long) transactionRepository.findByInsiderCik(cik).stream()
+            .filter(t -> t != null && t.getCompany() != null && t.getCompany().getCik() != null)
             .map(t -> t.getCompany().getCik())
             .distinct()
             .toArray().length;
