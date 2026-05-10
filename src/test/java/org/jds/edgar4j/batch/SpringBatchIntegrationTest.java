@@ -2,12 +2,9 @@ package org.jds.edgar4j.batch;
 
 import javax.sql.DataSource;
 
-import org.jds.edgar4j.batch.processor.Form4DocumentProcessor;
-import org.jds.edgar4j.batch.reader.EdgarFilingReader;
-import org.jds.edgar4j.batch.writer.InsiderTransactionWriter;
+import org.jds.edgar4j.integration.SecApiClient;
 import org.jds.edgar4j.model.insider.InsiderTransaction;
 import org.jds.edgar4j.port.InsiderTransactionDataPort;
-import org.jds.edgar4j.service.insider.EdgarApiService;
 import org.jds.edgar4j.service.insider.Form4ParserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -22,11 +19,11 @@ import org.springframework.batch.test.JobRepositoryTestUtils;
 import org.springframework.batch.test.context.SpringBatchTest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.jdbc.DataSourceBuilder;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
-import org.springframework.boot.jdbc.DataSourceBuilder;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
@@ -36,21 +33,17 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
 
-/**
- * Integration tests for Spring Batch Form 4 processing pipeline
- * 
- * @author J. Daniel Sobrado
- * @version 1.0
- * @since 2025-01-01
- */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
 @SpringBatchTest
 @EnableBatchProcessing
@@ -63,10 +56,7 @@ import static org.mockito.Mockito.when;
     "spring.batch.job.enabled=false",
     "spring.batch.job.name=processForm4FilingsJob",
     "spring.batch.jdbc.initialize-schema=always",
-    "spring.quartz.auto-startup=false",
-    "edgar4j.urls.submissionsCIKUrl=https://data.sec.gov/submissions/CIK",
-    "edgar4j.urls.edgarDataArchivesUrl=https://www.sec.gov/Archives/edgar/data",
-    "edgar4j.urls.companyTickersUrl=https://www.sec.gov/files/company_tickers.json"
+    "spring.quartz.auto-startup=false"
 })
 @Transactional
 public class SpringBatchIntegrationTest {
@@ -82,7 +72,7 @@ public class SpringBatchIntegrationTest {
     private Job processForm4FilingsJob;
 
     @Autowired
-    private EdgarApiService edgarApiService;
+    private SecApiClient secApiClient;
 
     @Autowired
     private Form4ParserService form4ParserService;
@@ -90,7 +80,7 @@ public class SpringBatchIntegrationTest {
     @Autowired
     private InsiderTransactionDataPort insiderTransactionDataPort;
 
-    private final String TEST_XML_CONTENT = """
+    private static final String TEST_XML_CONTENT = """
         <?xml version="1.0" encoding="UTF-8"?>
         <ownershipDocument>
             <documentType>4</documentType>
@@ -105,54 +95,7 @@ public class SpringBatchIntegrationTest {
                     <rptOwnerCik>0001234567</rptOwnerCik>
                     <rptOwnerName>SMITH JOHN</rptOwnerName>
                 </reportingOwnerId>
-                <reportingOwnerAddress>
-                    <rptOwnerStreet1>123 Main Street</rptOwnerStreet1>
-                    <rptOwnerCity>Seattle</rptOwnerCity>
-                    <rptOwnerState>WA</rptOwnerState>
-                    <rptOwnerZipCode>98101</rptOwnerZipCode>
-                </reportingOwnerAddress>
-                <reportingOwnerRelationship>
-                    <isDirector>1</isDirector>
-                    <isOfficer>0</isOfficer>
-                    <isTenPercentOwner>0</isTenPercentOwner>
-                    <isOther>0</isOther>
-                </reportingOwnerRelationship>
             </reportingOwner>
-            <nonDerivativeTable>
-                <nonDerivativeTransaction>
-                    <securityTitle>
-                        <value>Common Stock</value>
-                    </securityTitle>
-                    <transactionDate>
-                        <value>2024-01-15</value>
-                    </transactionDate>
-                    <transactionCoding>
-                        <transactionFormType>4</transactionFormType>
-                        <transactionCode>P</transactionCode>
-                    </transactionCoding>
-                    <transactionAmounts>
-                        <transactionShares>
-                            <value>1000</value>
-                        </transactionShares>
-                        <transactionPricePerShare>
-                            <value>350.00</value>
-                        </transactionPricePerShare>
-                        <transactionAcquiredDisposedCode>
-                            <value>A</value>
-                        </transactionAcquiredDisposedCode>
-                    </transactionAmounts>
-                    <postTransactionAmounts>
-                        <sharesOwnedFollowingTransaction>
-                            <value>15000</value>
-                        </sharesOwnedFollowingTransaction>
-                    </postTransactionAmounts>
-                    <ownershipNature>
-                        <directOrIndirectOwnership>
-                            <value>D</value>
-                        </directOrIndirectOwnership>
-                    </ownershipNature>
-                </nonDerivativeTransaction>
-            </nonDerivativeTable>
         </ownershipDocument>
         """;
 
@@ -160,18 +103,19 @@ public class SpringBatchIntegrationTest {
     void setUp() {
         jobRepositoryTestUtils.removeJobExecutions();
         jobLauncherTestUtils.setJob(processForm4FilingsJob);
-        reset(edgarApiService, form4ParserService, insiderTransactionDataPort);
+        reset(secApiClient, form4ParserService, insiderTransactionDataPort);
     }
 
     @DisplayName("Should process Form 4 batch job successfully")
     @Test
     void testForm4BatchJobExecution() throws Exception {
-        // Given
         String accessionNumber = "0001234567-24-000001";
-        
-        when(edgarApiService.getForm4FilingsByDateRange(any(LocalDate.class), any(LocalDate.class)))
-            .thenReturn(Arrays.asList(accessionNumber));
-        when(edgarApiService.getForm4Document(anyString()))
+
+        when(secApiClient.fetchDailyMasterIndex(any(LocalDate.class)))
+            .thenReturn(Optional.of(createMasterIndex(accessionNumber)));
+        when(secApiClient.fetchFiling(eq("0001234567"), eq(accessionNumber), eq("index.json")))
+            .thenReturn(createFilingIndex("doc4.xml"));
+        when(secApiClient.fetchForm4(eq("0001234567"), eq(accessionNumber), eq("doc4.xml")))
             .thenReturn(TEST_XML_CONTENT);
         when(form4ParserService.parseForm4Xml(anyString(), anyString()))
             .thenReturn(createTestTransactions());
@@ -184,10 +128,8 @@ public class SpringBatchIntegrationTest {
             .addString("formType", "FORM4")
             .toJobParameters();
 
-        // When
         JobExecution jobExecution = jobLauncherTestUtils.launchJob(jobParameters);
 
-        // Then
         assertEquals("COMPLETED", jobExecution.getExitStatus().getExitCode());
         assertTrue(jobExecution.getJobInstanceId() > 0);
         assertTrue(jobExecution.getStepExecutions().size() > 0);
@@ -196,9 +138,7 @@ public class SpringBatchIntegrationTest {
     @DisplayName("Should handle empty result set gracefully")
     @Test
     void testBatchJobWithNoData() throws Exception {
-        // Given
-        when(edgarApiService.getForm4FilingsByDateRange(any(LocalDate.class), any(LocalDate.class)))
-            .thenReturn(Arrays.asList());
+        when(secApiClient.fetchDailyMasterIndex(any(LocalDate.class))).thenReturn(Optional.empty());
 
         JobParameters jobParameters = new JobParametersBuilder()
             .addString("startDate", "2024-01-01")
@@ -206,29 +146,45 @@ public class SpringBatchIntegrationTest {
             .addString("formType", "FORM4")
             .toJobParameters();
 
-        // When
         JobExecution jobExecution = jobLauncherTestUtils.launchJob(jobParameters);
 
-        // Then
         assertEquals("COMPLETED", jobExecution.getExitStatus().getExitCode());
     }
 
     @DisplayName("Should fall back to the current date when batch dates are omitted")
     @Test
     void testJobUsesDefaultDatesWhenParametersAreMissing() throws Exception {
-        // Given
-        when(edgarApiService.getForm4FilingsByDateRange(any(LocalDate.class), any(LocalDate.class)))
-            .thenReturn(List.of());
+        when(secApiClient.fetchDailyMasterIndex(any(LocalDate.class))).thenReturn(Optional.empty());
 
         JobParameters jobParameters = new JobParametersBuilder()
             .addString("formType", "FORM4")
             .toJobParameters();
 
-        // When
         JobExecution jobExecution = jobLauncherTestUtils.launchJob(jobParameters);
 
-        // Then
         assertEquals("COMPLETED", jobExecution.getExitStatus().getExitCode());
+    }
+
+    private String createMasterIndex(String accessionNumber) {
+        return """
+            Description: Master Index
+
+            CIK|Company Name|Form Type|Date Filed|Filename
+            1234567890|TEST CORP|4|2024-01-15|edgar/data/1234567890/%s/doc4.xml
+            """.formatted(accessionNumber);
+    }
+
+    private String createFilingIndex(String documentName) {
+        return """
+            {
+              "directory": {
+                "item": [
+                  { "name": "primary_doc.html" },
+                  { "name": "%s" }
+                ]
+              }
+            }
+            """.formatted(documentName);
     }
 
     private List<InsiderTransaction> createTestTransactions() {
@@ -249,8 +205,8 @@ public class SpringBatchIntegrationTest {
 
         @Bean
         @Primary
-        EdgarApiService edgarApiService() {
-            return mock(EdgarApiService.class);
+        SecApiClient secApiClient() {
+            return mock(SecApiClient.class);
         }
 
         @Bean

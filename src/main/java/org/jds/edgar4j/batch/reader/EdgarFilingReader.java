@@ -2,12 +2,14 @@ package org.jds.edgar4j.batch.reader;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jds.edgar4j.service.insider.EdgarApiService;
+import org.jds.edgar4j.integration.SecApiClient;
+import org.jds.edgar4j.integration.SecForm4DocumentSupport;
 import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.infrastructure.item.ItemReader;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -29,7 +31,7 @@ public class EdgarFilingReader implements ItemReader<String> {
     private static final String SUPPORTED_FORM_TYPE = "FORM4";
     private static final String DATE_PATTERN = "yyyy-MM-dd";
 
-    private final EdgarApiService edgarApiService;
+    private final SecApiClient secApiClient;
 
     @Value("#{jobParameters['startDate']}")
     private String startDate;
@@ -97,8 +99,19 @@ public class EdgarFilingReader implements ItemReader<String> {
         try {
             log.info("Fetching Form 4 accession numbers from {} to {}", startDate, endDate);
 
-            // Use the EdgarApiService to get filings by date range
-            accessionNumbers = edgarApiService.getForm4FilingsByDateRange(startDate, endDate);
+            LocalDate currentDate = startDate;
+            while (!currentDate.isAfter(endDate)) {
+                if (!isWeekend(currentDate)) {
+                    try {
+                        secApiClient.fetchDailyMasterIndex(currentDate)
+                                .map(SecForm4DocumentSupport::parseDailyMasterIndex)
+                                .ifPresent(accessionNumbers::addAll);
+                    } catch (Exception e) {
+                        log.debug("Daily master index unavailable for {}: {}", currentDate, e.getMessage());
+                    }
+                }
+                currentDate = currentDate.plusDays(1);
+            }
 
             log.info("Successfully fetched {} accession numbers for date range", accessionNumbers.size());
 
@@ -140,5 +153,10 @@ public class EdgarFilingReader implements ItemReader<String> {
             return SUPPORTED_FORM_TYPE;
         }
         return value.trim().toUpperCase(java.util.Locale.ROOT);
+    }
+
+    private boolean isWeekend(LocalDate date) {
+        DayOfWeek dayOfWeek = date.getDayOfWeek();
+        return dayOfWeek == DayOfWeek.SATURDAY || dayOfWeek == DayOfWeek.SUNDAY;
     }
 }
