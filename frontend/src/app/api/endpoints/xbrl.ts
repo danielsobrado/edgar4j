@@ -153,7 +153,7 @@ export function normalizeFactsPayload(payload: unknown): XbrlFact[] {
 
     const values = Object.values(parsed);
     if (values.length > 0 && values.every(value => isObjectRecord(value))) {
-      return values as XbrlFact[];
+      return values as unknown as XbrlFact[];
     }
   }
 

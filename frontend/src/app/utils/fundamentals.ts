@@ -50,8 +50,8 @@ export interface AnnualTrendPoint {
 export const ANNUAL_FORM_TYPES = ['10-K', '10-K/A', '20-F', '20-F/A', '40-F', '40-F/A'] as const;
 export const QUARTERLY_FORM_TYPES = ['10-Q', '10-Q/A'] as const;
 
-const ANNUAL_FORMS = new Set(ANNUAL_FORM_TYPES);
-const QUARTERLY_FORMS = new Set(QUARTERLY_FORM_TYPES);
+const ANNUAL_FORMS = new Set<string>(ANNUAL_FORM_TYPES);
+const QUARTERLY_FORMS = new Set<string>(QUARTERLY_FORM_TYPES);
 
 function getSortableDate(value?: string | null): number {
   if (!value) {

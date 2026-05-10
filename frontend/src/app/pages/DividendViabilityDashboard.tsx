@@ -1195,8 +1195,8 @@ export function DividendViabilityDashboard() {
                     <XAxis dataKey="label" tick={{ fill: '#475569', fontSize: 12 }} />
                     <YAxis tickFormatter={(value) => `$${value}`} tick={{ fill: '#475569', fontSize: 12 }} />
                     <Tooltip
-                      formatter={(value: number | null, name: string) => [
-                        formatCurrency(value),
+                      formatter={(value, name) => [
+                        formatCurrency(typeof value === 'number' ? value : null),
                         name === 'dividends' ? 'Dividend / Share' : 'EPS Diluted',
                       ]}
                       labelFormatter={(label) => `Period ${label}`}

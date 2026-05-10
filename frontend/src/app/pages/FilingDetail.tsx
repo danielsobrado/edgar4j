@@ -148,7 +148,7 @@ export function FilingDetail() {
   };
 
   const secFilingUrl = `https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${filing.cik}&type=${filing.formType}&dateb=&owner=include&count=40`;
-  const secDocumentUrl = filing.filingUrl || `https://www.sec.gov/Archives/edgar/data/${filing.cik.replace(/^0+/, '')}/${filing.accessionNumber.replace(/-/g, '')}/${filing.primaryDocument || 'index.html'}`;
+  const secDocumentUrl = filing.url || `https://www.sec.gov/Archives/edgar/data/${filing.cik.replace(/^0+/, '')}/${filing.accessionNumber.replace(/-/g, '')}/${filing.primaryDocument || 'index.html'}`;
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -164,8 +164,8 @@ export function FilingDetail() {
                 )}
                 <FormTypeBadge formType={filing.formType} />
               </div>
-              {filing.documentDescription && (
-                <p className="text-gray-600">{filing.documentDescription}</p>
+              {filing.primaryDocDescription && (
+                <p className="text-gray-600">{filing.primaryDocDescription}</p>
               )}
             </div>
             <button
@@ -223,12 +223,6 @@ export function FilingDetail() {
               <div>
                 <p className="text-sm text-gray-600 mb-1">Keyword Matches</p>
                 <p>{filing.wordHits} hits</p>
-              </div>
-            )}
-            {filing.fileSize && (
-              <div>
-                <p className="text-sm text-gray-600 mb-1">File Size</p>
-                <p>{filing.fileSize}</p>
               </div>
             )}
           </div>
@@ -382,34 +376,6 @@ export function FilingDetail() {
             <h3 className="mb-3">Content Preview</h3>
             <div className="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto max-h-96 overflow-y-auto">
               <p className="text-gray-700 whitespace-pre-wrap">{filing.contentPreview}</p>
-            </div>
-          </div>
-        )}
-
-        {/* Related Documents */}
-        {filing.documents && filing.documents.length > 0 && (
-          <div className="p-6 border-b border-gray-200">
-            <h3 className="mb-3">Related Documents ({filing.documents.length})</h3>
-            <div className="space-y-2 max-h-60 overflow-y-auto">
-              {filing.documents.map((doc, index) => (
-                <div key={index} className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded">
-                  <div className="flex-1">
-                    <p className="font-mono text-sm">{doc.filename}</p>
-                    <p className="text-xs text-gray-500">{doc.description || doc.type}</p>
-                  </div>
-                  {doc.url && (
-                    <a
-                      href={doc.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline text-sm flex items-center gap-1"
-                    >
-                      <ExternalLink className="w-3 h-3" />
-                      View
-                    </a>
-                  )}
-                </div>
-              ))}
             </div>
           </div>
         )}

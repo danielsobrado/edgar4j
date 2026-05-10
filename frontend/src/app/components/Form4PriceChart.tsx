@@ -9,10 +9,9 @@ import {
   type IChartApi,
   type ISeriesApi,
   type CandlestickData,
-  type CandlestickSeriesOptions,
   type HistogramData,
-  type HistogramSeriesOptions,
   type MouseEventParams,
+  type SeriesMarker,
   type Time,
   type UTCTimestamp,
   createChart,
@@ -198,7 +197,7 @@ function aggregateMarkers(
       const shares = Math.abs(transaction.transactionShares ?? 0);
       const reportedValue = transactionReportedNotionalValue(transaction);
       const estimatedClose = reportedValue == null ? resolveEstimatedClose(date, marketCloseLookup) : null;
-      const estimatedValue = estimatedClose && shares > 0 ? Math.abs(shares * estimatedClose.close) : null;
+      const estimatedValue = estimatedClose !== null && shares > 0 ? Math.abs(shares * estimatedClose.close) : null;
 
       existing.count += 1;
       existing.totalShares += shares;
@@ -207,7 +206,7 @@ function aggregateMarkers(
         existing.reportedValue += reportedValue;
         existing.totalValue += reportedValue;
         existing.reportedTransactionCount += 1;
-      } else if (estimatedValue != null) {
+      } else if (estimatedClose !== null && estimatedValue != null) {
         existing.estimatedShares += shares;
         existing.estimatedValue += estimatedValue;
         existing.totalValue += estimatedValue;
@@ -532,26 +531,30 @@ export function Form4PriceChart({ ticker, anchorDate, rangeStartDate, rangeEndDa
         downColor: '#dc2626',
         borderUpColor: '#16a34a',
         borderDownColor: '#dc2626',
+        borderColor: '#16a34a',
+        borderVisible: true,
         wickUpColor: '#16a34a',
         wickDownColor: '#dc2626',
-      } satisfies CandlestickSeriesOptions
+        wickColor: '#16a34a',
+        wickVisible: true,
+      }
     );
 
     const buyValueSeries: ISeriesApi<'Histogram'> = chart.addSeries(
       HistogramSeries,
       {
-        priceFormat: { type: 'volume' },
+        priceFormat: { type: 'volume', precision: 0, minMove: 1 },
         priceScaleId: 'volume',
         color: 'rgba(22, 163, 74, 0.58)',
-      } satisfies HistogramSeriesOptions
+      }
     );
     const sellValueSeries: ISeriesApi<'Histogram'> = chart.addSeries(
       HistogramSeries,
       {
-        priceFormat: { type: 'volume' },
+        priceFormat: { type: 'volume', precision: 0, minMove: 1 },
         priceScaleId: 'volume',
         color: 'rgba(220, 38, 38, 0.58)',
-      } satisfies HistogramSeriesOptions
+      }
     );
     chart.priceScale('volume').applyOptions({
       scaleMargins: {
@@ -586,7 +589,7 @@ export function Form4PriceChart({ ticker, anchorDate, rangeStartDate, rangeEndDa
     buyValueSeries.setData(buyValueData);
     sellValueSeries.setData(sellValueData);
 
-    const markers = markerAggregates.map((aggregate) => ({
+    const markers: SeriesMarker<Time>[] = markerAggregates.map((aggregate) => ({
       id: aggregate.key,
       time: toTimestamp(aggregate.date),
       position: aggregate.direction === 'sell' ? 'aboveBar' : 'belowBar',

@@ -204,23 +204,23 @@ export function useBeneficialOwners(cusip: string | undefined) {
   return { owners, loading, error };
 }
 
-export function useOwnershipHistory(cusip: string | undefined, filerCik: string | undefined) {
+export function useOwnershipHistory(filerCik: string | undefined, issuerCik: string | undefined) {
   const [history, setHistory] = useState<OwnershipHistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!cusip || !filerCik) {
+    if (!filerCik || !issuerCik) {
       setLoading(false);
       return;
     }
 
     setLoading(true);
-    form13dgApi.getOwnershipHistory(cusip, filerCik)
+    form13dgApi.getOwnershipHistory(filerCik, issuerCik)
       .then(setHistory)
       .catch(err => setError(err.message))
       .finally(() => setLoading(false));
-  }, [cusip, filerCik]);
+  }, [filerCik, issuerCik]);
 
   return { history, loading, error };
 }

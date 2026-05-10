@@ -158,7 +158,10 @@ export function FilingSearch() {
     setRemoteError(null);
     setRemoteSearchResult(null);
     try {
-      const data = await remoteEdgarApi.searchFilings(request, signal ? { signal } : undefined);
+      const data = await remoteEdgarApi.searchFilings(
+        { ...request, formType: request.formType },
+        signal ? { signal } : undefined
+      );
       setRemoteSearchResult(data);
     } catch (err) {
       if (isAbortError(err)) {
@@ -641,9 +644,9 @@ export function FilingSearch() {
                             <button className="text-gray-500 hover:text-gray-700">
                               <Download className="w-4 h-4" />
                             </button>
-                            {filing.filingUrl && (
+                            {filing.url && (
                               <a
-                                href={filing.filingUrl}
+                                href={filing.url}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-gray-500 hover:text-gray-700"

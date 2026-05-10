@@ -358,7 +358,7 @@ export function Form13FPage() {
             {selectedFiling.holdings && selectedFiling.holdings.length > 0 ? (
               <HoldingsTable holdings={selectedFiling.holdings} />
             ) : (
-              <EmptyState type="data" message="No holdings data available" />
+              <EmptyState type="generic" message="No holdings data available" />
             )}
           </div>
         </div>

@@ -2,19 +2,33 @@ import React, { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Building2, MapPin, Calendar, FileText, Briefcase, Search, LineChart } from 'lucide-react';
 import { FormTypeBadge } from '../components/FormTypeBadge';
-import { useCompanies, useCompanyFilings } from '../hooks';
+import { useCompanies, useCompanyByCik, useCompanyFilings } from '../hooks';
 import { LoadingSpinner, LoadingPage } from '../components/common/LoadingSpinner';
 import { ErrorMessage } from '../components/common/ErrorMessage';
 import { EmptyState } from '../components/common/EmptyState';
 import { Pagination } from '../components/common/Pagination';
-import { CompanyResponse } from '../api';
+import { Address, Company, CompanyListItem } from '../api';
+
+function formatAddress(address: Address): string {
+  return [
+    address.street1,
+    address.street2,
+    address.city,
+    address.stateOrCountry,
+    address.zipCode,
+  ].filter(Boolean).join(', ');
+}
+
+function isCompanyDetails(company: Company | CompanyListItem): company is Company {
+  return 'exchanges' in company;
+}
 
 export function Companies() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
   // State
-  const [selectedCompany, setSelectedCompany] = React.useState<CompanyResponse | null>(null);
+  const [selectedCompanySummary, setSelectedCompanySummary] = React.useState<CompanyListItem | null>(null);
   const [searchTerm, setSearchTerm] = React.useState('');
   const [currentPage, setCurrentPage] = React.useState(0);
   const [pageSize, setPageSize] = React.useState(20);
@@ -36,6 +50,9 @@ export function Companies() {
     error: filingsError,
     fetchByCompany
   } = useCompanyFilings();
+  const { company: selectedCompanyDetails } = useCompanyByCik(selectedCompanySummary?.cik);
+  const selectedCompany = selectedCompanyDetails ?? selectedCompanySummary;
+  const detailsCompany = selectedCompany && isCompanyDetails(selectedCompany) ? selectedCompany : null;
 
   // Load companies on mount and when page changes
   useEffect(() => {
@@ -48,18 +65,18 @@ export function Companies() {
 
   // Select first company when list loads
   useEffect(() => {
-    if (companies.length > 0 && !selectedCompany) {
+    if (companies.length > 0 && !selectedCompanySummary) {
       const cikParam = searchParams.get('cik');
       if (cikParam) {
         const found = companies.find(c => c.cik === cikParam);
         if (found) {
-          setSelectedCompany(found);
+          setSelectedCompanySummary(found);
           return;
         }
       }
-      setSelectedCompany(companies[0]);
+      setSelectedCompanySummary(companies[0]);
     }
-  }, [companies, searchParams]);
+  }, [companies, selectedCompanySummary, searchParams]);
 
   // Load filings when company is selected
   useEffect(() => {
@@ -77,8 +94,8 @@ export function Companies() {
     });
   };
 
-  const handleCompanySelect = (company: CompanyResponse) => {
-    setSelectedCompany(company);
+  const handleCompanySelect = (company: CompanyListItem) => {
+    setSelectedCompanySummary(company);
   };
 
   if (companiesLoading && companies.length === 0) {
@@ -236,10 +253,10 @@ export function Companies() {
                   Company Information
                 </h3>
                 <div className="space-y-3">
-                  {selectedCompany.sicCode && (
+                  {selectedCompany.sic && (
                     <div>
                       <p className="text-sm text-gray-600 mb-1">SIC Code</p>
-                      <p className="font-mono">{selectedCompany.sicCode}</p>
+                      <p className="font-mono">{selectedCompany.sic}</p>
                       {selectedCompany.sicDescription && (
                         <p className="text-sm text-gray-600">{selectedCompany.sicDescription}</p>
                       )}
@@ -251,16 +268,16 @@ export function Companies() {
                       <p>{selectedCompany.stateOfIncorporation}</p>
                     </div>
                   )}
-                  {selectedCompany.fiscalYearEnd && (
+                  {detailsCompany?.fiscalYearEnd && (
                     <div>
                       <p className="text-sm text-gray-600 mb-1">Fiscal Year End</p>
-                      <p className="font-mono">{selectedCompany.fiscalYearEnd}</p>
+                      <p className="font-mono">{detailsCompany.fiscalYearEnd}</p>
                     </div>
                   )}
-                  {selectedCompany.exchange && (
+                  {detailsCompany && detailsCompany.exchanges.length > 0 && (
                     <div>
                       <p className="text-sm text-gray-600 mb-1">Exchange</p>
-                      <p>{selectedCompany.exchange}</p>
+                      <p>{detailsCompany.exchanges.join(', ')}</p>
                     </div>
                   )}
                 </div>
@@ -272,19 +289,19 @@ export function Companies() {
                   Addresses
                 </h3>
                 <div className="space-y-3">
-                  {selectedCompany.businessAddress && (
+                  {detailsCompany?.businessAddress && (
                     <div>
                       <p className="text-sm text-gray-600 mb-1">Business Address</p>
-                      <p className="text-sm">{selectedCompany.businessAddress}</p>
+                      <p className="text-sm">{formatAddress(detailsCompany.businessAddress)}</p>
                     </div>
                   )}
-                  {selectedCompany.mailingAddress && (
+                  {detailsCompany?.mailingAddress && (
                     <div>
                       <p className="text-sm text-gray-600 mb-1">Mailing Address</p>
-                      <p className="text-sm">{selectedCompany.mailingAddress}</p>
+                      <p className="text-sm">{formatAddress(detailsCompany.mailingAddress)}</p>
                     </div>
                   )}
-                  {!selectedCompany.businessAddress && !selectedCompany.mailingAddress && (
+                  {(!detailsCompany || (!detailsCompany.businessAddress && !detailsCompany.mailingAddress)) && (
                     <p className="text-sm text-gray-500">No address information available</p>
                   )}
                 </div>
@@ -324,8 +341,8 @@ export function Companies() {
                           <FormTypeBadge formType={filing.formType} />
                           <span className="font-mono text-sm text-gray-600">{filing.filingDate}</span>
                         </div>
-                        {filing.documentDescription && (
-                          <p className="text-sm text-gray-700">{filing.documentDescription}</p>
+                        {filing.primaryDocDescription && (
+                          <p className="text-sm text-gray-700">{filing.primaryDocDescription}</p>
                         )}
                         <p className="text-xs text-gray-500 font-mono mt-1">{filing.accessionNumber}</p>
                       </div>

@@ -201,7 +201,11 @@ export function useDownloads() {
   const { jobs, loading, error, refresh } = useDownloadJobs(50);
   const { jobs: activeJobs } = useActiveDownloadJobs(5000);
   const { summary, loading: summaryLoading, error: summaryError, refresh: refreshSummary } = useDownloadSummary();
-  const actions = useDownloadActions();
+  const {
+    loading: actionLoading,
+    error: actionError,
+    ...actions
+  } = useDownloadActions();
   const refreshAll = useCallback(async () => {
     await Promise.all([refresh(), refreshSummary()]);
   }, [refresh, refreshSummary]);
@@ -212,8 +216,10 @@ export function useDownloads() {
     summary,
     loading,
     summaryLoading,
+    actionLoading,
     error,
     summaryError,
+    actionError,
     refresh: refreshAll,
     ...actions,
   };
