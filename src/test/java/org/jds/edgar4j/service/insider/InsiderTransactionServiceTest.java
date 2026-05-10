@@ -36,6 +36,8 @@ class InsiderTransactionServiceTest {
 
     @Mock
     private InsiderTransactionDataPort transactionRepository;
+    @Mock
+    private Form4ParserService form4ParserService;
 
     private InsiderTransactionServiceImpl insiderTransactionService;
 
@@ -45,7 +47,7 @@ class InsiderTransactionServiceTest {
 
     @BeforeEach
     void setUp() {
-        insiderTransactionService = new InsiderTransactionServiceImpl(transactionRepository);
+        insiderTransactionService = new InsiderTransactionServiceImpl(transactionRepository, form4ParserService);
         
         testCompany = Company.builder()
             .id(1L)
@@ -292,6 +294,41 @@ class InsiderTransactionServiceTest {
         assertNotNull(results);
         assertEquals(1, results.size());
         verify(transactionRepository, times(1)).findByTransactionDateBetween(startDate, endDate);
+    }
+
+    @DisplayName("Should parse and save Form 4 XML transactions")
+    @Test
+    void testProcessForm4Data() {
+        // Given
+        String xmlContent = "<ownershipDocument></ownershipDocument>";
+        String accessionNumber = "0001234567-24-000001";
+        InsiderTransaction parsedTransaction = createValidTransaction(accessionNumber);
+        InsiderTransaction savedTransaction = createValidTransaction(accessionNumber);
+        savedTransaction.setId(1L);
+
+        when(form4ParserService.parseForm4Xml(xmlContent, accessionNumber)).thenReturn(List.of(parsedTransaction));
+        when(transactionRepository.save(parsedTransaction)).thenReturn(savedTransaction);
+
+        // When
+        List<InsiderTransaction> results = insiderTransactionService.processForm4Data(xmlContent, accessionNumber);
+
+        // Then
+        assertEquals(1, results.size());
+        assertEquals(1L, results.get(0).getId());
+        verify(form4ParserService).parseForm4Xml(xmlContent, accessionNumber);
+        verify(transactionRepository).save(parsedTransaction);
+    }
+
+    @DisplayName("Should skip Form 4 processing when XML content is blank")
+    @Test
+    void testProcessForm4DataBlankXml() {
+        // When
+        List<InsiderTransaction> results = insiderTransactionService.processForm4Data(" ", "0001234567-24-000001");
+
+        // Then
+        assertTrue(results.isEmpty());
+        verifyNoInteractions(form4ParserService);
+        verifyNoInteractions(transactionRepository);
     }
 
     private InsiderTransaction createValidTransaction() {

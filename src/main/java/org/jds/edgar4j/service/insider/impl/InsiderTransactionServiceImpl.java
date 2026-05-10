@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jds.edgar4j.model.insider.InsiderTransaction;
 import org.jds.edgar4j.port.InsiderTransactionDataPort;
+import org.jds.edgar4j.service.insider.Form4ParserService;
 import org.jds.edgar4j.service.insider.InsiderTransactionService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -31,6 +32,7 @@ import java.util.Optional;
 public class InsiderTransactionServiceImpl implements InsiderTransactionService {
 
     private final InsiderTransactionDataPort transactionRepository;
+    private final Form4ParserService form4ParserService;
 
     @Override
     public InsiderTransaction saveTransaction(InsiderTransaction transaction) {
@@ -130,16 +132,19 @@ public class InsiderTransactionServiceImpl implements InsiderTransactionService 
     @Override
     public List<InsiderTransaction> processForm4Data(String xmlContent, String accessionNumber) {
         log.info("Processing Form 4 data for accession number: {}", accessionNumber);
-        
-        // TODO: Implement Form 4 XML parsing
-        // This would involve:
-        // 1. Parse XML content to extract transaction data
-        // 2. Create InsiderTransaction objects
-        // 3. Validate and save transactions
-        // 4. Return list of saved transactions
-        
-        log.warn("Form 4 processing not yet implemented");
-        return List.of();
+
+        if (xmlContent == null || xmlContent.isBlank()) {
+            log.warn("No Form 4 XML content supplied for accession number: {}", accessionNumber);
+            return List.of();
+        }
+
+        List<InsiderTransaction> parsedTransactions = form4ParserService.parseForm4Xml(xmlContent, accessionNumber);
+        if (parsedTransactions.isEmpty()) {
+            log.warn("No insider transactions parsed from Form 4 accession number: {}", accessionNumber);
+            return List.of();
+        }
+
+        return saveAll(parsedTransactions);
     }
 
     @Override
