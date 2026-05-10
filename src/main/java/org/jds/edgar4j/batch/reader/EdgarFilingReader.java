@@ -68,7 +68,7 @@ public class EdgarFilingReader implements ItemReader<String> {
             if (!SUPPORTED_FORM_TYPE.equals(normalizedFormType)) {
                 log.warn("Unsupported formType '{}' configured. Supported types: {}. No filings will be read.",
                         formType, SUPPORTED_FORM_TYPE);
-                this.accessionNumberIterator = List.of().iterator();
+                this.accessionNumberIterator = List.<String>of().iterator();
                 return;
             }
 
