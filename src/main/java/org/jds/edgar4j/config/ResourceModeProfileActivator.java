@@ -18,13 +18,31 @@ public class ResourceModeProfileActivator implements EnvironmentPostProcessor, O
             return;
         }
 
-        LinkedHashSet<String> activeProfiles = new LinkedHashSet<>(Arrays.asList(environment.getActiveProfiles()));
-        activeProfiles.remove("resource-high");
-        activeProfiles.remove("resource-low");
+        LinkedHashSet<String> activeProfiles = normalizeActiveProfiles(environment.getActiveProfiles());
+        activeProfiles.removeIf(this::isResourceProfile);
         if (!activeProfiles.contains(derivedProfile)) {
             activeProfiles.add(derivedProfile);
         }
         environment.setActiveProfiles(activeProfiles.toArray(String[]::new));
+    }
+
+    private LinkedHashSet<String> normalizeActiveProfiles(String[] activeProfiles) {
+        LinkedHashSet<String> normalizedProfiles = new LinkedHashSet<>();
+        if (activeProfiles == null) {
+            return normalizedProfiles;
+        }
+
+        for (String profile : activeProfiles) {
+            String normalizedProfile = normalizeProfile(profile);
+            if (normalizedProfile != null) {
+                normalizedProfiles.add(normalizedProfile);
+            }
+        }
+        return normalizedProfiles;
+    }
+
+    private boolean isResourceProfile(String profile) {
+        return "resource-high".equals(profile) || "resource-low".equals(profile);
     }
 
     @Override
@@ -54,7 +72,10 @@ public class ResourceModeProfileActivator implements EnvironmentPostProcessor, O
     }
 
     private String resolveProfile(String value) {
-        String normalizedValue = value == null ? "high" : value.trim().toLowerCase(Locale.ROOT);
+        String normalizedValue = normalizeProfile(value);
+        if (normalizedValue == null) {
+            return null;
+        }
         return switch (normalizedValue) {
             case "resource-low", "low", "test-low" -> "resource-low";
             case "resource-high", "high", "test" -> "resource-high";
@@ -62,14 +83,23 @@ public class ResourceModeProfileActivator implements EnvironmentPostProcessor, O
         };
     }
 
+    private String normalizeProfile(String value) {
+        if (value == null) {
+            return null;
+        }
+
+        String normalizedValue = value.trim().toLowerCase(Locale.ROOT);
+        return normalizedValue.isEmpty() ? null : normalizedValue;
+    }
+
     private boolean isLowProfile(String profile) {
-        String normalizedProfile = profile == null ? null : profile.trim().toLowerCase(Locale.ROOT);
+        String normalizedProfile = normalizeProfile(profile);
         return "resource-low".equals(normalizedProfile) || "low".equals(normalizedProfile)
                 || "test-low".equals(normalizedProfile);
     }
 
     private boolean isHighProfile(String profile) {
-        String normalizedProfile = profile == null ? null : profile.trim().toLowerCase(Locale.ROOT);
+        String normalizedProfile = normalizeProfile(profile);
         return "resource-high".equals(normalizedProfile) || "high".equals(normalizedProfile)
                 || "test".equals(normalizedProfile);
     }
