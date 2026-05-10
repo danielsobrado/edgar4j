@@ -37,7 +37,9 @@ import org.jds.edgar4j.model.FormType;
 import org.jds.edgar4j.port.FillingDataPort;
 import org.jds.edgar4j.service.CompanyMarketDataService;
 import org.jds.edgar4j.service.CompanyService;
+import org.jds.edgar4j.service.dividend.DividendAlertsService;
 import org.jds.edgar4j.service.dividend.DividendEventExtractor;
+import org.jds.edgar4j.service.dividend.DividendMetricsService;
 import org.jds.edgar4j.validation.UrlAllowlistValidator;
 import org.jds.edgar4j.xbrl.XbrlService;
 import org.jds.edgar4j.xbrl.model.XbrlInstance;
@@ -95,7 +97,9 @@ class DividendAnalysisServiceImplTest {
                 secApiConfig,
                 xbrlService,
                 urlAllowlistValidator,
-                dividendEventExtractor);
+                dividendEventExtractor,
+                new DividendMetricsService(),
+                new DividendAlertsService());
     }
 
     @Test

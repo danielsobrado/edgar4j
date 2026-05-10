@@ -1,7 +1,6 @@
 package org.jds.edgar4j.service.impl;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -43,7 +42,9 @@ import org.jds.edgar4j.port.FillingDataPort;
 import org.jds.edgar4j.service.CompanyMarketDataService;
 import org.jds.edgar4j.service.CompanyService;
 import org.jds.edgar4j.service.DividendAnalysisService;
+import org.jds.edgar4j.service.dividend.DividendAlertsService;
 import org.jds.edgar4j.service.dividend.DividendEventExtractor;
+import org.jds.edgar4j.service.dividend.DividendMetricsService;
 import org.jds.edgar4j.validation.UrlAllowlistValidator;
 import org.jds.edgar4j.xbrl.XbrlService;
 import org.jds.edgar4j.xbrl.model.XbrlInstance;
@@ -106,6 +107,8 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
     private final XbrlService xbrlService;
     private final UrlAllowlistValidator urlAllowlistValidator;
     private final DividendEventExtractor dividendEventExtractor;
+    private final DividendMetricsService dividendMetricsService;
+    private final DividendAlertsService dividendAlertsService;
 
     @Override
     public DividendOverviewResponse getOverview(String tickerOrCik) {
@@ -383,10 +386,10 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
         Double operatingCashFlow = getMetric(latestAnnual,
                 List.of("OperatingCashFlow"),
                 List.of("NetCashProvidedByUsedInOperatingActivities"));
-        Double capitalExpenditures = magnitude(getMetric(latestAnnual,
+        Double capitalExpenditures = dividendMetricsService.magnitude(getMetric(latestAnnual,
                 List.of("CapitalExpenditures"),
                 List.of("PaymentsToAcquirePropertyPlantAndEquipment", "PaymentsToAcquireProductiveAssets")));
-        Double dividendsPaid = magnitude(getMetric(latestAnnual,
+        Double dividendsPaid = dividendMetricsService.magnitude(getMetric(latestAnnual,
                 List.of("DividendsPaid", "PaymentsOfDividendsCommonStock"),
                 List.of("PaymentsOfDividendsCommonStock", "DividendsCommonStockCash", "PaymentsOfOrdinaryDividends")));
         Double freeCashFlow = operatingCashFlow != null && capitalExpenditures != null
@@ -396,26 +399,26 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
         Double cash = getMetric(latestBalance,
                 List.of("Cash"),
                 List.of("CashAndCashEquivalentsAtCarryingValue"));
-        Double longTermDebt = magnitude(getMetric(latestBalance,
+        Double longTermDebt = dividendMetricsService.magnitude(getMetric(latestBalance,
                 List.of("LongTermDebt"),
                 List.of("LongTermDebt")));
-        Double shortTermDebt = magnitude(getMetric(latestBalance,
+        Double shortTermDebt = dividendMetricsService.magnitude(getMetric(latestBalance,
                 List.of("DebtCurrent", "ShortTermDebt"),
                 List.of("DebtCurrent", "LongTermDebtCurrent", "ShortTermBorrowings")));
         Double grossDebt = longTermDebt == null && shortTermDebt == null
                 ? null
-                : defaultIfNull(longTermDebt) + defaultIfNull(shortTermDebt);
+                : dividendMetricsService.defaultIfNull(longTermDebt) + dividendMetricsService.defaultIfNull(shortTermDebt);
         Double netDebt = grossDebt != null && cash != null ? grossDebt - cash : null;
         Double operatingIncome = getMetric(latestAnnual,
                 List.of("OperatingIncome"),
                 List.of("OperatingIncomeLoss"));
-        Double depreciationAmortization = magnitude(getMetric(latestAnnual,
+        Double depreciationAmortization = dividendMetricsService.magnitude(getMetric(latestAnnual,
                 List.of("DepreciationAmortization"),
                 List.of("DepreciationDepletionAndAmortization", "DepreciationAndAmortization")));
         Double ebitdaProxy = operatingIncome != null && depreciationAmortization != null
                 ? operatingIncome + depreciationAmortization
                 : null;
-        Double interestExpense = magnitude(getMetric(latestAnnual,
+        Double interestExpense = dividendMetricsService.magnitude(getMetric(latestAnnual,
                 List.of("InterestExpense"),
                 List.of("InterestExpense", "InterestExpenseDebt")));
         Double currentAssets = getMetric(latestBalance,
@@ -425,12 +428,12 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
                 List.of("TotalCurrentLiabilities"),
                 List.of("LiabilitiesCurrent"));
 
-        Double cashCoverage = safeDivide(freeCashFlow, dividendsPaid);
+        Double cashCoverage = dividendMetricsService.safeDivide(freeCashFlow, dividendsPaid);
         Double retainedCash = freeCashFlow != null && dividendsPaid != null ? freeCashFlow - dividendsPaid : null;
-        Double netDebtToEbitda = ebitdaProxy != null && ebitdaProxy > 0d ? safeDivide(netDebt, ebitdaProxy) : null;
-        Double currentRatio = safeDivide(currentAssets, currentLiabilities);
-        Double interestCoverage = safeDivide(operatingIncome, interestExpense);
-        Double fcfMargin = safeDivide(freeCashFlow, revenue);
+        Double netDebtToEbitda = ebitdaProxy != null && ebitdaProxy > 0d ? dividendMetricsService.safeDivide(netDebt, ebitdaProxy) : null;
+        Double currentRatio = dividendMetricsService.safeDivide(currentAssets, currentLiabilities);
+        Double interestCoverage = dividendMetricsService.safeDivide(operatingIncome, interestExpense);
+        Double fcfMargin = dividendMetricsService.safeDivide(freeCashFlow, revenue);
 
         Double referencePrice = Optional.ofNullable(ticker)
                 .flatMap(companyMarketDataService::getStoredMarketData)
@@ -438,10 +441,10 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
                 .filter(price -> price != null && price > 0d)
                 .orElse(null);
 
-        Double dpsLatest = findLatestDividendPerShare(trend);
-        Double dpsCagr5y = calculateDividendCagr(trend, 5);
-        Integer uninterruptedYears = countUninterruptedYears(trend);
-        Integer consecutiveRaises = countConsecutiveRaises(trend);
+        Double dpsLatest = dividendMetricsService.findLatestDividendPerShare(trend);
+        Double dpsCagr5y = dividendMetricsService.calculateDividendCagr(trend, 5);
+        Integer uninterruptedYears = dividendMetricsService.countUninterruptedYears(trend);
+        Integer consecutiveRaises = dividendMetricsService.countConsecutiveRaises(trend);
         Double dividendYield = referencePrice != null && referencePrice > 0d && dpsLatest != null
                 ? dpsLatest / referencePrice
                 : null;
@@ -449,7 +452,7 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
         DividendOverviewResponse.Snapshot snapshot = DividendOverviewResponse.Snapshot.builder()
                 .dpsLatest(dpsLatest)
                 .dpsCagr5y(dpsCagr5y)
-                .fcfPayoutRatio(freeCashFlow != null && freeCashFlow > 0d ? safeDivide(dividendsPaid, freeCashFlow) : null)
+                .fcfPayoutRatio(freeCashFlow != null && freeCashFlow > 0d ? dividendMetricsService.safeDivide(dividendsPaid, freeCashFlow) : null)
                 .uninterruptedYears(uninterruptedYears)
                 .consecutiveRaises(consecutiveRaises)
                 .netDebtToEbitda(netDebtToEbitda)
@@ -459,9 +462,9 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
                 .dividendYield(dividendYield)
                 .build();
 
-        List<DividendOverviewResponse.Alert> alerts = buildAlerts(trend, snapshot);
-        int score = buildScore(snapshot, alerts);
-        DividendOverviewResponse.DividendRating rating = toRating(score);
+        List<DividendOverviewResponse.Alert> alerts = dividendAlertsService.buildAlerts(trend, snapshot);
+        int score = dividendAlertsService.buildScore(snapshot, alerts);
+        DividendOverviewResponse.DividendRating rating = dividendAlertsService.toRating(score);
 
         DividendOverviewResponse.CompanySummary companySummary = buildCompanySummary(company, ticker, filings);
         DividendOverviewResponse.Coverage coverage = DividendOverviewResponse.Coverage.builder()
@@ -870,10 +873,10 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
         Double operatingCashFlow = getMetric(annual,
                 List.of("OperatingCashFlow"),
                 List.of("NetCashProvidedByUsedInOperatingActivities"));
-        Double capitalExpenditures = magnitude(getMetric(annual,
+        Double capitalExpenditures = dividendMetricsService.magnitude(getMetric(annual,
                 List.of("CapitalExpenditures"),
                 List.of("PaymentsToAcquirePropertyPlantAndEquipment", "PaymentsToAcquireProductiveAssets")));
-        Double dividendsPaid = magnitude(getMetric(annual,
+        Double dividendsPaid = dividendMetricsService.magnitude(getMetric(annual,
                 List.of("DividendsPaid", "PaymentsOfDividendsCommonStock"),
                 List.of("PaymentsOfDividendsCommonStock", "DividendsCommonStockCash", "PaymentsOfOrdinaryDividends")));
         Double freeCashFlow = operatingCashFlow != null && capitalExpenditures != null
@@ -886,48 +889,48 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
                 ? trendPoint.getEarningsPerShare()
                 : getMetric(annual, List.of("EarningsPerShareDiluted"), List.of("EarningsPerShareDiluted"));
         Double earningsPayoutRatio = earningsPerShare != null && earningsPerShare > 0d && dividendsPerShare != null
-                ? safeDivide(dividendsPerShare, earningsPerShare)
+                ? dividendMetricsService.safeDivide(dividendsPerShare, earningsPerShare)
                 : null;
         Double fcfPayoutRatio = freeCashFlow != null && freeCashFlow > 0d && dividendsPaid != null
-                ? safeDivide(dividendsPaid, freeCashFlow)
+                ? dividendMetricsService.safeDivide(dividendsPaid, freeCashFlow)
                 : null;
-        Double cashCoverage = safeDivide(freeCashFlow, dividendsPaid);
+        Double cashCoverage = dividendMetricsService.safeDivide(freeCashFlow, dividendsPaid);
         Double retainedCash = freeCashFlow != null && dividendsPaid != null ? freeCashFlow - dividendsPaid : null;
         Double cash = getMetric(annual,
                 List.of("Cash"),
                 List.of("CashAndCashEquivalentsAtCarryingValue"));
-        Double longTermDebt = magnitude(getMetric(annual,
+        Double longTermDebt = dividendMetricsService.magnitude(getMetric(annual,
                 List.of("LongTermDebt"),
                 List.of("LongTermDebt")));
-        Double shortTermDebt = magnitude(getMetric(annual,
+        Double shortTermDebt = dividendMetricsService.magnitude(getMetric(annual,
                 List.of("DebtCurrent", "ShortTermDebt"),
                 List.of("DebtCurrent", "LongTermDebtCurrent", "ShortTermBorrowings")));
         Double grossDebt = longTermDebt == null && shortTermDebt == null
                 ? null
-                : defaultIfNull(longTermDebt) + defaultIfNull(shortTermDebt);
+                : dividendMetricsService.defaultIfNull(longTermDebt) + dividendMetricsService.defaultIfNull(shortTermDebt);
         Double netDebt = grossDebt != null && cash != null ? grossDebt - cash : null;
         Double operatingIncome = getMetric(annual,
                 List.of("OperatingIncome"),
                 List.of("OperatingIncomeLoss"));
-        Double depreciationAmortization = magnitude(getMetric(annual,
+        Double depreciationAmortization = dividendMetricsService.magnitude(getMetric(annual,
                 List.of("DepreciationAmortization"),
                 List.of("DepreciationDepletionAndAmortization", "DepreciationAndAmortization")));
         Double ebitdaProxy = operatingIncome != null && depreciationAmortization != null
                 ? operatingIncome + depreciationAmortization
                 : null;
-        Double interestExpense = magnitude(getMetric(annual,
+        Double interestExpense = dividendMetricsService.magnitude(getMetric(annual,
                 List.of("InterestExpense"),
                 List.of("InterestExpense", "InterestExpenseDebt")));
-        Double netDebtToEbitda = ebitdaProxy != null && ebitdaProxy > 0d ? safeDivide(netDebt, ebitdaProxy) : null;
+        Double netDebtToEbitda = ebitdaProxy != null && ebitdaProxy > 0d ? dividendMetricsService.safeDivide(netDebt, ebitdaProxy) : null;
         Double currentAssets = getMetric(annual,
                 List.of("TotalCurrentAssets"),
                 List.of("AssetsCurrent"));
         Double currentLiabilities = getMetric(annual,
                 List.of("TotalCurrentLiabilities"),
                 List.of("LiabilitiesCurrent"));
-        Double currentRatio = safeDivide(currentAssets, currentLiabilities);
-        Double interestCoverage = safeDivide(operatingIncome, interestExpense);
-        Double fcfMargin = safeDivide(freeCashFlow, revenue);
+        Double currentRatio = dividendMetricsService.safeDivide(currentAssets, currentLiabilities);
+        Double interestCoverage = dividendMetricsService.safeDivide(operatingIncome, interestExpense);
+        Double fcfMargin = dividendMetricsService.safeDivide(freeCashFlow, revenue);
 
         return new HistoryRowData(
                 periodEnd,
@@ -967,8 +970,8 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
                 .toList();
 
         Double latestValue = points.isEmpty() ? null : points.get(points.size() - 1).getValue();
-        Double cagr = calculateMetricCagr(points);
-        Double volatility = calculateMetricVolatility(points);
+        Double cagr = dividendMetricsService.calculateMetricCagr(points);
+        Double volatility = dividendMetricsService.calculateMetricVolatility(points);
 
         return DividendHistoryResponse.MetricSeries.builder()
                 .metric(definition.id())
@@ -977,7 +980,7 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
                 .latestValue(latestValue)
                 .cagr(cagr)
                 .volatility(volatility)
-                .trend(determineMetricTrend(points, volatility))
+                .trend(dividendMetricsService.determineMetricTrend(points, volatility))
                 .points(points)
                 .build();
     }
@@ -1022,90 +1025,6 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
             case "fcf_margin" -> row.fcfMargin();
             default -> null;
         };
-    }
-
-    private Double calculateMetricCagr(List<DividendHistoryResponse.MetricPoint> points) {
-        if (points.size() < 2) {
-            return null;
-        }
-
-        DividendHistoryResponse.MetricPoint first = points.get(0);
-        DividendHistoryResponse.MetricPoint last = points.get(points.size() - 1);
-        if (first.getValue() == null || last.getValue() == null || first.getValue() <= 0d || last.getValue() <= 0d) {
-            return null;
-        }
-
-        long years = 0;
-        if (first.getPeriodEnd() != null && last.getPeriodEnd() != null) {
-            years = ChronoUnit.YEARS.between(first.getPeriodEnd(), last.getPeriodEnd());
-        }
-        if (years <= 0) {
-            years = points.size() - 1L;
-        }
-        if (years <= 0) {
-            return null;
-        }
-
-        return roundDouble(Math.pow(last.getValue() / first.getValue(), 1d / years) - 1d);
-    }
-
-    private Double calculateMetricVolatility(List<DividendHistoryResponse.MetricPoint> points) {
-        if (points.size() < 3) {
-            return null;
-        }
-
-        List<Double> changes = new ArrayList<>();
-        for (int index = 1; index < points.size(); index++) {
-            Double previous = points.get(index - 1).getValue();
-            Double current = points.get(index).getValue();
-            if (previous == null || current == null || previous == 0d) {
-                continue;
-            }
-
-            double change = (current - previous) / Math.abs(previous);
-            if (Double.isFinite(change)) {
-                changes.add(change);
-            }
-        }
-
-        if (changes.size() < 2) {
-            return null;
-        }
-
-        double mean = changes.stream().mapToDouble(Double::doubleValue).average().orElse(0d);
-        double variance = changes.stream()
-                .mapToDouble(change -> Math.pow(change - mean, 2d))
-                .average()
-                .orElse(0d);
-        return roundDouble(Math.sqrt(variance));
-    }
-
-    private DividendHistoryResponse.TrendDirection determineMetricTrend(
-            List<DividendHistoryResponse.MetricPoint> points,
-            Double volatility) {
-        if (points.size() < 2) {
-            return DividendHistoryResponse.TrendDirection.INSUFFICIENT_DATA;
-        }
-
-        Double first = points.get(0).getValue();
-        Double last = points.get(points.size() - 1).getValue();
-        if (first == null || last == null) {
-            return DividendHistoryResponse.TrendDirection.INSUFFICIENT_DATA;
-        }
-
-        if (volatility != null && volatility >= 0.35d) {
-            return DividendHistoryResponse.TrendDirection.VOLATILE;
-        }
-
-        double baseline = Math.abs(first) > 0d ? Math.abs(first) : 1d;
-        double change = (last - first) / baseline;
-        if (change > 0.05d) {
-            return DividendHistoryResponse.TrendDirection.UP;
-        }
-        if (change < -0.05d) {
-            return DividendHistoryResponse.TrendDirection.DOWN;
-        }
-        return DividendHistoryResponse.TrendDirection.FLAT;
     }
 
     private List<DividendAlertsResponse.AlertEvent> buildHistoricalAlerts(AnalysisContext context, boolean activeOnly) {
@@ -1183,7 +1102,7 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
                 && previous.dividendsPerShare() != null
                 && previous.dividendsPerShare() > 0d
                 && current.dividendsPerShare() < previous.dividendsPerShare()) {
-            events.add(toAlertEventData(alert(
+            events.add(toAlertEventData(dividendAlertsService.alert(
                     "dividend-cut",
                     DividendOverviewResponse.AlertSeverity.HIGH,
                     "Dividend cut detected",
@@ -1192,7 +1111,7 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
         }
 
         if (current.fcfPayoutRatio() != null && current.fcfPayoutRatio() > 0.85d) {
-            events.add(toAlertEventData(alert(
+            events.add(toAlertEventData(dividendAlertsService.alert(
                     "fcf-payout",
                     current.fcfPayoutRatio() > 1d
                             ? DividendOverviewResponse.AlertSeverity.HIGH
@@ -1203,7 +1122,7 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
         }
 
         if (current.currentRatio() != null && current.currentRatio() < 1d) {
-            events.add(toAlertEventData(alert(
+            events.add(toAlertEventData(dividendAlertsService.alert(
                     "current-ratio",
                     current.currentRatio() < 0.8d
                             ? DividendOverviewResponse.AlertSeverity.HIGH
@@ -1214,7 +1133,7 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
         }
 
         if (current.netDebtToEbitda() != null && current.netDebtToEbitda() > 3.5d) {
-            events.add(toAlertEventData(alert(
+            events.add(toAlertEventData(dividendAlertsService.alert(
                     "net-debt-to-ebitda",
                     current.netDebtToEbitda() > 5d
                             ? DividendOverviewResponse.AlertSeverity.HIGH
@@ -1225,7 +1144,7 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
         }
 
         if (current.interestCoverage() != null && current.interestCoverage() < 3d) {
-            events.add(toAlertEventData(alert(
+            events.add(toAlertEventData(dividendAlertsService.alert(
                     "interest-coverage",
                     current.interestCoverage() < 2d
                             ? DividendOverviewResponse.AlertSeverity.HIGH
@@ -1679,7 +1598,7 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
                             periodEnd,
                             parseDate(entry.getFiled()),
                             blankToNull(entry.getAccn()),
-                            magnitude(value),
+                            dividendMetricsService.magnitude(value),
                             priority.priority());
                     series.put(periodEnd, candidate, this::isBetterFactCandidate);
                 }
@@ -1775,10 +1694,10 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
             return directValue;
         }
 
-        Double dividendsPaid = magnitude(getMetric(filing,
+        Double dividendsPaid = dividendMetricsService.magnitude(getMetric(filing,
                 List.of("DividendsPaid", "PaymentsOfDividendsCommonStock"),
                 List.of("PaymentsOfDividendsCommonStock", "DividendsCommonStockCash", "PaymentsOfOrdinaryDividends")));
-        return safeDivide(dividendsPaid, getSharesOutstanding(filing));
+        return dividendMetricsService.safeDivide(dividendsPaid, getSharesOutstanding(filing));
     }
 
     private Double getSharesOutstanding(AnalyzedFilingData filing) {
@@ -1956,229 +1875,6 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
         return warnings;
     }
 
-    private List<DividendOverviewResponse.Alert> buildAlerts(
-            List<DividendOverviewResponse.TrendPoint> trend,
-            DividendOverviewResponse.Snapshot snapshot) {
-        List<DividendOverviewResponse.Alert> alerts = new ArrayList<>();
-        DividendOverviewResponse.TrendPoint latest = trend.isEmpty() ? null : trend.get(trend.size() - 1);
-        DividendOverviewResponse.TrendPoint previous = trend.size() > 1 ? trend.get(trend.size() - 2) : null;
-
-        if (latest != null
-                && previous != null
-                && latest.getDividendsPerShare() != null
-                && previous.getDividendsPerShare() != null
-                && previous.getDividendsPerShare() > 0d
-                && latest.getDividendsPerShare() < previous.getDividendsPerShare()) {
-            alerts.add(alert("dividend-cut", DividendOverviewResponse.AlertSeverity.HIGH,
-                    "Dividend cut detected",
-                    "The latest annual dividend-per-share value is below the prior year."));
-        }
-
-        if (snapshot.getFcfPayoutRatio() != null && snapshot.getFcfPayoutRatio() > 0.85d) {
-            alerts.add(alert("fcf-payout",
-                    snapshot.getFcfPayoutRatio() > 1d
-                            ? DividendOverviewResponse.AlertSeverity.HIGH
-                            : DividendOverviewResponse.AlertSeverity.MEDIUM,
-                    "Elevated cash payout ratio",
-                    "Dividends are consuming most of free cash flow."));
-        }
-
-        if (snapshot.getCurrentRatio() != null && snapshot.getCurrentRatio() < 1d) {
-            alerts.add(alert("current-ratio",
-                    snapshot.getCurrentRatio() < 0.8d
-                            ? DividendOverviewResponse.AlertSeverity.HIGH
-                            : DividendOverviewResponse.AlertSeverity.MEDIUM,
-                    "Thin near-term liquidity",
-                    "Current liabilities exceed or nearly exceed current assets."));
-        }
-
-        if (snapshot.getNetDebtToEbitda() != null && snapshot.getNetDebtToEbitda() > 3.5d) {
-            alerts.add(alert("net-debt-to-ebitda",
-                    snapshot.getNetDebtToEbitda() > 5d
-                            ? DividendOverviewResponse.AlertSeverity.HIGH
-                            : DividendOverviewResponse.AlertSeverity.MEDIUM,
-                    "Leverage is running hot",
-                    "Net debt is elevated relative to EBITDA proxy."));
-        }
-
-        if (snapshot.getInterestCoverage() != null && snapshot.getInterestCoverage() < 3d) {
-            alerts.add(alert("interest-coverage",
-                    snapshot.getInterestCoverage() < 2d
-                            ? DividendOverviewResponse.AlertSeverity.HIGH
-                            : DividendOverviewResponse.AlertSeverity.MEDIUM,
-                    "Interest coverage is weak",
-                    "Operating income has limited cushion versus interest expense."));
-        }
-
-        return alerts;
-    }
-
-    private DividendOverviewResponse.Alert alert(
-            String id,
-            DividendOverviewResponse.AlertSeverity severity,
-            String title,
-            String description) {
-        return DividendOverviewResponse.Alert.builder()
-                .id(id)
-                .severity(severity)
-                .title(title)
-                .description(description)
-                .build();
-    }
-
-    private int buildScore(
-            DividendOverviewResponse.Snapshot snapshot,
-            List<DividendOverviewResponse.Alert> alerts) {
-        int score = 50;
-
-        if (snapshot.getDpsLatest() != null && snapshot.getDpsLatest() > 0d) {
-            score += 10;
-        }
-        if (snapshot.getDpsCagr5y() != null) {
-            if (snapshot.getDpsCagr5y() >= 0.08d) {
-                score += 12;
-            } else if (snapshot.getDpsCagr5y() >= 0.03d) {
-                score += 6;
-            } else if (snapshot.getDpsCagr5y() < 0d) {
-                score -= 10;
-            }
-        }
-        if (snapshot.getFcfPayoutRatio() != null) {
-            if (snapshot.getFcfPayoutRatio() <= 0.6d) {
-                score += 14;
-            } else if (snapshot.getFcfPayoutRatio() <= 0.8d) {
-                score += 8;
-            } else if (snapshot.getFcfPayoutRatio() > 1d) {
-                score -= 12;
-            } else {
-                score -= 6;
-            }
-        }
-        if (snapshot.getUninterruptedYears() != null) {
-            if (snapshot.getUninterruptedYears() >= 10) {
-                score += 10;
-            } else if (snapshot.getUninterruptedYears() >= 5) {
-                score += 5;
-            }
-        }
-        if (snapshot.getConsecutiveRaises() != null) {
-            if (snapshot.getConsecutiveRaises() >= 5) {
-                score += 8;
-            } else if (snapshot.getConsecutiveRaises() >= 1) {
-                score += 4;
-            }
-        }
-        if (snapshot.getNetDebtToEbitda() != null) {
-            if (snapshot.getNetDebtToEbitda() <= 1.5d) {
-                score += 10;
-            } else if (snapshot.getNetDebtToEbitda() <= 3d) {
-                score += 4;
-            } else {
-                score -= 8;
-            }
-        }
-        if (snapshot.getInterestCoverage() != null) {
-            if (snapshot.getInterestCoverage() >= 8d) {
-                score += 8;
-            } else if (snapshot.getInterestCoverage() >= 4d) {
-                score += 4;
-            } else if (snapshot.getInterestCoverage() < 2d) {
-                score -= 8;
-            }
-        }
-        if (snapshot.getCurrentRatio() != null) {
-            if (snapshot.getCurrentRatio() >= 1.5d) {
-                score += 5;
-            } else if (snapshot.getCurrentRatio() < 1d) {
-                score -= 5;
-            }
-        }
-        if (snapshot.getFcfMargin() != null) {
-            if (snapshot.getFcfMargin() >= 0.15d) {
-                score += 5;
-            } else if (snapshot.getFcfMargin() < 0.05d) {
-                score -= 4;
-            }
-        }
-
-        for (DividendOverviewResponse.Alert alert : alerts) {
-            switch (alert.getSeverity()) {
-                case HIGH -> score -= 8;
-                case MEDIUM -> score -= 4;
-                case LOW -> score -= 2;
-            }
-        }
-
-        return Math.max(0, Math.min(100, score));
-    }
-
-    private DividendOverviewResponse.DividendRating toRating(int score) {
-        if (score >= 80) {
-            return DividendOverviewResponse.DividendRating.SAFE;
-        }
-        if (score >= 65) {
-            return DividendOverviewResponse.DividendRating.STABLE;
-        }
-        if (score >= 45) {
-            return DividendOverviewResponse.DividendRating.WATCH;
-        }
-        return DividendOverviewResponse.DividendRating.AT_RISK;
-    }
-
-    private Double findLatestDividendPerShare(List<DividendOverviewResponse.TrendPoint> trend) {
-        for (int index = trend.size() - 1; index >= 0; index--) {
-            Double dividendsPerShare = trend.get(index).getDividendsPerShare();
-            if (dividendsPerShare != null) {
-                return dividendsPerShare;
-            }
-        }
-        return null;
-    }
-
-    private Double calculateDividendCagr(List<DividendOverviewResponse.TrendPoint> trend, int years) {
-        List<DividendOverviewResponse.TrendPoint> points = trend.stream()
-                .filter(point -> point.getDividendsPerShare() != null)
-                .toList();
-        if (points.size() < years + 1) {
-            return null;
-        }
-
-        List<DividendOverviewResponse.TrendPoint> relevant = points.subList(points.size() - (years + 1), points.size());
-        Double first = relevant.get(0).getDividendsPerShare();
-        Double last = relevant.get(relevant.size() - 1).getDividendsPerShare();
-        if (first == null || last == null || first <= 0d || last <= 0d) {
-            return null;
-        }
-
-        double result = Math.pow(last / first, 1d / years) - 1d;
-        return Double.isFinite(result) ? result : null;
-    }
-
-    private Integer countUninterruptedYears(List<DividendOverviewResponse.TrendPoint> trend) {
-        int count = 0;
-        for (int index = trend.size() - 1; index >= 0; index--) {
-            Double dividendsPerShare = trend.get(index).getDividendsPerShare();
-            if (dividendsPerShare == null || dividendsPerShare <= 0d) {
-                break;
-            }
-            count++;
-        }
-        return count;
-    }
-
-    private Integer countConsecutiveRaises(List<DividendOverviewResponse.TrendPoint> trend) {
-        int count = 0;
-        for (int index = trend.size() - 1; index >= 1; index--) {
-            Double current = trend.get(index).getDividendsPerShare();
-            Double previous = trend.get(index - 1).getDividendsPerShare();
-            if (current == null || previous == null || current <= previous) {
-                break;
-            }
-            count++;
-        }
-        return count;
-    }
-
     private String resolveFilingUrl(Filling filing) {
         if (filing == null) {
             return null;
@@ -2306,33 +2002,6 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
 
     private Double toDouble(BigDecimal value) {
         return value != null ? value.doubleValue() : null;
-    }
-
-    private Double magnitude(Double value) {
-        return value != null ? Math.abs(value) : null;
-    }
-
-    private Double safeDivide(Double numerator, Double denominator) {
-        if (numerator == null || denominator == null || denominator == 0d) {
-            return null;
-        }
-
-        double result = numerator / denominator;
-        return roundDouble(result);
-    }
-
-    private Double roundDouble(double value) {
-        if (!Double.isFinite(value)) {
-            return null;
-        }
-
-        return BigDecimal.valueOf(value)
-                .setScale(6, RoundingMode.HALF_UP)
-                .doubleValue();
-    }
-
-    private Double defaultIfNull(Double value) {
-        return value != null ? value : 0d;
     }
 
     private String blankToNull(String value) {
