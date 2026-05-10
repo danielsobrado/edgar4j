@@ -21,7 +21,6 @@ import org.jds.edgar4j.model.Form4Transaction;
 import org.springframework.stereotype.Component;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
-import org.w3c.dom.NodeList;
 import org.xml.sax.InputSource;
 
 import lombok.extern.slf4j.Slf4j;
@@ -38,24 +37,16 @@ public class Form4Parser {
     private static final String TRANSACTION_TYPE_NON_DERIVATIVE = "NON_DERIVATIVE";
     private static final String TRANSACTION_TYPE_DERIVATIVE = "DERIVATIVE";
 
-    private JAXBContext jaxbContext;
-    private DocumentBuilderFactory documentBuilderFactory;
+    private final JAXBContext jaxbContext;
+    private final DocumentBuilderFactory documentBuilderFactory;
 
     public Form4Parser() {
         try {
             this.jaxbContext = JAXBContext.newInstance(OwnershipDocument.class);
-            this.documentBuilderFactory = DocumentBuilderFactory.newInstance();
-            this.documentBuilderFactory.setNamespaceAware(false);
-            // Security: disable XXE and external entity resolution.
-            this.documentBuilderFactory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
-            this.documentBuilderFactory.setFeature("http://xml.org/sax/features/external-general-entities", false);
-            this.documentBuilderFactory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
-            this.documentBuilderFactory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
-            this.documentBuilderFactory.setXIncludeAware(false);
-            this.documentBuilderFactory.setExpandEntityReferences(false);
+            this.documentBuilderFactory = OwnershipDomParserSupport.buildDocumentBuilderFactory();
         } catch (Exception e) {
-            log.error("Failed to initialize Form4 parser", e);
-            throw new RuntimeException("Failed to initialize Form4 parser", e);
+            log.error("Failed to initialize Form 4 parser", e);
+            throw new RuntimeException("Failed to initialize Form 4 parser", e);
         }
     }
 
@@ -89,27 +80,11 @@ public class Form4Parser {
      * declarations which cause "disallow-doctype-decl" security errors in the XML parser.
      */
     private String cleanXml(String xml) {
-        if (xml == null) {
-            return null;
-        }
-
-        // Always start from <ownershipDocument> to skip XML declaration and DOCTYPE blocks.
-        // SEC Form 4 files contain <!DOCTYPE ownershipDocument [...]> which is blocked by
-        // the "disallow-doctype-decl" security feature. By starting at the root element
-        // we safely bypass it while retaining all transaction data.
-        int startIdx = xml.indexOf("<ownershipDocument");
-
-        if (startIdx == -1) {
+        String cleanedXml = OwnershipDomParserSupport.cleanXml(xml);
+        if ((cleanedXml == null || cleanedXml.isBlank()) && xml != null && !xml.isBlank()) {
             log.warn("No XML content found in document");
-            return xml;
         }
-
-        int endIdx = xml.lastIndexOf("</ownershipDocument>");
-        if (endIdx == -1) {
-            return xml.substring(startIdx);
-        }
-
-        return xml.substring(startIdx, endIdx + "</ownershipDocument>".length());
+        return cleanedXml;
     }
 
     /**
@@ -140,31 +115,31 @@ public class Form4Parser {
 
             Element root = doc.getDocumentElement();
 
-            form4.setDocumentType(getElementText(root, "documentType"));
-            form4.setPeriodOfReport(parseDate(getElementText(root, "periodOfReport")));
+            form4.setDocumentType(OwnershipDomParserSupport.getElementText(root, "documentType"));
+            form4.setPeriodOfReport(parseDate(OwnershipDomParserSupport.getElementText(root, "periodOfReport")));
 
-            Element issuer = getFirstElement(root, "issuer");
+            Element issuer = OwnershipDomParserSupport.getFirstElement(root, "issuer");
             if (issuer != null) {
-                form4.setCik(getElementText(issuer, "issuerCik"));
-                form4.setIssuerName(getElementText(issuer, "issuerName"));
-                form4.setTradingSymbol(getElementText(issuer, "issuerTradingSymbol"));
+                form4.setCik(OwnershipDomParserSupport.getElementText(issuer, "issuerCik"));
+                form4.setIssuerName(OwnershipDomParserSupport.getElementText(issuer, "issuerName"));
+                form4.setTradingSymbol(OwnershipDomParserSupport.getElementText(issuer, "issuerTradingSymbol"));
             }
 
-            Element reportingOwner = getFirstElement(root, "reportingOwner");
+            Element reportingOwner = OwnershipDomParserSupport.getFirstElement(root, "reportingOwner");
             if (reportingOwner != null) {
-                Element ownerId = getFirstElement(reportingOwner, "reportingOwnerId");
+                Element ownerId = OwnershipDomParserSupport.getFirstElement(reportingOwner, "reportingOwnerId");
                 if (ownerId != null) {
-                    form4.setRptOwnerCik(getElementText(ownerId, "rptOwnerCik"));
-                    form4.setRptOwnerName(getElementText(ownerId, "rptOwnerName"));
+                    form4.setRptOwnerCik(OwnershipDomParserSupport.getElementText(ownerId, "rptOwnerCik"));
+                    form4.setRptOwnerName(OwnershipDomParserSupport.getElementText(ownerId, "rptOwnerName"));
                 }
 
-                Element relationship = getFirstElement(reportingOwner, "reportingOwnerRelationship");
+                Element relationship = OwnershipDomParserSupport.getFirstElement(reportingOwner, "reportingOwnerRelationship");
                 if (relationship != null) {
-                    form4.setDirector(isTrue(getElementText(relationship, "isDirector")));
-                    form4.setOfficer(isTrue(getElementText(relationship, "isOfficer")));
-                    form4.setTenPercentOwner(isTrue(getElementText(relationship, "isTenPercentOwner")));
-                    form4.setOther(isTrue(getElementText(relationship, "isOther")));
-                    form4.setOfficerTitle(getElementText(relationship, "officerTitle"));
+                    form4.setDirector(OwnershipDomParserSupport.isTrue(OwnershipDomParserSupport.getElementText(relationship, "isDirector")));
+                    form4.setOfficer(OwnershipDomParserSupport.isTrue(OwnershipDomParserSupport.getElementText(relationship, "isOfficer")));
+                    form4.setTenPercentOwner(OwnershipDomParserSupport.isTrue(OwnershipDomParserSupport.getElementText(relationship, "isTenPercentOwner")));
+                    form4.setOther(OwnershipDomParserSupport.isTrue(OwnershipDomParserSupport.getElementText(relationship, "isOther")));
+                    form4.setOfficerTitle(OwnershipDomParserSupport.getElementText(relationship, "officerTitle"));
                     form4.setOwnerType(deriveOwnerTypeFromFlags(
                             form4.isDirector(), form4.isOfficer(),
                             form4.isTenPercentOwner(), form4.isOther()));
@@ -172,8 +147,8 @@ public class Form4Parser {
             }
 
             List<Form4Transaction> transactions = new ArrayList<>();
-            transactions.addAll(parseNonDerivativeTransactionsFromDom(root, accessionNumber));
-            transactions.addAll(parseDerivativeTransactionsFromDom(root, accessionNumber));
+            transactions.addAll(OwnershipDomParserSupport.parseNonDerivativeEntries(root, accessionNumber, "nonDerivativeTransaction"));
+            transactions.addAll(OwnershipDomParserSupport.parseDerivativeEntries(root, accessionNumber, "derivativeTransaction"));
             form4.setTransactions(transactions);
 
             if (!transactions.isEmpty()) {
@@ -192,127 +167,6 @@ public class Form4Parser {
             log.error("DOM parsing failed for accession: {}", accessionNumber, e);
             return null;
         }
-    }
-
-    private List<Form4Transaction> parseNonDerivativeTransactionsFromDom(Element root, String accessionNumber) {
-        List<Form4Transaction> transactions = new ArrayList<>();
-
-        Element table = getFirstElement(root, "nonDerivativeTable");
-        if (table == null) return transactions;
-
-        NodeList txNodes = table.getElementsByTagName("nonDerivativeTransaction");
-        for (int i = 0; i < txNodes.getLength(); i++) {
-            Element tx = (Element) txNodes.item(i);
-            Form4Transaction transaction = new Form4Transaction();
-            transaction.setAccessionNumber(accessionNumber);
-            transaction.setTransactionType(TRANSACTION_TYPE_NON_DERIVATIVE);
-
-            transaction.setSecurityTitle(getNestedValue(tx, "securityTitle"));
-            transaction.setTransactionDate(parseDate(getNestedValue(tx, "transactionDate")));
-
-            Element coding = getFirstElement(tx, "transactionCoding");
-            if (coding != null) {
-                transaction.setTransactionCode(getElementText(coding, "transactionCode"));
-                transaction.setTransactionFormType(getElementText(coding, "transactionFormType"));
-                transaction.setEquitySwapInvolved(isTrue(getElementText(coding, "equitySwapInvolved")));
-            }
-
-            Element amounts = getFirstElement(tx, "transactionAmounts");
-            if (amounts != null) {
-                transaction.setTransactionShares(parseFloat(getNestedValue(amounts, "transactionShares")));
-                transaction.setTransactionPricePerShare(parseFloat(getNestedValue(amounts, "transactionPricePerShare")));
-                transaction.setAcquiredDisposedCode(getNestedValue(amounts, "transactionAcquiredDisposedCode"));
-            }
-
-            Element postAmounts = getFirstElement(tx, "postTransactionAmounts");
-            if (postAmounts != null) {
-                transaction.setSharesOwnedFollowingTransaction(
-                        parseFloat(getNestedValue(postAmounts, "sharesOwnedFollowingTransaction")));
-            }
-
-            Element ownership = getFirstElement(tx, "ownershipNature");
-            if (ownership != null) {
-                transaction.setDirectOrIndirectOwnership(getNestedValue(ownership, "directOrIndirectOwnership"));
-                transaction.setNatureOfOwnership(getNestedValue(ownership, "natureOfOwnership"));
-            }
-
-            if (transaction.getTransactionShares() != null && transaction.getTransactionPricePerShare() != null) {
-                transaction.setTransactionValue(
-                        transaction.getTransactionShares() * transaction.getTransactionPricePerShare());
-            }
-
-            transactions.add(transaction);
-        }
-
-        return transactions;
-    }
-
-    private List<Form4Transaction> parseDerivativeTransactionsFromDom(Element root, String accessionNumber) {
-        List<Form4Transaction> transactions = new ArrayList<>();
-
-        Element table = getFirstElement(root, "derivativeTable");
-        if (table == null) return transactions;
-
-        NodeList txNodes = table.getElementsByTagName("derivativeTransaction");
-        for (int i = 0; i < txNodes.getLength(); i++) {
-            Element tx = (Element) txNodes.item(i);
-            Form4Transaction transaction = new Form4Transaction();
-            transaction.setAccessionNumber(accessionNumber);
-            transaction.setTransactionType(TRANSACTION_TYPE_DERIVATIVE);
-
-            transaction.setSecurityTitle(getNestedValue(tx, "securityTitle"));
-            transaction.setTransactionDate(parseDate(getNestedValue(tx, "transactionDate")));
-            transaction.setExercisePrice(parseFloat(getNestedValue(tx, "conversionOrExercisePrice")));
-            transaction.setExpirationDate(parseDate(getNestedValue(tx, "expirationDate")));
-
-            Element coding = getFirstElement(tx, "transactionCoding");
-            if (coding != null) {
-                transaction.setTransactionCode(getElementText(coding, "transactionCode"));
-                transaction.setTransactionFormType(getElementText(coding, "transactionFormType"));
-            }
-
-            Element amounts = getFirstElement(tx, "transactionAmounts");
-            if (amounts != null) {
-                transaction.setTransactionShares(parseFloat(getNestedValue(amounts, "transactionShares")));
-                transaction.setTransactionPricePerShare(parseFloat(getNestedValue(amounts, "transactionPricePerShare")));
-                transaction.setAcquiredDisposedCode(getNestedValue(amounts, "transactionAcquiredDisposedCode"));
-            }
-
-            Element underlying = getFirstElement(tx, "underlyingSecurity");
-            if (underlying != null) {
-                transaction.setUnderlyingSecurityTitle(getNestedValue(underlying, "underlyingSecurityTitle"));
-                transaction.setUnderlyingSecurityShares(parseFloat(getNestedValue(underlying, "underlyingSecurityShares")));
-            }
-
-            transactions.add(transaction);
-        }
-
-        return transactions;
-    }
-
-    private Element getFirstElement(Element parent, String tagName) {
-        NodeList nodes = parent.getElementsByTagName(tagName);
-        return nodes.getLength() > 0 ? (Element) nodes.item(0) : null;
-    }
-
-    private String getElementText(Element parent, String tagName) {
-        Element element = getFirstElement(parent, tagName);
-        return element != null ? element.getTextContent().trim() : null;
-    }
-
-    private String getNestedValue(Element parent, String tagName) {
-        Element element = getFirstElement(parent, tagName);
-        if (element == null) return null;
-
-        Element valueElement = getFirstElement(element, "value");
-        if (valueElement != null) {
-            return valueElement.getTextContent().trim();
-        }
-        return element.getTextContent().trim();
-    }
-
-    private boolean isTrue(String value) {
-        return "1".equals(value) || "true".equalsIgnoreCase(value);
     }
 
     private String deriveOwnerTypeFromFlags(boolean isDirector, boolean isOfficer,

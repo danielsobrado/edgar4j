@@ -33,9 +33,13 @@ final class OwnershipDomParserSupport {
             return null;
         }
 
-        int startIdx = xml.indexOf("<?xml");
+        int startIdx = xml.indexOf("<ownershipDocument");
         if (startIdx == -1) {
-            startIdx = xml.indexOf("<ownershipDocument");
+            startIdx = xml.indexOf("<?xml");
+        }
+
+        if (startIdx == -1) {
+            startIdx = xml.indexOf("<");
         }
 
         if (startIdx == -1) {

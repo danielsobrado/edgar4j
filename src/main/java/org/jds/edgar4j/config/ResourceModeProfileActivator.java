@@ -47,7 +47,7 @@ public class ResourceModeProfileActivator implements EnvironmentPostProcessor, O
 
     @Override
     public int getOrder() {
-        return Ordered.HIGHEST_PRECEDENCE;
+        return Ordered.LOWEST_PRECEDENCE;
     }
 
     private String deriveProfile(ConfigurableEnvironment environment) {

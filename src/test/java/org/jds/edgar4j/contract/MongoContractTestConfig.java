@@ -24,7 +24,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Profile;
 import org.springframework.data.mongodb.repository.config.EnableMongoRepositories;
-import org.jds.edgar4j.config.FullyQualifiedRepositoryBeanNameGenerator;
+import org.springframework.context.annotation.FullyQualifiedAnnotationBeanNameGenerator;
 
 @Configuration(proxyBeanMethods = false)
 @Profile("mongo-contract")
@@ -44,7 +44,7 @@ import org.jds.edgar4j.config.FullyQualifiedRepositoryBeanNameGenerator;
         CompanyRepository.class,
         TickerRepository.class,
         FillingRepository.class
-}, nameGenerator = FullyQualifiedRepositoryBeanNameGenerator.class)
+}, nameGenerator = FullyQualifiedAnnotationBeanNameGenerator.class)
 @Import({
         EmbeddedMongoConfig.class,
         MongoFilingIndexCleanup.class,

@@ -9,6 +9,7 @@ import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 @Configuration(proxyBeanMethods = false)
 @EnableCaching
@@ -27,7 +28,8 @@ public class CacheConfig {
     public static final String CACHE_INSIDER_PURCHASES = "insiderPurchases";
 
     @Bean
-    @Profile("!resource-low & !resource-high")
+    @Profile("resource-high")
+    @ConditionalOnProperty(prefix = "spring.cache", name = "type", havingValue = "caffeine", matchIfMissing = false)
     @ConditionalOnMissingBean(CacheManager.class)
     public CacheManager fallbackCacheManager() {
         return new ConcurrentMapCacheManager(
