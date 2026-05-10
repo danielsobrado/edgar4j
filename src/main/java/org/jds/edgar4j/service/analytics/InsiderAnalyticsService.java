@@ -12,8 +12,11 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -76,6 +79,7 @@ public class InsiderAnalyticsService {
         
         // Filter transactions by date range
         List<InsiderTransaction> relevantTransactions = transactions.stream()
+            .filter(t -> t.getTransactionDate() != null)
             .filter(t -> !t.getTransactionDate().isBefore(startDate) && !t.getTransactionDate().isAfter(endDate))
             .collect(Collectors.toList());
         
@@ -121,6 +125,7 @@ public class InsiderAnalyticsService {
         log.debug("Calculating insider metrics for CIK: {}", insiderCik);
         
         List<InsiderTransaction> relevantTransactions = transactions.stream()
+            .filter(t -> t.getTransactionDate() != null)
             .filter(t -> !t.getTransactionDate().isBefore(startDate) && !t.getTransactionDate().isAfter(endDate))
             .collect(Collectors.toList());
         
@@ -195,13 +200,26 @@ public class InsiderAnalyticsService {
     }
 
     private int calculateMarketTimingScore(InsiderTransaction transaction) {
-        // TODO: Implement market timing analysis by comparing transaction timing with stock performance
-        // This would require historical stock price data and performance calculations
-        return 5; // Neutral score for now
+        Double directionalReturn = calculateDirectionalReturn(transaction);
+        if (directionalReturn == null) {
+            return 5;
+        }
+
+        if (directionalReturn >= 0.25) return 10;
+        if (directionalReturn >= 0.15) return 9;
+        if (directionalReturn >= 0.10) return 8;
+        if (directionalReturn >= 0.05) return 7;
+        if (directionalReturn >= 0.02) return 6;
+        if (directionalReturn > -0.02) return 5;
+        if (directionalReturn > -0.05) return 4;
+        if (directionalReturn > -0.10) return 3;
+        if (directionalReturn > -0.15) return 2;
+        if (directionalReturn > -0.25) return 1;
+        return 0;
     }
 
     private String classifyTransaction(InsiderTransaction transaction) {
-        if (transaction.getIsDerivative()) {
+        if (Boolean.TRUE.equals(transaction.getIsDerivative())) {
             if ("M".equals(transaction.getTransactionCode())) {
                 return "Option Exercise";
             } else if ("A".equals(transaction.getTransactionCode())) {
@@ -280,6 +298,9 @@ public class InsiderAnalyticsService {
         }
         
         long daysBetween = ChronoUnit.DAYS.between(startDate, endDate);
+        if (daysBetween <= 0) {
+            return transactions.size();
+        }
         return (double) transactions.size() / daysBetween * 30; // Transactions per month
     }
 
@@ -290,13 +311,20 @@ public class InsiderAnalyticsService {
         
         // Group transactions by insider
         Map<String, Long> transactionsByInsider = transactions.stream()
+            .filter(t -> t.getInsider() != null && t.getInsider().getCik() != null)
             .collect(Collectors.groupingBy(
                 t -> t.getInsider().getCik(),
                 Collectors.counting()
             ));
+
+        if (transactionsByInsider.isEmpty()) {
+            return 0.0;
+        }
         
         // Calculate Herfindahl-Hirschman Index
-        long totalTransactions = transactions.size();
+        long totalTransactions = transactionsByInsider.values().stream()
+            .mapToLong(Long::longValue)
+            .sum();
         double hhi = transactionsByInsider.values().stream()
             .mapToDouble(count -> {
                 double share = (double) count / totalTransactions;
@@ -308,15 +336,51 @@ public class InsiderAnalyticsService {
     }
 
     private String analyzeTransactionPattern(List<InsiderTransaction> transactions) {
-        // TODO: Implement sophisticated pattern analysis
-        // This could include frequency analysis, clustering, trend detection
+        if (transactions.isEmpty()) {
+            return "NONE";
+        }
+
+        List<InsiderTransaction> orderedTransactions = transactions.stream()
+            .filter(t -> t.getTransactionDate() != null)
+            .sorted(Comparator.comparing(InsiderTransaction::getTransactionDate))
+            .collect(Collectors.toList());
+
+        if (orderedTransactions.size() < 2) {
+            return "INFREQUENT";
+        }
+
+        long activeDays = ChronoUnit.DAYS.between(
+            orderedTransactions.get(0).getTransactionDate(),
+            orderedTransactions.get(orderedTransactions.size() - 1).getTransactionDate()) + 1;
+        if (activeDays <= 7 && orderedTransactions.size() >= 3) {
+            return "CLUSTERED";
+        }
+
+        long distinctTransactionCodes = orderedTransactions.stream()
+            .map(InsiderTransaction::getTransactionCode)
+            .filter(Objects::nonNull)
+            .distinct()
+            .count();
+        if (distinctTransactionCodes > 2) {
+            return "MIXED";
+        }
+
+        double monthlyFrequency = (double) orderedTransactions.size() / Math.max(activeDays, 1) * 30;
+        if (monthlyFrequency >= 4.0) {
+            return "FREQUENT";
+        }
+        if (monthlyFrequency <= 0.5) {
+            return "INFREQUENT";
+        }
         return "REGULAR";
     }
 
     private String findMostCommonTransactionType(List<InsiderTransaction> transactions) {
         Map<String, Long> typeCount = transactions.stream()
+            .map(InsiderTransaction::getTransactionCode)
+            .filter(Objects::nonNull)
             .collect(Collectors.groupingBy(
-                InsiderTransaction::getTransactionCode,
+                code -> code,
                 Collectors.counting()
             ));
         
@@ -327,13 +391,79 @@ public class InsiderAnalyticsService {
     }
 
     private double calculateTransactionSuccessRate(List<InsiderTransaction> transactions) {
-        // TODO: Implement success rate calculation based on subsequent stock performance
-        return 0.0;
+        List<Double> directionalReturns = transactions.stream()
+            .map(this::calculateDirectionalReturn)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toList());
+
+        if (directionalReturns.isEmpty()) {
+            return 0.0;
+        }
+
+        long successfulTransactions = directionalReturns.stream()
+            .filter(returnValue -> returnValue > 0.0)
+            .count();
+        return (double) successfulTransactions / directionalReturns.size() * 100.0;
     }
 
     private double calculateOverallPerformance(List<InsiderTransaction> transactions) {
-        // TODO: Implement performance calculation based on stock price movements after transactions
-        return 0.0;
+        return transactions.stream()
+            .map(this::calculateDirectionalReturn)
+            .filter(Objects::nonNull)
+            .mapToDouble(Double::doubleValue)
+            .average()
+            .orElse(0.0) * 100.0;
+    }
+
+    private Double calculateDirectionalReturn(InsiderTransaction transaction) {
+        if (transaction == null || transaction.getCompany() == null || transaction.getTransactionDate() == null) {
+            return null;
+        }
+
+        String symbol = transaction.getCompany().getTickerSymbol();
+        if (symbol == null || symbol.isBlank()) {
+            return null;
+        }
+
+        BigDecimal entryPrice = transaction.getPricePerShare();
+        if (entryPrice == null || entryPrice.compareTo(BigDecimal.ZERO) <= 0) {
+            entryPrice = fetchPrice(symbol, transaction.getTransactionDate());
+        }
+
+        BigDecimal exitPrice = fetchPrice(symbol, transaction.getTransactionDate().plusDays(30));
+        if (entryPrice == null || exitPrice == null || entryPrice.compareTo(BigDecimal.ZERO) <= 0) {
+            return null;
+        }
+
+        BigDecimal rawReturn = exitPrice.subtract(entryPrice)
+            .divide(entryPrice, 8, RoundingMode.HALF_UP);
+
+        if (isSale(transaction)) {
+            rawReturn = rawReturn.negate();
+        } else if (!isPurchase(transaction)) {
+            return null;
+        }
+
+        return rawReturn.doubleValue();
+    }
+
+    private BigDecimal fetchPrice(String symbol, LocalDate date) {
+        try {
+            return marketDataService.getPriceForDate(symbol, date).get(10, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            log.debug("Unable to fetch market price for {} on {}", symbol, date, e);
+            return null;
+        }
+    }
+
+    private boolean isPurchase(InsiderTransaction transaction) {
+        return "P".equals(transaction.getTransactionCode())
+            || InsiderTransaction.AcquiredDisposed.ACQUIRED.equals(transaction.getAcquiredDisposed());
+    }
+
+    private boolean isSale(InsiderTransaction transaction) {
+        return "S".equals(transaction.getTransactionCode())
+            || InsiderTransaction.AcquiredDisposed.DISPOSED.equals(transaction.getAcquiredDisposed());
     }
 
     /**

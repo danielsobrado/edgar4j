@@ -19,6 +19,7 @@ import java.util.concurrent.TimeUnit;
 import org.jds.edgar4j.properties.Edgar4JProperties;
 import org.jds.edgar4j.service.SettingsService;
 import org.jds.edgar4j.service.insider.EdgarApiService;
+import org.jds.edgar4j.service.insider.InsiderTransactionService;
 import org.springframework.stereotype.Service;
 
 import lombok.RequiredArgsConstructor;
@@ -44,6 +45,7 @@ public class EdgarApiServiceImpl implements EdgarApiService {
         .build();
     private final SettingsService settingsService;
     private final Edgar4JProperties edgar4JProperties;
+    private final InsiderTransactionService insiderTransactionService;
 
     private static final DecimalFormat CIK_FORMAT = new DecimalFormat("0000000000");
 
@@ -90,8 +92,9 @@ public class EdgarApiServiceImpl implements EdgarApiService {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 String cleanAccessionNumber = accessionNumber.replace("-", "");
+                String archiveCik = formatCikForArchivePath(cik);
                 String url = String.format("%s/%s/%s/%s", 
-                    edgar4JProperties.getUrls().getEdgarDataArchivesUrl(), cik, cleanAccessionNumber, primaryDocument);
+                    edgar4JProperties.getUrls().getEdgarDataArchivesUrl(), archiveCik, cleanAccessionNumber, primaryDocument);
                 
                 HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
@@ -153,19 +156,9 @@ public class EdgarApiServiceImpl implements EdgarApiService {
 
     @Override
     public CompletableFuture<Void> processBulkSubmissions() {
-        log.info("Processing bulk submissions (not yet implemented)");
-        
-        return CompletableFuture.supplyAsync(() -> {
-            // TODO: Implement bulk submissions processing
-            // This would involve:
-            // 1. Download bulk submissions ZIP file
-            // 2. Extract and parse JSON files
-            // 3. Process company and filing data
-            // 4. Store in database
-            
-            log.warn("Bulk submissions processing not yet implemented");
-            return null;
-        });
+        log.info("Processing bulk submissions");
+        return CompletableFuture.failedFuture(new UnsupportedOperationException(
+            "Bulk submissions processing requires a ZIP download/extraction pipeline and is not implemented yet"));
     }
 
     @Override
@@ -225,13 +218,28 @@ public class EdgarApiServiceImpl implements EdgarApiService {
                         String form = forms.get(i).asText();
                         if ("4".equals(form)) {
                             String accessionNumber = accessionNumbers.get(i).asText();
-                            String filingDate = filingDates.get(i).asText();
-                            String primaryDocument = primaryDocuments.get(i).asText();
+                            String filingDate = textAt(filingDates, i);
+                            String primaryDocument = textAt(primaryDocuments, i);
+                            if (primaryDocument == null || primaryDocument.isBlank()) {
+                                primaryDocument = resolvePrimaryDocument(cik, accessionNumber);
+                            }
+                            if (primaryDocument == null || primaryDocument.isBlank()) {
+                                log.warn("Skipping Form 4 accession {} because no primary XML document was available", accessionNumber);
+                                continue;
+                            }
                             
                             log.debug("Found Form 4: {} filed on {}", accessionNumber, filingDate);
-                            
-                            // TODO: Process Form 4 filing
-                            // This would involve downloading and parsing the Form 4 document
+
+                            try {
+                                String xmlContent = downloadForm4Document(cik, accessionNumber, primaryDocument)
+                                    .get(30, TimeUnit.SECONDS);
+                                if (xmlContent != null && !xmlContent.isBlank()) {
+                                    insiderTransactionService.processForm4Data(xmlContent, accessionNumber);
+                                }
+                            } catch (Exception e) {
+                                log.warn("Failed to process Form 4 accession {} for CIK {}: {}",
+                                    accessionNumber, cik, e.getMessage());
+                            }
                         }
                     }
                 }
@@ -263,12 +271,18 @@ public class EdgarApiServiceImpl implements EdgarApiService {
                         String form = forms.get(i).asText();
                         if ("4".equals(form)) {
                             String accessionNumber = accessionNumbers.get(i).asText();
-                            String filingDate = filingDates.get(i).asText();
-                            String primaryDocument = primaryDocuments.get(i).asText();
+                            String filingDate = textAt(filingDates, i);
+                            String primaryDocument = textAt(primaryDocuments, i);
+                            if (primaryDocument == null || primaryDocument.isBlank()) {
+                                primaryDocument = resolvePrimaryDocument(rootNode.path("cik").asText(), accessionNumber);
+                            }
+                            if (primaryDocument == null || primaryDocument.isBlank()) {
+                                continue;
+                            }
                             
                             String documentUrl = String.format("%s/%s/%s/%s", 
                                 edgar4JProperties.getUrls().getEdgarDataArchivesUrl(), 
-                                rootNode.path("cik").asText(), 
+                                formatCikForArchivePath(rootNode.path("cik").asText()), 
                                 accessionNumber.replace("-", ""), 
                                 primaryDocument);
                             
@@ -338,23 +352,20 @@ public class EdgarApiServiceImpl implements EdgarApiService {
         log.info("Getting Form 4 document for accession number: {}", accessionNumber);
         
         try {
-            // TODO: Implement logic to find CIK and primary document for the accession number
-            // For now, this is a simplified implementation
-            // In a full implementation, you would:
-            // 1. Query your database to find the CIK and primary document for this accession number
-            // 2. Or parse the accession number to extract CIK if following SEC format
-            
-            // Temporary implementation - extract CIK from accession number pattern
             String cik = extractCikFromAccessionNumber(accessionNumber);
-            String primaryDocument = "doc4.xml"; // Default Form 4 document name
-            
-            if (cik != null) {
-                CompletableFuture<String> future = downloadForm4Document(cik, accessionNumber, primaryDocument);
-                return future.get(30, TimeUnit.SECONDS);
+            if (cik == null) {
+                log.warn("Could not determine CIK for accession number: {}", accessionNumber);
+                return null;
             }
-            
-            log.warn("Could not determine CIK for accession number: {}", accessionNumber);
-            return null;
+
+            String primaryDocument = resolvePrimaryDocument(cik, accessionNumber);
+            if (primaryDocument == null) {
+                log.warn("Could not resolve primary Form 4 XML document for accession number: {}", accessionNumber);
+                return null;
+            }
+
+            CompletableFuture<String> future = downloadForm4Document(cik, accessionNumber, primaryDocument);
+            return future.get(30, TimeUnit.SECONDS);
             
         } catch (Exception e) {
             log.error("Error getting Form 4 document for accession number: {}", accessionNumber, e);
@@ -436,6 +447,90 @@ public class EdgarApiServiceImpl implements EdgarApiService {
      */
     private String extractCikFromAccessionNumber(String accessionNumber) {
         return EdgarForm4ParsingUtils.extractCikFromAccessionNumber(accessionNumber);
+    }
+
+    private String textAt(JsonNode arrayNode, int index) {
+        if (arrayNode == null || !arrayNode.isArray() || index >= arrayNode.size()) {
+            return null;
+        }
+        return arrayNode.get(index).asText(null);
+    }
+
+    private String resolvePrimaryDocument(String cik, String accessionNumber) {
+        try {
+            String url = String.format("%s/%s/%s/index.json",
+                edgar4JProperties.getUrls().getEdgarDataArchivesUrl(),
+                formatCikForArchivePath(cik),
+                accessionNumber.replace("-", ""));
+
+            HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .header("User-Agent", resolveUserAgent())
+                .header("Accept", "application/json")
+                .header("Accept-Encoding", "gzip, deflate")
+                .timeout(Duration.ofSeconds(30))
+                .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() != 200) {
+                log.debug("Unable to resolve filing index for accession {}. Status: {}", accessionNumber, response.statusCode());
+                return null;
+            }
+
+            return selectPrimaryXmlDocument(response.body());
+        } catch (Exception e) {
+            log.debug("Unable to resolve primary document for accession {}", accessionNumber, e);
+            return null;
+        }
+    }
+
+    static String selectPrimaryXmlDocument(String filingIndexJson) {
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode items = mapper.readTree(filingIndexJson).path("directory").path("item");
+            if (!items.isArray()) {
+                return null;
+            }
+
+            String firstXmlDocument = null;
+            for (JsonNode item : items) {
+                String name = item.path("name").asText(null);
+                if (name == null || !name.toLowerCase().endsWith(".xml")) {
+                    continue;
+                }
+
+                String lowerName = name.toLowerCase();
+                if (lowerName.endsWith(".xsd") || lowerName.equals("filingsummary.xml")) {
+                    continue;
+                }
+
+                if (lowerName.contains("form4") || lowerName.contains("doc4") || lowerName.contains("ownership")) {
+                    return name;
+                }
+
+                if (firstXmlDocument == null) {
+                    firstXmlDocument = name;
+                }
+            }
+
+            return firstXmlDocument;
+        } catch (Exception e) {
+            log.debug("Unable to parse filing index JSON", e);
+            return null;
+        }
+    }
+
+    private String formatCikForArchivePath(String cik) {
+        if (cik == null || cik.isBlank()) {
+            return cik;
+        }
+
+        try {
+            return String.valueOf(Long.parseLong(cik));
+        } catch (NumberFormatException e) {
+            log.warn("Invalid CIK format for archive path: {}", cik);
+            return cik;
+        }
     }
 
     private String resolveUserAgent() {

@@ -7,11 +7,16 @@ import org.jds.edgar4j.port.InsiderCompanyDataPort;
 import org.jds.edgar4j.port.InsiderCompanyRelationshipDataPort;
 import org.jds.edgar4j.port.InsiderTransactionDataPort;
 import org.jds.edgar4j.service.insider.CompanyService;
+import org.jds.edgar4j.service.provider.MarketDataProvider;
+import org.jds.edgar4j.service.provider.MarketDataService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Implementation of CompanyService for managing company data
@@ -29,14 +34,14 @@ public class CompanyServiceImpl implements CompanyService {
     private final InsiderCompanyDataPort companyRepository;
     private final InsiderTransactionDataPort transactionRepository;
     private final InsiderCompanyRelationshipDataPort relationshipRepository;
+    private final MarketDataService marketDataService;
 
     @Override
     public Company saveCompany(Company company) {
         log.debug("Saving company: {}", company.getCompanyName());
         
-        // Ensure CIK is properly formatted
         if (company.getCik() != null) {
-            company.setCik(company.getCik());
+            company.setCik(formatCik(company.getCik()));
         }
         
         return companyRepository.save(company);
@@ -54,6 +59,9 @@ public class CompanyServiceImpl implements CompanyService {
     @Transactional(readOnly = true)
     public Optional<Company> findByTickerSymbol(String tickerSymbol) {
         log.debug("Finding company by ticker symbol: {}", tickerSymbol);
+        if (tickerSymbol == null || tickerSymbol.isBlank()) {
+            return Optional.empty();
+        }
         return companyRepository.findByTickerSymbol(tickerSymbol.toUpperCase());
     }
 
@@ -156,13 +164,25 @@ public class CompanyServiceImpl implements CompanyService {
     public Company enrichCompanyData(Company company) {
         log.debug("Enriching company data for: {}", company.getCompanyName());
         
-        // TODO: Implement market data enrichment
-        // This would integrate with external APIs for:
-        // - Market cap calculation
-        // - Sector and industry classification
-        // - Exchange information
-        // - SIC code enrichment
-        
+        if (company == null || company.getTickerSymbol() == null || company.getTickerSymbol().isBlank()) {
+            return company;
+        }
+
+        try {
+            MarketDataService.EnhancedMarketData enhancedData = marketDataService
+                .getEnhancedMarketData(company.getTickerSymbol())
+                .get(30, TimeUnit.SECONDS);
+
+            if (enhancedData == null) {
+                return company;
+            }
+
+            applyMarketData(company, enhancedData);
+            return saveCompany(company);
+        } catch (Exception e) {
+            log.warn("Unable to enrich company data for {}: {}", company.getTickerSymbol(), e.getMessage());
+        }
+
         return company;
     }
 
@@ -174,13 +194,35 @@ public class CompanyServiceImpl implements CompanyService {
         if (companyOpt.isPresent()) {
             Company company = companyOpt.get();
             
-            // TODO: Implement market cap calculation
-            // This would require:
-            // 1. Get current stock price from market data API
-            // 2. Calculate market cap = stock price * shares outstanding
-            // 3. Update company record
-            
-            log.debug("Market cap update not implemented yet for: {}", company.getCompanyName());
+            if (company.getTickerSymbol() == null || company.getTickerSymbol().isBlank()) {
+                log.debug("Skipping market cap update for {} because no ticker symbol is available", company.getCompanyName());
+                return;
+            }
+
+            try {
+                MarketDataProvider.StockPrice stockPrice = marketDataService
+                    .getCurrentPrice(company.getTickerSymbol())
+                    .get(30, TimeUnit.SECONDS);
+
+                if (stockPrice == null || stockPrice.getPrice() == null) {
+                    log.debug("No current price available for market cap update: {}", company.getTickerSymbol());
+                    return;
+                }
+
+                company.setCurrentStockPrice(stockPrice.getPrice());
+                if (stockPrice.getVolume() != null) {
+                    company.setLastTradingVolume(stockPrice.getVolume());
+                }
+                if (stockPrice.getMarketCap() != null) {
+                    company.setMarketCap(BigDecimal.valueOf(stockPrice.getMarketCap()));
+                } else {
+                    company.calculateMarketCap(stockPrice.getPrice());
+                }
+                company.setLastMarketDataUpdate(LocalDateTime.now());
+                saveCompany(company);
+            } catch (Exception e) {
+                log.warn("Unable to update market cap for {}: {}", company.getTickerSymbol(), e.getMessage());
+            }
         }
     }
 
@@ -197,16 +239,18 @@ public class CompanyServiceImpl implements CompanyService {
         Company company = companyOpt.get();
         
         // Get transaction count
-        Long totalTransactions = transactionRepository.countTransactionsByCompany(cik);
+        String formattedCik = formatCik(cik);
+        Long totalTransactions = transactionRepository.countTransactionsByCompany(formattedCik);
         
         // Get active relationships count
-        Long activeRelationships = relationshipRepository.countActiveRelationshipsByCompany(cik);
+        Long activeRelationships = relationshipRepository.countActiveRelationshipsByCompany(formattedCik);
         
         // Get total insiders (unique count from transactions)
-        Long totalInsiders = (long) transactionRepository.findByCompanyCik(cik).stream()
+        Long totalInsiders = (long) transactionRepository.findByCompanyCik(formattedCik).stream()
+            .filter(t -> t.getInsider() != null && t.getInsider().getCik() != null)
             .map(t -> t.getInsider().getCik())
             .distinct()
-            .toArray().length;
+            .count();
         
         // Get last filing date
         String lastFilingDate = company.getLastFilingDate() != null 
@@ -214,6 +258,51 @@ public class CompanyServiceImpl implements CompanyService {
             : null;
         
         return new CompanyStatistics(totalInsiders, totalTransactions, activeRelationships, lastFilingDate);
+    }
+
+    private void applyMarketData(Company company, MarketDataService.EnhancedMarketData enhancedData) {
+        if (enhancedData.hasPrice()) {
+            MarketDataProvider.StockPrice stockPrice = enhancedData.getStockPrice();
+            company.setCurrentStockPrice(stockPrice.getPrice());
+            company.setLastTradingVolume(stockPrice.getVolume());
+            if (stockPrice.getMarketCap() != null) {
+                company.setMarketCap(BigDecimal.valueOf(stockPrice.getMarketCap()));
+            } else {
+                company.calculateMarketCap(stockPrice.getPrice());
+            }
+        }
+
+        if (enhancedData.hasProfile()) {
+            MarketDataProvider.CompanyProfile profile = enhancedData.getCompanyProfile();
+            if (profile.getName() != null && !profile.getName().isBlank()) {
+                company.setCompanyName(profile.getName());
+            }
+            company.setIndustry(profile.getIndustry());
+            company.setSector(profile.getSector());
+            company.setCountry(profile.getCountry());
+            company.setExchange(profile.getExchange());
+            company.setWebsite(profile.getWebsite());
+            if (profile.getSharesOutstanding() != null) {
+                company.setTotalSharesOutstanding(BigDecimal.valueOf(profile.getSharesOutstanding()));
+            }
+            if (profile.getMarketCapitalization() != null) {
+                company.setMarketCap(BigDecimal.valueOf(profile.getMarketCapitalization()));
+            } else if (company.getCurrentStockPrice() != null) {
+                company.calculateMarketCap(company.getCurrentStockPrice());
+            }
+        }
+
+        if (enhancedData.hasMetrics()) {
+            MarketDataProvider.FinancialMetrics metrics = enhancedData.getFinancialMetrics();
+            company.setPeRatio(metrics.getPeRatio());
+            company.setPbRatio(metrics.getPriceToBook());
+            company.setBeta(metrics.getBeta());
+            company.setDividendYield(metrics.getDividendYield());
+            company.setFiftyTwoWeekHigh(metrics.getFiftyTwoWeekHigh());
+            company.setFiftyTwoWeekLow(metrics.getFiftyTwoWeekLow());
+        }
+
+        company.setLastMarketDataUpdate(LocalDateTime.now());
     }
 
     /**

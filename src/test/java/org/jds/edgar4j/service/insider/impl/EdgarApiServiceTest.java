@@ -10,6 +10,7 @@ import java.util.List;
 
 import org.jds.edgar4j.properties.Edgar4JProperties;
 import org.jds.edgar4j.service.SettingsService;
+import org.jds.edgar4j.service.insider.InsiderTransactionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -23,6 +24,9 @@ class EdgarApiServiceTest {
     @Mock
     private SettingsService settingsService;
 
+    @Mock
+    private InsiderTransactionService insiderTransactionService;
+
     private EdgarApiServiceImpl edgarApiService;
 
     @BeforeEach
@@ -33,7 +37,7 @@ class EdgarApiServiceTest {
         properties.getUrls().setSubmissionsCIKUrl("https://data.sec.gov/submissions/CIK");
         properties.getUrls().setEdgarDataArchivesUrl("https://www.sec.gov/Archives/edgar/data");
         properties.getUrls().setCompanyTickersUrl("https://www.sec.gov/files/company_tickers.json");
-        edgarApiService = new EdgarApiServiceImpl(settingsService, properties);
+        edgarApiService = new EdgarApiServiceImpl(settingsService, properties, insiderTransactionService);
     }
 
     @Test
@@ -72,6 +76,25 @@ class EdgarApiServiceTest {
         List<String> accessionNumbers = EdgarForm4ParsingUtils.parseDailyMasterIndex(sampleMasterIndex);
 
         assertEquals(List.of("0001234567-24-000001", "0000111222-24-000003"), accessionNumbers);
+    }
+
+    @Test
+    @DisplayName("selectPrimaryXmlDocument should prefer Form 4 ownership XML")
+    void selectPrimaryXmlDocumentShouldPreferForm4OwnershipXml() {
+        String filingIndexJson = """
+            {
+              "directory": {
+                "item": [
+                  { "name": "primary_doc.html" },
+                  { "name": "FilingSummary.xml" },
+                  { "name": "doc4.xml" },
+                  { "name": "schema.xsd" }
+                ]
+              }
+            }
+            """;
+
+        assertEquals("doc4.xml", EdgarApiServiceImpl.selectPrimaryXmlDocument(filingIndexJson));
     }
 
     @Test
