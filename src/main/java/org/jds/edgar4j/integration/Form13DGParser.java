@@ -501,6 +501,14 @@ public class Form13DGParser {
         }
     }
 
+    private LocalDate parseWithFormatter(String value, DateTimeFormatter formatter) {
+        try {
+            return LocalDate.parse(value, formatter);
+        } catch (DateTimeParseException e) {
+            return null;
+        }
+    }
+
     private Long parseLong(String value) {
         if (value == null || value.trim().isEmpty()) {
             return null;
