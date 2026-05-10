@@ -5,7 +5,12 @@ import org.jds.edgar4j.dto.response.ApiResponse;
 import org.jds.edgar4j.dto.response.SettingsResponse;
 import org.jds.edgar4j.job.TickerSyncJob;
 import org.jds.edgar4j.service.SettingsService;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -14,17 +19,25 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @RestController
 @RequestMapping("/api/settings")
-@RequiredArgsConstructor
 public class SettingsController {
 
     private final SettingsService settingsService;
     private final TickerSyncJob tickerSyncJob;
+    private final Executor downloadExecutor;
+
+    public SettingsController(
+            SettingsService settingsService,
+            TickerSyncJob tickerSyncJob,
+            @Qualifier("downloadExecutor") Executor downloadExecutor) {
+        this.settingsService = settingsService;
+        this.tickerSyncJob = tickerSyncJob;
+        this.downloadExecutor = downloadExecutor;
+    }
 
     @GetMapping
     public ResponseEntity<ApiResponse<SettingsResponse>> getSettings() {
@@ -62,16 +75,22 @@ public class SettingsController {
             return ResponseEntity.badRequest()
                     .body(ApiResponse.<String>error("Ticker sync is already running"));
         }
-        
-        // Run sync in background (fire and forget)
-        new Thread(() -> {
-            try {
-                tickerSyncJob.triggerSync();
-            } catch (Exception e) {
-                log.error("Error triggering ticker sync", e);
-            }
-        }).start();
-        
-        return ResponseEntity.ok(ApiResponse.success("Ticker sync started", "Ticker sync job has been triggered"));
+
+        try {
+            CompletableFuture.runAsync(() -> {
+                try {
+                    tickerSyncJob.triggerSync();
+                } catch (Exception e) {
+                    log.error("Error triggering ticker sync", e);
+                }
+            }, downloadExecutor);
+        } catch (Exception ex) {
+            log.error("Failed to dispatch ticker sync async task", ex);
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(ApiResponse.error("Unable to start ticker sync job"));
+        }
+
+        return ResponseEntity.accepted()
+                .body(ApiResponse.success("Ticker sync started", "Ticker sync job has been triggered"));
     }
 }
