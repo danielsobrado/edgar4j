@@ -1,8 +1,6 @@
 package org.jds.edgar4j.controller;
 
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.util.List;
 
 import org.jds.edgar4j.model.Form13DG;
@@ -16,6 +14,7 @@ import org.jds.edgar4j.service.Form13DGService.OwnershipComparison;
 import org.jds.edgar4j.util.PaginationUtils;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -39,8 +38,6 @@ import lombok.extern.slf4j.Slf4j;
 public class Form13DGController {
 
     private final Form13DGService form13DGService;
-
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     // ========== BASIC CRUD ==========
 
@@ -136,18 +133,10 @@ public class Form13DGController {
      */
     @GetMapping("/stats/counts")
     public ResponseEntity<List<ScheduleTypeCount>> getFilingCounts(
-            @RequestParam String startDate,
-            @RequestParam String endDate) {
-
-        try {
-            LocalDate start = parseDate(startDate);
-            LocalDate end = parseDate(endDate);
-            List<ScheduleTypeCount> counts = form13DGService.getFilingCountsByScheduleType(start, end);
-            return ResponseEntity.ok(counts);
-        } catch (DateTimeParseException e) {
-            log.warn("Invalid date format: {} or {}", startDate, endDate);
-            return ResponseEntity.badRequest().build();
-        }
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        List<ScheduleTypeCount> counts = form13DGService.getFilingCountsByScheduleType(startDate, endDate);
+        return ResponseEntity.ok(counts);
     }
 
     // ========== ISSUER QUERIES ==========
@@ -241,21 +230,13 @@ public class Form13DGController {
      */
     @GetMapping("/event-date-range")
     public ResponseEntity<Page<Form13DG>> getByEventDateRange(
-            @RequestParam String startDate,
-            @RequestParam String endDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-
-        try {
-            LocalDate start = parseDate(startDate);
-            LocalDate end = parseDate(endDate);
-            PageRequest pageRequest = PaginationUtils.pageRequest(page, size, "eventDate");
-            Page<Form13DG> results = form13DGService.findByEventDateRange(start, end, pageRequest);
-            return ResponseEntity.ok(results);
-        } catch (DateTimeParseException e) {
-            log.warn("Invalid date format: {} or {}", startDate, endDate);
-            return ResponseEntity.badRequest().build();
-        }
+        PageRequest pageRequest = PaginationUtils.pageRequest(page, size, "eventDate");
+        Page<Form13DG> results = form13DGService.findByEventDateRange(startDate, endDate, pageRequest);
+        return ResponseEntity.ok(results);
     }
 
     /**
@@ -263,21 +244,13 @@ public class Form13DGController {
      */
     @GetMapping("/filed-date-range")
     public ResponseEntity<Page<Form13DG>> getByFiledDateRange(
-            @RequestParam String startDate,
-            @RequestParam String endDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-
-        try {
-            LocalDate start = parseDate(startDate);
-            LocalDate end = parseDate(endDate);
-            PageRequest pageRequest = PaginationUtils.pageRequest(page, size, "filedDate");
-            Page<Form13DG> results = form13DGService.findByFiledDateRange(start, end, pageRequest);
-            return ResponseEntity.ok(results);
-        } catch (DateTimeParseException e) {
-            log.warn("Invalid date format: {} or {}", startDate, endDate);
-            return ResponseEntity.badRequest().build();
-        }
+        PageRequest pageRequest = PaginationUtils.pageRequest(page, size, "filedDate");
+        Page<Form13DG> results = form13DGService.findByFiledDateRange(startDate, endDate, pageRequest);
+        return ResponseEntity.ok(results);
     }
 
     // ========== OWNERSHIP QUERIES ==========
@@ -438,7 +411,4 @@ public class Form13DGController {
         }
     }
 
-    private LocalDate parseDate(String dateStr) {
-        return LocalDate.parse(dateStr, DATE_FORMATTER);
-    }
 }

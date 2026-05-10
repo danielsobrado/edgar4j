@@ -1,8 +1,6 @@
 package org.jds.edgar4j.controller;
 
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.util.List;
 
 import org.jds.edgar4j.model.Form4;
@@ -12,6 +10,7 @@ import org.jds.edgar4j.util.PaginationUtils;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -36,8 +35,6 @@ public class Form4Controller {
     private static final long MAX_DATE_RANGE_DAYS = 366;
 
     private final Form4Service form4Service;
-
-    private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     /**
      * Get Form 4 by ID.
@@ -68,8 +65,8 @@ public class Form4Controller {
             @PathVariable String symbol,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
-            @RequestParam(required = false) String startDate,
-            @RequestParam(required = false) String endDate) {
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
 
         int safePage = PaginationUtils.normalizePage(page);
         int safeSize = PaginationUtils.normalizeSize(size);
@@ -80,8 +77,8 @@ public class Form4Controller {
         if (results.isEmpty()) {
             log.info("No local Form 4 data for symbol {}, attempting SEC API fallback", symbol);
             try {
-                LocalDate start = startDate != null ? parseDate(startDate) : LocalDate.now().minusYears(1);
-                LocalDate end = endDate != null ? parseDate(endDate) : LocalDate.now();
+                LocalDate start = startDate != null ? startDate : LocalDate.now().minusYears(1);
+                LocalDate end = endDate != null ? endDate : LocalDate.now();
 
                 if (!isValidDateRange(start, end)) {
                     return ResponseEntity.badRequest().build();
@@ -140,26 +137,19 @@ public class Form4Controller {
      */
     @GetMapping("/date-range")
     public ResponseEntity<Page<Form4>> getByDateRange(
-            @RequestParam String startDate,
-            @RequestParam String endDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        try {
-            LocalDate start = parseDate(startDate);
-            LocalDate end = parseDate(endDate);
-            if (!isValidDateRange(start, end)) {
-                return ResponseEntity.badRequest().build();
-            }
-            int safePage = PaginationUtils.normalizePage(page);
-            int safeSize = PaginationUtils.normalizeSize(size);
-            PageRequest pageRequest = PaginationUtils.pageRequest(safePage, safeSize, "transactionDate");
-            Page<Form4> results = form4Service.findByDateRange(start, end, pageRequest);
-            return ResponseEntity.ok(results);
-        } catch (DateTimeParseException e) {
-            log.warn("Invalid date format: {} or {}", startDate, endDate);
+        if (!isValidDateRange(startDate, endDate)) {
             return ResponseEntity.badRequest().build();
         }
+        int safePage = PaginationUtils.normalizePage(page);
+        int safeSize = PaginationUtils.normalizeSize(size);
+        PageRequest pageRequest = PaginationUtils.pageRequest(safePage, safeSize, "transactionDate");
+        Page<Form4> results = form4Service.findByDateRange(startDate, endDate, pageRequest);
+        return ResponseEntity.ok(results);
     }
 
     /**
@@ -168,26 +158,19 @@ public class Form4Controller {
     @GetMapping("/symbol/{symbol}/date-range")
     public ResponseEntity<Page<Form4>> getBySymbolAndDateRange(
             @PathVariable String symbol,
-            @RequestParam String startDate,
-            @RequestParam String endDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        try {
-            LocalDate start = parseDate(startDate);
-            LocalDate end = parseDate(endDate);
-            if (!isValidDateRange(start, end)) {
-                return ResponseEntity.badRequest().build();
-            }
-            int safePage = PaginationUtils.normalizePage(page);
-            int safeSize = PaginationUtils.normalizeSize(size);
-            PageRequest pageRequest = PaginationUtils.pageRequest(safePage, safeSize, "transactionDate");
-            Page<Form4> results = form4Service.findBySymbolAndDateRange(symbol.toUpperCase(), start, end, pageRequest);
-            return ResponseEntity.ok(results);
-        } catch (DateTimeParseException e) {
-            log.warn("Invalid date format: {} or {}", startDate, endDate);
+        if (!isValidDateRange(startDate, endDate)) {
             return ResponseEntity.badRequest().build();
         }
+        int safePage = PaginationUtils.normalizePage(page);
+        int safeSize = PaginationUtils.normalizeSize(size);
+        PageRequest pageRequest = PaginationUtils.pageRequest(safePage, safeSize, "transactionDate");
+        Page<Form4> results = form4Service.findBySymbolAndDateRange(symbol.toUpperCase(), startDate, endDate, pageRequest);
+        return ResponseEntity.ok(results);
     }
 
     /**
@@ -218,21 +201,14 @@ public class Form4Controller {
     @GetMapping("/symbol/{symbol}/stats")
     public ResponseEntity<InsiderStats> getInsiderStats(
             @PathVariable String symbol,
-            @RequestParam String startDate,
-            @RequestParam String endDate) {
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
 
-        try {
-            LocalDate start = parseDate(startDate);
-            LocalDate end = parseDate(endDate);
-            if (!isValidDateRange(start, end)) {
-                return ResponseEntity.badRequest().build();
-            }
-            InsiderStats stats = form4Service.getInsiderStats(symbol.toUpperCase(), start, end);
-            return ResponseEntity.ok(stats);
-        } catch (DateTimeParseException e) {
-            log.warn("Invalid date format: {} or {}", startDate, endDate);
+        if (!isValidDateRange(startDate, endDate)) {
             return ResponseEntity.badRequest().build();
         }
+        InsiderStats stats = form4Service.getInsiderStats(symbol.toUpperCase(), startDate, endDate);
+        return ResponseEntity.ok(stats);
     }
 
     /**
@@ -287,10 +263,6 @@ public class Form4Controller {
         }
         form4Service.deleteById(id);
         return ResponseEntity.noContent().build();
-    }
-
-    private LocalDate parseDate(String dateStr) {
-        return LocalDate.parse(dateStr, DATE_FORMAT);
     }
 
     private boolean isValidDateRange(LocalDate start, LocalDate end) {

@@ -1,8 +1,6 @@
 package org.jds.edgar4j.controller;
 
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.util.List;
 
 import org.jds.edgar4j.model.Form6K;
@@ -10,6 +8,7 @@ import org.jds.edgar4j.service.Form6KService;
 import org.jds.edgar4j.util.PaginationUtils;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -33,8 +32,6 @@ import lombok.extern.slf4j.Slf4j;
 public class Form6KController {
 
     private final Form6KService form6KService;
-
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     @GetMapping("/{id}")
     public ResponseEntity<Form6K> getById(@PathVariable String id) {
@@ -72,20 +69,12 @@ public class Form6KController {
 
     @GetMapping("/date-range")
     public ResponseEntity<Page<Form6K>> getByDateRange(
-            @RequestParam String startDate,
-            @RequestParam String endDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-
-        try {
-            LocalDate start = parseDate(startDate);
-            LocalDate end = parseDate(endDate);
-            PageRequest pageRequest = PaginationUtils.pageRequest(page, size, "filedDate");
-            return ResponseEntity.ok(form6KService.findByFiledDateRange(start, end, pageRequest));
-        } catch (DateTimeParseException e) {
-            log.warn("Invalid date format: {} or {}", startDate, endDate);
-            return ResponseEntity.badRequest().build();
-        }
+        PageRequest pageRequest = PaginationUtils.pageRequest(page, size, "filedDate");
+        return ResponseEntity.ok(form6KService.findByFiledDateRange(startDate, endDate, pageRequest));
     }
 
     @GetMapping("/recent")
@@ -99,8 +88,8 @@ public class Form6KController {
             @RequestParam String accessionNumber,
             @RequestParam String primaryDocument,
             @RequestParam(required = false) String companyName,
-            @RequestParam(required = false) String filedDate,
-            @RequestParam(required = false) String reportDate) {
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate filedDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate reportDate) {
 
         if (form6KService.existsByAccessionNumber(accessionNumber)) {
             return form6KService.findByAccessionNumber(accessionNumber)
@@ -117,19 +106,16 @@ public class Form6KController {
             if (companyName != null && !companyName.isBlank()) {
                 form6K.setCompanyName(companyName);
             }
-            if (filedDate != null && !filedDate.isBlank()) {
-                form6K.setFiledDate(parseDate(filedDate));
+            if (filedDate != null) {
+                form6K.setFiledDate(filedDate);
             }
-            if (reportDate != null && !reportDate.isBlank()) {
-                form6K.setReportDate(parseDate(reportDate));
+            if (reportDate != null) {
+                form6K.setReportDate(reportDate);
             }
 
             Form6K saved = form6KService.save(form6K);
             return ResponseEntity.ok(saved);
 
-        } catch (DateTimeParseException e) {
-            log.warn("Invalid date format in request: filedDate={}, reportDate={}", filedDate, reportDate);
-            return ResponseEntity.badRequest().build();
         } catch (Exception e) {
             log.error("Failed to download/parse Form 6-K: {}", accessionNumber, e);
             return ResponseEntity.internalServerError().build();
@@ -151,8 +137,5 @@ public class Form6KController {
         return ResponseEntity.noContent().build();
     }
 
-    private LocalDate parseDate(String dateStr) {
-        return LocalDate.parse(dateStr, DATE_FORMATTER);
-    }
 }
 

@@ -1,8 +1,6 @@
 package org.jds.edgar4j.controller;
 
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.util.List;
 
 import org.jds.edgar4j.model.Form13F;
@@ -16,6 +14,7 @@ import org.jds.edgar4j.service.Form13FService.InstitutionalOwnershipStats;
 import org.jds.edgar4j.util.PaginationUtils;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -39,8 +38,6 @@ import lombok.extern.slf4j.Slf4j;
 public class Form13FController {
 
     private final Form13FService form13FService;
-
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     /**
      * Get Form 13F by ID.
@@ -95,19 +92,13 @@ public class Form13FController {
      */
     @GetMapping("/quarter")
     public ResponseEntity<Page<Form13F>> getByQuarter(
-            @RequestParam String period,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate period,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        try {
-            LocalDate reportPeriod = parseDate(period);
-            PageRequest pageRequest = PaginationUtils.pageRequest(page, size, "totalValue");
-            Page<Form13F> results = form13FService.findByReportPeriod(reportPeriod, pageRequest);
-            return ResponseEntity.ok(results);
-        } catch (DateTimeParseException e) {
-            log.warn("Invalid date format: {}", period);
-            return ResponseEntity.badRequest().build();
-        }
+        PageRequest pageRequest = PaginationUtils.pageRequest(page, size, "totalValue");
+        Page<Form13F> results = form13FService.findByReportPeriod(period, pageRequest);
+        return ResponseEntity.ok(results);
     }
 
     /**
@@ -115,21 +106,13 @@ public class Form13FController {
      */
     @GetMapping("/date-range")
     public ResponseEntity<Page<Form13F>> getByDateRange(
-            @RequestParam String startDate,
-            @RequestParam String endDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-
-        try {
-            LocalDate start = parseDate(startDate);
-            LocalDate end = parseDate(endDate);
-            PageRequest pageRequest = PaginationUtils.pageRequest(page, size, "reportPeriod");
-            Page<Form13F> results = form13FService.findByReportPeriodRange(start, end, pageRequest);
-            return ResponseEntity.ok(results);
-        } catch (DateTimeParseException e) {
-            log.warn("Invalid date format: {} or {}", startDate, endDate);
-            return ResponseEntity.badRequest().build();
-        }
+        PageRequest pageRequest = PaginationUtils.pageRequest(page, size, "reportPeriod");
+        Page<Form13F> results = form13FService.findByReportPeriodRange(startDate, endDate, pageRequest);
+        return ResponseEntity.ok(results);
     }
 
     /**
@@ -138,21 +121,13 @@ public class Form13FController {
     @GetMapping("/cik/{cik}/date-range")
     public ResponseEntity<Page<Form13F>> getByCikAndDateRange(
             @PathVariable String cik,
-            @RequestParam String startDate,
-            @RequestParam String endDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-
-        try {
-            LocalDate start = parseDate(startDate);
-            LocalDate end = parseDate(endDate);
-            PageRequest pageRequest = PaginationUtils.pageRequest(page, size, "reportPeriod");
-            Page<Form13F> results = form13FService.findByCikAndReportPeriodRange(cik, start, end, pageRequest);
-            return ResponseEntity.ok(results);
-        } catch (DateTimeParseException e) {
-            log.warn("Invalid date format: {} or {}", startDate, endDate);
-            return ResponseEntity.badRequest().build();
-        }
+        PageRequest pageRequest = PaginationUtils.pageRequest(page, size, "reportPeriod");
+        Page<Form13F> results = form13FService.findByCikAndReportPeriodRange(cik, startDate, endDate, pageRequest);
+        return ResponseEntity.ok(results);
     }
 
     /**
@@ -210,17 +185,10 @@ public class Form13FController {
      */
     @GetMapping("/top-filers")
     public ResponseEntity<List<FilerSummary>> getTopFilers(
-            @RequestParam String period,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate period,
             @RequestParam(defaultValue = "10") int limit) {
-
-        try {
-            LocalDate reportPeriod = parseDate(period);
-            List<FilerSummary> results = form13FService.getTopFilers(reportPeriod, Math.min(limit, 100));
-            return ResponseEntity.ok(results);
-        } catch (DateTimeParseException e) {
-            log.warn("Invalid date format: {}", period);
-            return ResponseEntity.badRequest().build();
-        }
+        List<FilerSummary> results = form13FService.getTopFilers(period, Math.min(limit, 100));
+        return ResponseEntity.ok(results);
     }
 
     /**
@@ -228,17 +196,10 @@ public class Form13FController {
      */
     @GetMapping("/top-holdings")
     public ResponseEntity<List<HoldingSummary>> getTopHoldings(
-            @RequestParam String period,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate period,
             @RequestParam(defaultValue = "10") int limit) {
-
-        try {
-            LocalDate reportPeriod = parseDate(period);
-            List<HoldingSummary> results = form13FService.getTopHoldings(reportPeriod, Math.min(limit, 100));
-            return ResponseEntity.ok(results);
-        } catch (DateTimeParseException e) {
-            log.warn("Invalid date format: {}", period);
-            return ResponseEntity.badRequest().build();
-        }
+        List<HoldingSummary> results = form13FService.getTopHoldings(period, Math.min(limit, 100));
+        return ResponseEntity.ok(results);
     }
 
     /**
@@ -256,16 +217,10 @@ public class Form13FController {
     @GetMapping("/cusip/{cusip}/ownership")
     public ResponseEntity<InstitutionalOwnershipStats> getInstitutionalOwnership(
             @PathVariable String cusip,
-            @RequestParam String period) {
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate period) {
 
-        try {
-            LocalDate reportPeriod = parseDate(period);
-            InstitutionalOwnershipStats stats = form13FService.getInstitutionalOwnership(cusip.toUpperCase(), reportPeriod);
-            return ResponseEntity.ok(stats);
-        } catch (DateTimeParseException e) {
-            log.warn("Invalid date format: {}", period);
-            return ResponseEntity.badRequest().build();
-        }
+        InstitutionalOwnershipStats stats = form13FService.getInstitutionalOwnership(cusip.toUpperCase(), period);
+        return ResponseEntity.ok(stats);
     }
 
     /**
@@ -274,18 +229,11 @@ public class Form13FController {
     @GetMapping("/cik/{cik}/compare")
     public ResponseEntity<HoldingsComparison> compareHoldings(
             @PathVariable String cik,
-            @RequestParam String period1,
-            @RequestParam String period2) {
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate period1,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate period2) {
 
-        try {
-            LocalDate p1 = parseDate(period1);
-            LocalDate p2 = parseDate(period2);
-            HoldingsComparison comparison = form13FService.compareHoldings(cik, p1, p2);
-            return ResponseEntity.ok(comparison);
-        } catch (DateTimeParseException e) {
-            log.warn("Invalid date format: {} or {}", period1, period2);
-            return ResponseEntity.badRequest().build();
-        }
+        HoldingsComparison comparison = form13FService.compareHoldings(cik, period1, period2);
+        return ResponseEntity.ok(comparison);
     }
 
     /**
@@ -343,7 +291,4 @@ public class Form13FController {
         return ResponseEntity.noContent().build();
     }
 
-    private LocalDate parseDate(String dateStr) {
-        return LocalDate.parse(dateStr, DATE_FORMATTER);
-    }
 }

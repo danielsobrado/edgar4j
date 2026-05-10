@@ -1,8 +1,6 @@
 package org.jds.edgar4j.controller;
 
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.util.List;
 
 import org.jds.edgar4j.model.Form3;
@@ -10,6 +8,7 @@ import org.jds.edgar4j.service.Form3Service;
 import org.jds.edgar4j.util.PaginationUtils;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -33,8 +32,6 @@ import lombok.extern.slf4j.Slf4j;
 public class Form3Controller {
 
     private final Form3Service form3Service;
-
-    private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     @GetMapping("/{id}")
     public ResponseEntity<Form3> getById(@PathVariable String id) {
@@ -72,20 +69,12 @@ public class Form3Controller {
 
     @GetMapping("/date-range")
     public ResponseEntity<Page<Form3>> getByDateRange(
-            @RequestParam String startDate,
-            @RequestParam String endDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-
-        try {
-            LocalDate start = parseDate(startDate);
-            LocalDate end = parseDate(endDate);
-            PageRequest pageRequest = PaginationUtils.pageRequest(page, size, "filedDate");
-            return ResponseEntity.ok(form3Service.findByFiledDateRange(start, end, pageRequest));
-        } catch (DateTimeParseException e) {
-            log.warn("Invalid date format: {} or {}", startDate, endDate);
-            return ResponseEntity.badRequest().build();
-        }
+        PageRequest pageRequest = PaginationUtils.pageRequest(page, size, "filedDate");
+        return ResponseEntity.ok(form3Service.findByFiledDateRange(startDate, endDate, pageRequest));
     }
 
     @GetMapping("/recent")
@@ -99,7 +88,7 @@ public class Form3Controller {
             @RequestParam String accessionNumber,
             @RequestParam String primaryDocument,
             @RequestParam(required = false) String companyName,
-            @RequestParam(required = false) String filedDate) {
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate filedDate) {
 
         if (form3Service.existsByAccessionNumber(accessionNumber)) {
             return form3Service.findByAccessionNumber(accessionNumber)
@@ -116,16 +105,13 @@ public class Form3Controller {
             if (companyName != null && !companyName.isBlank()) {
                 form3.setIssuerName(companyName);
             }
-            if (filedDate != null && !filedDate.isBlank()) {
-                form3.setFiledDate(parseDate(filedDate));
+            if (filedDate != null) {
+                form3.setFiledDate(filedDate);
             }
 
             Form3 saved = form3Service.save(form3);
             return ResponseEntity.ok(saved);
 
-        } catch (DateTimeParseException e) {
-            log.warn("Invalid date format in request: filedDate={}", filedDate);
-            return ResponseEntity.badRequest().build();
         } catch (Exception e) {
             log.error("Failed to download/parse Form 3: {}", accessionNumber, e);
             return ResponseEntity.internalServerError().build();
@@ -147,7 +133,4 @@ public class Form3Controller {
         return ResponseEntity.noContent().build();
     }
 
-    private LocalDate parseDate(String dateStr) {
-        return LocalDate.parse(dateStr, DATE_FORMAT);
-    }
 }
