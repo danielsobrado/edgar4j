@@ -62,6 +62,14 @@ public class SecApiClient {
         return executeRequest(config.getCompanyFactsUrl(cik));
     }
 
+    public byte[] fetchBulkSubmissionsArchive() {
+        return executeBinaryRequest(config.getBulkSubmissionsFileUrl());
+    }
+
+    public byte[] fetchBulkCompanyFactsArchive() {
+        return executeBinaryRequest(config.getBulkCompanyFactsFileUrl());
+    }
+
     public String fetchForm4(String cik, String accessionNumber, String primaryDocument) {
         String url = config.getForm4Url(cik, accessionNumber, primaryDocument);
         return executeRequest(url);
@@ -259,6 +267,38 @@ public class SecApiClient {
         }
     }
 
+    private byte[] executeBinaryRequest(String url) {
+        try {
+            byte[] cached = downloadedResourceStore.readBytes(CACHE_NAMESPACE, url).orElse(null);
+            if (cached != null) {
+                log.debug("Using cached SEC binary response for {}", url);
+                return cached;
+            }
+
+            rateLimiter.acquire();
+            log.debug("Fetching binary URL: {}", url);
+
+            HttpRequest request = buildBinaryRequest(url);
+            HttpResponse<InputStream> response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
+
+            byte[] body = readBodyBytes(response);
+            validateResponse(response.statusCode(), url, response.statusCode() >= 400
+                    ? new String(body, StandardCharsets.UTF_8)
+                    : "");
+            downloadedResourceStore.writeBytes(CACHE_NAMESPACE, url, body);
+            return body;
+        } catch (SecApiException e) {
+            log.warn("SEC binary request failed for {}: {}", url, e.getMessage());
+            throw e;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new SecApiException("Request interrupted", e);
+        } catch (Exception e) {
+            log.error("Error fetching binary URL: {}", url, e);
+            throw new SecApiException("Failed to fetch binary data from SEC API: " + e.getMessage(), e);
+        }
+    }
+
     private HttpRequest buildRequest(String url) {
         String userAgent = settingsService.getUserAgent();
 
@@ -267,6 +307,19 @@ public class SecApiClient {
                 .timeout(TIMEOUT)
                 .header("User-Agent", userAgent)
                 .header("Accept", "application/json, text/html, application/xml, text/plain")
+                .header("Accept-Encoding", "gzip, deflate")
+                .GET()
+                .build();
+    }
+
+    private HttpRequest buildBinaryRequest(String url) {
+        String userAgent = settingsService.getUserAgent();
+
+        return HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(TIMEOUT)
+                .header("User-Agent", userAgent)
+                .header("Accept", "application/zip, application/octet-stream, */*")
                 .header("Accept-Encoding", "gzip, deflate")
                 .GET()
                 .build();
@@ -292,10 +345,14 @@ public class SecApiClient {
     }
 
     private String readBody(HttpResponse<InputStream> response) {
+        return new String(readBodyBytes(response), StandardCharsets.UTF_8);
+    }
+
+    private byte[] readBodyBytes(HttpResponse<InputStream> response) {
         String encoding = response.headers().firstValue("Content-Encoding").orElse("");
         try (InputStream rawStream = response.body();
              InputStream decodedStream = wrapStream(rawStream, encoding)) {
-            return new String(decodedStream.readAllBytes(), StandardCharsets.UTF_8);
+            return decodedStream.readAllBytes();
         } catch (IOException e) {
             throw new SecApiException("Failed to read SEC response body", e);
         }

@@ -71,12 +71,10 @@ public class DownloadJobExecutor {
                     }
                     break;
                 case BULK_SUBMISSIONS:
-                    downloadBulkDataService.downloadBulkSubmissionsArchive();
-                    filesDownloaded = 1;
+                    filesDownloaded = downloadBulkDataService.downloadBulkSubmissionsArchive();
                     break;
                 case BULK_COMPANY_FACTS:
-                    downloadBulkDataService.downloadBulkCompanyFactsArchive();
-                    filesDownloaded = 1;
+                    filesDownloaded = downloadBulkDataService.downloadBulkCompanyFactsArchive();
                     break;
                 default:
                     log.warn("Unsupported download type: {}", request.getType());
