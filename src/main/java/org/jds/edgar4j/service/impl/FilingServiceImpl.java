@@ -66,9 +66,9 @@ public class FilingServiceImpl implements FilingService {
         );
         PageRequest pageRequest = PageRequest.of(page, size, sort);
 
-        Page<FilingSearchPort.SearchResult> page = filingSearchPort.search(toSearchCriteria(request), pageRequest);
+        Page<FilingSearchPort.SearchResult> searchResultsPage = filingSearchPort.search(toSearchCriteria(request), pageRequest);
 
-        List<String> filingIds = page.getContent().stream()
+        List<String> filingIds = searchResultsPage.getContent().stream()
                 .map(FilingSearchPort.SearchResult::id)
                 .toList();
         Map<String, Filling> filingsById = fillingRepository.findAllById(filingIds).stream()
@@ -80,7 +80,7 @@ public class FilingServiceImpl implements FilingService {
                 .map(this::toFilingResponse)
                 .collect(Collectors.toList());
 
-        return PaginatedResponse.of(content, request.getPage(), request.getSize(), page.getTotalElements());
+        return PaginatedResponse.of(content, request.getPage(), request.getSize(), searchResultsPage.getTotalElements());
     }
 
     @Override

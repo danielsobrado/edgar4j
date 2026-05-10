@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -302,8 +303,59 @@ public class ValueTransformer {
     }
 
     private static BigDecimal transformQuarterEnd(String value) {
-        // Q1 2024 -> returns month number or similar
-        return null;  // Would need date context
+        String normalized = value == null ? "" : value.trim().toUpperCase();
+        if (normalized.isEmpty()) {
+            return null;
+        }
+
+        Matcher q1Matcher = Pattern.compile("\\bQ(\\d)\\s*[-/]?\\s*(\\d{4})\\b").matcher(normalized);
+        Matcher q2Matcher = Pattern.compile("\\b(\\d{4})\\s*[-/]?\\s*Q(\\d)\\b").matcher(normalized);
+        Matcher wordMatcher = Pattern.compile("(FIRST|SECOND|THIRD|FOURTH)\\s+QUARTER\\s+(\\d{4})").matcher(normalized);
+
+        Integer quarter = null;
+        if (q1Matcher.find()) {
+            quarter = parseQuarter(q1Matcher.group(1));
+            return buildQuarterDecimal(parseYear(q1Matcher.group(2)), quarter);
+        }
+        if (q2Matcher.find()) {
+            quarter = parseQuarter(q2Matcher.group(1));
+            return buildQuarterDecimal(parseYear(q2Matcher.group(1)), quarter);
+        }
+        if (wordMatcher.find()) {
+            quarter = switch (wordMatcher.group(1)) {
+                case "FIRST" -> 1;
+                case "SECOND" -> 2;
+                case "THIRD" -> 3;
+                case "FOURTH" -> 4;
+                default -> null;
+            };
+            return buildQuarterDecimal(parseYear(wordMatcher.group(2)), quarter);
+        }
+
+        return null;
+    }
+
+    private static Integer parseQuarter(String quarterText) {
+        try {
+            int quarter = Integer.parseInt(quarterText);
+            if (quarter < 1 || quarter > 4) {
+                return null;
+            }
+            return quarter;
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private static int parseYear(String yearText) {
+        return Integer.parseInt(yearText);
+    }
+
+    private static BigDecimal buildQuarterDecimal(int year, Integer quarter) {
+        if (quarter == null) {
+            return null;
+        }
+        return BigDecimal.valueOf(year).add(BigDecimal.valueOf(quarter).divide(BigDecimal.valueOf(4), 2, RoundingMode.UNNECESSARY));
     }
 
     @FunctionalInterface

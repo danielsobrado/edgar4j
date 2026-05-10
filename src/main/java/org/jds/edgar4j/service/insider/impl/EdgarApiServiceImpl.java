@@ -38,8 +38,7 @@ import lombok.extern.slf4j.Slf4j;
 public class EdgarApiServiceImpl implements EdgarApiService {
 
     private static final String DEFAULT_USER_AGENT = "Edgar4J/1.0";
-    private static final String BULK_SUBMISSIONS_NOT_IMPLEMENTED_MESSAGE =
-            "Bulk submissions processing requires a ZIP download/extraction pipeline and is not implemented yet";
+    private static final int MAX_BULK_COMPANIES = 200;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final HttpClient httpClient = HttpClient.newBuilder()
@@ -159,8 +158,34 @@ public class EdgarApiServiceImpl implements EdgarApiService {
     @Override
     public CompletableFuture<Void> processBulkSubmissions() {
         log.info("Processing bulk submissions");
-        return CompletableFuture.failedFuture(
-                new UnsupportedOperationException(BULK_SUBMISSIONS_NOT_IMPLEMENTED_MESSAGE));
+        return CompletableFuture.supplyAsync(() -> {
+            List<CompanyTicker> tickers = getCompanyTickers().join();
+            if (tickers == null || tickers.isEmpty()) {
+                log.info("No tickers found for bulk submissions");
+                return null;
+            }
+
+            int processed = 0;
+            for (CompanyTicker ticker : tickers) {
+                if (ticker == null || ticker.getCik() == null || ticker.getCik().isBlank()) {
+                    continue;
+                }
+
+                try {
+                    processCompanySubmissions(ticker.getCik()).get(60, TimeUnit.SECONDS);
+                    processed++;
+                    if (processed >= MAX_BULK_COMPANIES) {
+                        log.warn("Reached bulk processing limit of {} companies; stopping to protect runtime", MAX_BULK_COMPANIES);
+                        break;
+                    }
+                } catch (Exception e) {
+                    log.warn("Failed to process bulk submissions for CIK {}: {}", ticker.getCik(), e.getMessage());
+                }
+            }
+
+            log.info("Finished bulk submissions processing for {} companies", processed);
+            return null;
+        });
     }
 
     @Override
