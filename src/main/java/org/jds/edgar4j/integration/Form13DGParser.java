@@ -466,11 +466,19 @@ public class Form13DGParser {
 
             // Try alternate format: MM/dd/yyyy
             if (cleaned.contains("/")) {
-                return LocalDate.parse(cleaned, DATE_FORMATTER_ALT);
+                LocalDate slashDate = parseWithFormatter(cleaned, DATE_FORMATTER_ALT);
+                if (slashDate != null) {
+                    return slashDate;
+                }
             }
 
             // Try format: MMDDYYYY
             if (cleaned.length() == 8) {
+                LocalDate yyyyMmDd = parseWithFormatter(cleaned, "yyyyMMdd");
+                if (yyyyMmDd != null) {
+                    return yyyyMmDd;
+                }
+
                 return LocalDate.of(
                     Integer.parseInt(cleaned.substring(4, 8)),
                     Integer.parseInt(cleaned.substring(0, 2)),
@@ -478,18 +486,17 @@ public class Form13DGParser {
                 );
             }
 
-            // Try format: YYYYMMDD
-            if (cleaned.length() == 8) {
-                return LocalDate.of(
-                    Integer.parseInt(cleaned.substring(0, 4)),
-                    Integer.parseInt(cleaned.substring(4, 6)),
-                    Integer.parseInt(cleaned.substring(6, 8))
-                );
-            }
-
             return LocalDate.parse(cleaned, DATE_FORMATTER);
         } catch (DateTimeParseException | NumberFormatException e) {
             log.warn("Failed to parse date: {}", dateStr);
+            return null;
+        }
+    }
+
+    private LocalDate parseWithFormatter(String value, String pattern) {
+        try {
+            return LocalDate.parse(value, DateTimeFormatter.ofPattern(pattern));
+        } catch (DateTimeParseException e) {
             return null;
         }
     }

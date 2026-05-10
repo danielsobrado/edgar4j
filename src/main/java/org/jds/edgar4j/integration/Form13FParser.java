@@ -109,11 +109,12 @@ public class Form13FParser {
         }
 
         try {
-            DocumentBuilder builder = documentBuilderFactory.newDocumentBuilder();
-            // Temporarily disable namespace awareness for primary doc
-            documentBuilderFactory.setNamespaceAware(false);
-            DocumentBuilder builder2 = documentBuilderFactory.newDocumentBuilder();
-            Document doc = builder2.parse(new InputSource(new StringReader(cleanPrimaryDoc(primaryDocXml))));
+            // Primary documents are not namespace-aware XML fragments in some filings.
+            DocumentBuilderFactory metadataFactory = DocumentBuilderFactory.newInstance();
+            metadataFactory.setNamespaceAware(false);
+            metadataFactory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+            DocumentBuilder builder = metadataFactory.newDocumentBuilder();
+            Document doc = builder.parse(new InputSource(new StringReader(cleanPrimaryDoc(primaryDocXml))));
             doc.getDocumentElement().normalize();
 
             Element root = doc.getDocumentElement();
@@ -204,9 +205,6 @@ public class Form13FParser {
                     }
                 }
             }
-
-            // Restore namespace awareness
-            documentBuilderFactory.setNamespaceAware(true);
 
         } catch (Exception e) {
             log.warn("Failed to parse metadata for accession: {}", form13F.getAccessionNumber(), e);
@@ -434,9 +432,20 @@ public class Form13FParser {
         try {
             // Handle different date formats
             String cleaned = dateStr.trim();
+            if (cleaned.contains("/")) {
+                LocalDate slashDate = parseWithFormatter(cleaned, "MM/dd/yyyy");
+                if (slashDate != null) {
+                    return slashDate;
+                }
+            }
             if (cleaned.length() == 10) {
                 return LocalDate.parse(cleaned, DATE_FORMATTER);
-            } else if (cleaned.length() == 8) {
+            }
+            if (cleaned.length() == 8) {
+                LocalDate asYyyyMmDd = parseWithFormatter(cleaned, "yyyyMMdd");
+                if (asYyyyMmDd != null) {
+                    return asYyyyMmDd;
+                }
                 // Format: MMDDYYYY
                 return LocalDate.of(
                     Integer.parseInt(cleaned.substring(4, 8)),
@@ -445,8 +454,16 @@ public class Form13FParser {
                 );
             }
             return LocalDate.parse(cleaned, DATE_FORMATTER);
-        } catch (DateTimeParseException e) {
+        } catch (DateTimeParseException | NumberFormatException e) {
             log.warn("Failed to parse date: {}", dateStr);
+            return null;
+        }
+    }
+
+    private LocalDate parseWithFormatter(String value, String pattern) {
+        try {
+            return LocalDate.parse(value, DateTimeFormatter.ofPattern(pattern));
+        } catch (DateTimeParseException e) {
             return null;
         }
     }

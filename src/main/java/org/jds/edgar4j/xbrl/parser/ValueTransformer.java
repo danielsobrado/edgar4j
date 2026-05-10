@@ -77,7 +77,11 @@ public class ValueTransformer {
             FormatHandler handler = FORMAT_HANDLERS.get(format.toLowerCase());
             if (handler != null) {
                 try {
-                    return handler.transform(value);
+                    BigDecimal transformedValue = handler.transform(value);
+                    if (transformedValue != null) {
+                        return transformedValue;
+                    }
+                    log.trace("Format handler returned null for {} and value '{}', using generic number parsing", format, value);
                 } catch (Exception e) {
                     log.trace("Format handler failed for {}: {}", format, e.getMessage());
                 }
