@@ -59,9 +59,10 @@ public class DownloadJobExecutor {
                     filesDownloaded = downloadTickersService.downloadTickersMFs();
                     break;
                 case SUBMISSIONS:
-                    if (request.getCik() != null) {
-                        filesDownloaded = downloadSubmissionsService.downloadSubmissions(request.getCik());
+                    if (request.getCik() == null || request.getCik().isBlank()) {
+                        throw new IllegalArgumentException("CIK is required for submissions download jobs");
                     }
+                    filesDownloaded = downloadSubmissionsService.downloadSubmissions(request.getCik());
                     break;
                 case REMOTE_FILINGS_SYNC:
                     filesDownloaded = executeRemoteFilingSync(jobId, request);

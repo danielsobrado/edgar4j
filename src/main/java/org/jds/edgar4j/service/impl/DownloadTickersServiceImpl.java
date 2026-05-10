@@ -1,8 +1,10 @@
 package org.jds.edgar4j.service.impl;
 
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 import org.jds.edgar4j.model.Ticker;
@@ -77,6 +79,7 @@ public class DownloadTickersServiceImpl implements DownloadTickersService {
     private void saveTickers(List<Ticker> tickers) {
         List<String> codes = tickers.stream()
                 .map(Ticker::getCode)
+                .map(this::normalizeTickerCode)
                 .filter(Objects::nonNull)
                 .filter(code -> !code.isBlank())
                 .distinct()
@@ -84,11 +87,21 @@ public class DownloadTickersServiceImpl implements DownloadTickersService {
 
         if (!codes.isEmpty()) {
             Map<String, String> existingIdsByCode = tickerRepository.findByCodeIn(codes).stream()
-                    .filter(existing -> existing.getCode() != null)
-                    .collect(Collectors.toMap(Ticker::getCode, Ticker::getId, (left, right) -> left));
+                    .filter(existing -> existing.getCode() != null && !existing.getCode().isBlank())
+                    .collect(Collectors.toMap(
+                        existing -> normalizeTickerCode(existing.getCode()),
+                        Ticker::getId,
+                        (left, right) -> left,
+                        LinkedHashMap::new));
 
             for (Ticker ticker : tickers) {
-                String existingId = existingIdsByCode.get(ticker.getCode());
+                String normalizedCode = normalizeTickerCode(ticker.getCode());
+                ticker.setCode(normalizedCode);
+                if (normalizedCode == null) {
+                    continue;
+                }
+
+                String existingId = existingIdsByCode.get(normalizedCode);
                 if (existingId != null) {
                     ticker.setId(existingId);
                 }
@@ -96,6 +109,15 @@ public class DownloadTickersServiceImpl implements DownloadTickersService {
         }
 
         tickerRepository.saveAll(tickers);
+    }
+
+    private String normalizeTickerCode(String code) {
+        if (code == null) {
+            return null;
+        }
+
+        String normalized = code.trim().toUpperCase(Locale.ROOT);
+        return normalized.isBlank() ? null : normalized;
     }
 }
 

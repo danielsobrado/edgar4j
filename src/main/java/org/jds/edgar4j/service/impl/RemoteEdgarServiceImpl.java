@@ -45,7 +45,7 @@ public class RemoteEdgarServiceImpl implements RemoteEdgarService {
     @Override
     public List<RemoteTickerResponse> getRemoteTickers(String source, String search, int limit) {
         int safeLimit = Math.max(1, Math.min(limit, MAX_TICKER_LIMIT));
-        String safeSource = source == null ? "all" : source.toLowerCase(Locale.ROOT);
+        String safeSource = source == null ? "all" : source.trim().toLowerCase(Locale.ROOT);
         String normalizedSearch = search == null ? "" : search.trim().toLowerCase(Locale.ROOT);
 
         List<Ticker> parsedTickers = switch (safeSource) {
@@ -69,14 +69,19 @@ public class RemoteEdgarServiceImpl implements RemoteEdgarService {
 
     @Override
     public RemoteSubmissionResponse getRemoteSubmission(String cik, int filingsLimit) {
+        if (cik == null || cik.isBlank()) {
+            throw new IllegalArgumentException("CIK is required");
+        }
+
+        String normalizedCik = cik.trim();
         int safeFilingsLimit = Math.max(1, Math.min(filingsLimit, MAX_FILINGS_LIMIT));
-        String json = secApiClient.fetchSubmissions(cik);
+        String json = secApiClient.fetchSubmissions(normalizedCik);
         SecSubmissionResponse submission = responseParser.parseSubmissionResponse(json);
 
         List<RemoteSubmissionFilingResponse> recentFilings = mapRecentFilings(submission, safeFilingsLimit);
 
         return RemoteSubmissionResponse.builder()
-                .cik(submission.getCik())
+                .cik(normalizedCik)
                 .companyName(submission.getName())
                 .sic(submission.getSic())
                 .sicDescription(submission.getSicDescription())

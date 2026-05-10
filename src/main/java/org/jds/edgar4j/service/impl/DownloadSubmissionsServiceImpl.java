@@ -36,15 +36,20 @@ public class DownloadSubmissionsServiceImpl implements DownloadSubmissionsServic
     public long downloadSubmissions(String cik) {
         log.info("Download submissions for CIK: {}", cik);
 
+        if (cik == null || cik.isBlank()) {
+            throw new IllegalArgumentException("CIK is required");
+        }
+
+        String normalizedCik = cik.trim();
         try {
-            long cikLong = Long.parseLong(cik);
+            long cikLong = Long.parseLong(normalizedCik);
             log.debug("Parsed CIK: {}", cikLong);
         } catch (NumberFormatException e) {
             log.error("CIK is not a number: {}", cik);
             throw new IllegalArgumentException("Invalid CIK format: " + cik);
         }
 
-        String jsonResponse = secApiClient.fetchSubmissions(cik);
+        String jsonResponse = secApiClient.fetchSubmissions(normalizedCik);
         log.debug("Received response length: {} characters", jsonResponse.length());
 
         SecSubmissionResponse response = responseParser.parseSubmissionResponse(jsonResponse);
@@ -52,19 +57,19 @@ public class DownloadSubmissionsServiceImpl implements DownloadSubmissionsServic
 
         Submissions submissions = responseParser.toSubmissions(response);
 
-        Submissions existingSubmissions = submissionsRepository.findByCik(cik).orElse(null);
+        Submissions existingSubmissions = submissionsRepository.findByCik(normalizedCik).orElse(null);
         if (existingSubmissions != null) {
             submissions.setId(existingSubmissions.getId());
-            log.info("Updating existing submissions for CIK: {}", cik);
+            log.info("Updating existing submissions for CIK: {}", normalizedCik);
         } else {
-            log.info("Creating new submissions for CIK: {}", cik);
+            log.info("Creating new submissions for CIK: {}", normalizedCik);
         }
 
         submissionsRepository.save(submissions);
-        log.info("Saved submissions for CIK: {}", cik);
+        log.info("Saved submissions for CIK: {}", normalizedCik);
 
         List<Filling> fillings = responseParser.toFillings(response);
-        log.info("Parsed {} filings for CIK: {}", fillings.size(), cik);
+        log.info("Parsed {} filings for CIK: {}", fillings.size(), normalizedCik);
 
         Map<String, Filling> uniqueFillingsByAccession = new LinkedHashMap<>();
         int filingsWithoutAccession = 0;
@@ -83,11 +88,11 @@ public class DownloadSubmissionsServiceImpl implements DownloadSubmissionsServic
 
         List<Filling> fillingsToSave = List.copyOf(uniqueFillingsByAccession.values());
         if (filingsWithoutAccession > 0) {
-            log.warn("Skipping {} filings without accession number for CIK: {}", filingsWithoutAccession, cik);
+            log.warn("Skipping {} filings without accession number for CIK: {}", filingsWithoutAccession, normalizedCik);
         }
 
         fillingRepository.saveAll(fillingsToSave);
-        log.info("Saved {} filings for CIK: {}", fillingsToSave.size(), cik);
+        log.info("Saved {} filings for CIK: {}", fillingsToSave.size(), normalizedCik);
         return fillingsToSave.size();
     }
 }

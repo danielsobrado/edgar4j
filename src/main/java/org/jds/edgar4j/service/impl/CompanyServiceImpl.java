@@ -2,6 +2,7 @@ package org.jds.edgar4j.service.impl;
 
 import java.util.Optional;
 import java.util.Set;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 import org.jds.edgar4j.dto.request.CompanySearchRequest;
@@ -90,9 +91,14 @@ public class CompanyServiceImpl implements CompanyService {
      */
     @Override
     public Optional<CompanyResponse> getCompanyByCik(String cik) {
+        if (cik == null || cik.isBlank()) {
+            return Optional.empty();
+        }
+
         log.debug("getCompanyByCik: {}", cik);
 
-        Long cikNum = parseCikToLong(cik);
+        String normalizedCik = cik.trim();
+        Long cikNum = parseCikToLong(normalizedCik);
 
         // Step 1 – find ticker info from company_tickers
         Optional<CompanyTicker> tickerEntry = (cikNum != null)
@@ -100,7 +106,7 @@ public class CompanyServiceImpl implements CompanyService {
                 : Optional.empty();
 
         // Step 2 – load full submissions document (try both padded and raw forms)
-        Optional<Submissions> submissions = submissionsRepository.findByCik(cik);
+        Optional<Submissions> submissions = submissionsRepository.findByCik(normalizedCik);
         if (submissions.isEmpty() && cikNum != null) {
             // try zero-padded form that submissions collection uses
             submissions = submissionsRepository.findByCik(String.format("%010d", cikNum));
@@ -140,7 +146,11 @@ public class CompanyServiceImpl implements CompanyService {
     public Optional<CompanyResponse> getCompanyByTicker(String ticker) {
         log.debug("getCompanyByTicker: {}", ticker);
 
-        String upperTicker = ticker.toUpperCase();
+        if (ticker == null || ticker.isBlank()) {
+            return Optional.empty();
+        }
+
+        String upperTicker = ticker.trim().toUpperCase(Locale.ROOT);
 
         Optional<CompanyTicker> tickerEntry = companyTickerRepository.findByTickerIgnoreCase(upperTicker);
 
@@ -180,7 +190,10 @@ public class CompanyServiceImpl implements CompanyService {
 
     @Override
     public Optional<String> getCikByTicker(String ticker) {
-        return companyTickerRepository.findByTickerIgnoreCase(ticker.toUpperCase())
+        if (ticker == null || ticker.isBlank()) {
+            return Optional.empty();
+        }
+        return companyTickerRepository.findByTickerIgnoreCase(ticker.trim().toUpperCase(Locale.ROOT))
                 .map(CompanyTicker::getCikPadded);
     }
 
@@ -194,11 +207,17 @@ public class CompanyServiceImpl implements CompanyService {
 
     @Override
     public Optional<CompanyTicker> getCompanyTickerByTicker(String ticker) {
-        return companyTickerRepository.findByTickerIgnoreCase(ticker.toUpperCase());
+        if (ticker == null || ticker.isBlank()) {
+            return Optional.empty();
+        }
+        return companyTickerRepository.findByTickerIgnoreCase(ticker.trim().toUpperCase(Locale.ROOT));
     }
 
     @Override
     public Optional<CompanyTicker> getCompanyTickerByCik(String cik) {
+        if (cik == null || cik.isBlank()) {
+            return Optional.empty();
+        }
         Long cikNum = parseCikToLong(cik);
         if (cikNum == null) return Optional.empty();
         return companyTickerRepository.findFirstByCikStr(cikNum);
