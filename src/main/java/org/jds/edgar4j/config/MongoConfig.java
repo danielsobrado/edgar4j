@@ -12,7 +12,7 @@ import org.springframework.data.mongodb.core.convert.MappingMongoConverter;
 import org.springframework.data.mongodb.repository.config.EnableMongoRepositories;
 
 @Configuration
-@Profile("resource-high & !resource-low")
+@Profile("resource-high")
 @ConditionalOnProperty(prefix = "edgar4j", name = "resource-mode", havingValue = "high", matchIfMissing = true)
 @EnableMongoRepositories(
     basePackages = "org.jds.edgar4j.repository",

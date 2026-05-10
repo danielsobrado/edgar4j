@@ -28,7 +28,7 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Service
-@Profile("resource-high & !resource-low")
+@Profile("resource-high")
 @RequiredArgsConstructor
 public class InsiderAnalyticsService {
 

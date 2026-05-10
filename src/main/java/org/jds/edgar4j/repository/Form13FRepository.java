@@ -15,7 +15,7 @@ import org.springframework.context.annotation.Profile;
 /**
  * Repository for Form 13F SEC filings (institutional holdings).
  */
-@Profile("resource-high & !resource-low")
+@Profile("resource-high")
 public interface Form13FRepository extends MongoRepository<Form13F, String> {
 
     // Find by accession number (unique identifier)

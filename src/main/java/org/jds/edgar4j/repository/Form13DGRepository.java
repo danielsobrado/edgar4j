@@ -15,7 +15,7 @@ import org.springframework.context.annotation.Profile;
 /**
  * Repository for Form 13D/13G SEC filings (beneficial ownership reports).
  */
-@Profile("resource-high & !resource-low")
+@Profile("resource-high")
 public interface Form13DGRepository extends MongoRepository<Form13DG, String> {
 
     // Find by accession number (unique identifier)

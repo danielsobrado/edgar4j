@@ -7,7 +7,7 @@ import org.jds.edgar4j.model.Sp500Constituent;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.context.annotation.Profile;
 
-@Profile("resource-high & !resource-low")
+@Profile("resource-high")
 public interface Sp500ConstituentRepository extends MongoRepository<Sp500Constituent, String> {
 
     Optional<Sp500Constituent> findByTickerIgnoreCase(String ticker);

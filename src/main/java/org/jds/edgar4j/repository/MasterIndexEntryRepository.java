@@ -4,6 +4,6 @@ import org.jds.edgar4j.model.MasterIndexEntry;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.context.annotation.Profile;
 
-@Profile("resource-high & !resource-low")
+@Profile("resource-high")
 public interface MasterIndexEntryRepository extends MongoRepository<MasterIndexEntry, String> {
 }

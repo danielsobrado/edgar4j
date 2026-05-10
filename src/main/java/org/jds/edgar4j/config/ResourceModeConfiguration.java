@@ -28,7 +28,7 @@ public class ResourceModeConfiguration {
     }
 
     @Bean
-    @Profile("resource-high & !resource-low")
+    @Profile("resource-high")
     @ConditionalOnMissingBean
     public ResourceModeInfo highResourceModeInfo() {
         return new ResourceModeInfo("high", "MongoDB-backed document storage");

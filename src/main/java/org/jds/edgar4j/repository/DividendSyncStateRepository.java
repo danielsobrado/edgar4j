@@ -6,7 +6,7 @@ import org.jds.edgar4j.model.DividendSyncState;
 import org.springframework.context.annotation.Profile;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
-@Profile("resource-high & !resource-low")
+@Profile("resource-high")
 public interface DividendSyncStateRepository
     extends MongoRepository<DividendSyncState, String> {
 

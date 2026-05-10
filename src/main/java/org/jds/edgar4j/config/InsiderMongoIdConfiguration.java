@@ -16,7 +16,7 @@ import org.springframework.data.mongodb.core.mapping.event.BeforeConvertCallback
 import lombok.RequiredArgsConstructor;
 
 @Configuration
-@Profile("resource-high & !resource-low")
+@Profile("resource-high")
 @RequiredArgsConstructor
 public class InsiderMongoIdConfiguration {
 
