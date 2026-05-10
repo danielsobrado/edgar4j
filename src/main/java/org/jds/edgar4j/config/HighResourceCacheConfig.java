@@ -27,7 +27,7 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import lombok.RequiredArgsConstructor;
 
 @Configuration
-@Profile("resource-high")
+@Profile("resource-high & !resource-low")
 @ConditionalOnProperty(prefix = "edgar4j", name = "resource-mode", havingValue = "high", matchIfMissing = true)
 @RequiredArgsConstructor
 public class HighResourceCacheConfig {

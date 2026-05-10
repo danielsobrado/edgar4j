@@ -9,7 +9,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.Delegate;
 
 @Component
-@Profile("resource-high")
+@Profile("resource-high & !resource-low")
 @RequiredArgsConstructor
 public class InsiderCompanyRelationshipMongoAdapter implements InsiderCompanyRelationshipDataPort {
 

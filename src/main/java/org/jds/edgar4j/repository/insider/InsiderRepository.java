@@ -16,7 +16,7 @@ import org.springframework.data.mongodb.repository.Query;
  * @version 1.0
  * @since 2025-01-01
  */
-@Profile("resource-high")
+@Profile("resource-high & !resource-low")
 public interface InsiderRepository extends MongoRepository<Insider, Long> {
 
     /**

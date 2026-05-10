@@ -14,7 +14,7 @@ import org.springframework.context.annotation.Profile;
 /**
  * Repository for Form 20-F SEC filings.
  */
-@Profile("resource-high")
+@Profile("resource-high & !resource-low")
 public interface Form20FRepository extends MongoRepository<Form20F, String> {
 
     Optional<Form20F> findByAccessionNumber(String accessionNumber);

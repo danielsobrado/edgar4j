@@ -14,7 +14,7 @@ import org.springframework.context.annotation.Profile;
 /**
  * Repository for Form 6-K SEC filings.
  */
-@Profile("resource-high")
+@Profile("resource-high & !resource-low")
 public interface Form6KRepository extends MongoRepository<Form6K, String> {
 
     Optional<Form6K> findByAccessionNumber(String accessionNumber);

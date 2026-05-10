@@ -14,7 +14,7 @@ import org.springframework.context.annotation.Profile;
 /**
  * Repository for Form 5 SEC filings.
  */
-@Profile("resource-high")
+@Profile("resource-high & !resource-low")
 public interface Form5Repository extends MongoRepository<Form5, String> {
 
     Optional<Form5> findByAccessionNumber(String accessionNumber);

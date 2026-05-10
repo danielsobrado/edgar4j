@@ -7,7 +7,7 @@ import org.jds.edgar4j.model.SearchHistory;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.context.annotation.Profile;
 
-@Profile("resource-high")
+@Profile("resource-high & !resource-low")
 public interface SearchHistoryRepository extends MongoRepository<SearchHistory, String> {
 
     List<SearchHistory> findTop10ByOrderByTimestampDesc();

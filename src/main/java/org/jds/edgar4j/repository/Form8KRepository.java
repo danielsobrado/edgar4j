@@ -14,7 +14,7 @@ import org.springframework.context.annotation.Profile;
 /**
  * Repository for Form 8-K SEC filings.
  */
-@Profile("resource-high")
+@Profile("resource-high & !resource-low")
 public interface Form8KRepository extends MongoRepository<Form8K, String> {
 
     Optional<Form8K> findByAccessionNumber(String accessionNumber);

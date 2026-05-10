@@ -7,7 +7,7 @@ import org.jds.edgar4j.model.Exchange;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.context.annotation.Profile;
 
-@Profile("resource-high")
+@Profile("resource-high & !resource-low")
 public interface ExchangeRepository extends MongoRepository<Exchange, String> {
 
     Optional<Exchange> findByCode(String code);

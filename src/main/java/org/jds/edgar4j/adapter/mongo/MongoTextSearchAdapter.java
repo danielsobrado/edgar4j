@@ -30,7 +30,7 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Component
-@Profile("resource-high")
+@Profile("resource-high & !resource-low")
 @ConditionalOnProperty(name = "spring.elasticsearch.repositories.enabled", havingValue = "false", matchIfMissing = true)
 public class MongoTextSearchAdapter implements FilingSearchPort {
 

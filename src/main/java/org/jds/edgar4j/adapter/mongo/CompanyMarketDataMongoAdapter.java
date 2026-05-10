@@ -8,7 +8,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 @Component
-@Profile("resource-high")
+@Profile("resource-high & !resource-low")
 @RequiredArgsConstructor
 public class CompanyMarketDataMongoAdapter implements CompanyMarketDataDataPort {
 

@@ -17,7 +17,7 @@ import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 
 @Service
-@Profile("resource-high")
+@Profile("resource-high & !resource-low")
 @RequiredArgsConstructor
 public class MongoSequenceService {
 

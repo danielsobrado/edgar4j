@@ -14,7 +14,7 @@ import java.util.Optional;
  * <p>Provides fast CIK Ã¢â€ â€ Ticker cross-lookups without loading the full
  * {@code submissions} documents.
  */
-@Profile("resource-high")
+@Profile("resource-high & !resource-low")
 public interface CompanyTickerRepository extends MongoRepository<CompanyTicker, String> {
 
     /** Find by exact ticker (case-sensitive, as stored in the collection). */
