@@ -6,6 +6,8 @@ spring:
     exclude:
       - org.springframework.boot.autoconfigure.data.redis.DataRedisAutoConfiguration
       - org.springframework.boot.autoconfigure.data.redis.DataRedisReactiveAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.elasticsearch.ElasticsearchDataAutoConfiguration
+      - org.springframework.boot.autoconfigure.elasticsearch.ElasticsearchRestClientAutoConfiguration
   cache:
     type: caffeine
   datasource:
@@ -33,10 +35,7 @@ spring:
     mongodb:
       database: edgar_test
       auto-index-creation: true
-  autoconfigure:
-    exclude:
-      - org.springframework.boot.autoconfigure.data.elasticsearch.ElasticsearchDataAutoConfiguration
-      - org.springframework.boot.autoconfigure.elasticsearch.ElasticsearchRestClientAutoConfiguration
+
 
 edgar4j:
   security:
