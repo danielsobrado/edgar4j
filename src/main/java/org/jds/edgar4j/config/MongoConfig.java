@@ -14,6 +14,7 @@ import org.springframework.data.mongodb.repository.config.EnableMongoRepositorie
 @Profile("resource-high")
 @ConditionalOnProperty(prefix = "edgar4j", name = "resource-mode", havingValue = "high", matchIfMissing = true)
 @EnableMongoRepositories(
+    nameGenerator = FullyQualifiedRepositoryBeanNameGenerator.class,
     basePackages = "org.jds.edgar4j.repository"
 )
 public class MongoConfig {
