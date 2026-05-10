@@ -1,6 +1,7 @@
 package org.jds.edgar4j.exception;
 
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -86,7 +87,7 @@ public class GlobalExceptionHandler {
         Map<String, String> errors = new HashMap<>();
         String field = ex.getName() != null ? ex.getName() : "request";
         String message;
-        if ("LocalDate".equals(ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : null)) {
+        if (LocalDate.class.equals(ex.getRequiredType())) {
             message = String.format("Invalid date format for '%s'. Expected yyyy-MM-dd", field);
         } else {
             message = String.format("Invalid value for '%s': %s", field, ex.getValue());
