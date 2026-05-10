@@ -8,9 +8,9 @@ import java.util.List;
 import org.jds.edgar4j.model.Form4;
 import org.jds.edgar4j.service.Form4Service;
 import org.jds.edgar4j.service.Form4Service.InsiderStats;
+import org.jds.edgar4j.util.PaginationUtils;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -71,7 +71,9 @@ public class Form4Controller {
             @RequestParam(required = false) String startDate,
             @RequestParam(required = false) String endDate) {
 
-        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "transactionDate"));
+        int safePage = PaginationUtils.normalizePage(page);
+        int safeSize = PaginationUtils.normalizeSize(size);
+        PageRequest pageRequest = PaginationUtils.pageRequest(safePage, safeSize, "transactionDate");
         Page<Form4> results = form4Service.findByTradingSymbol(symbol.toUpperCase(), pageRequest);
         
         // If no results in local DB, try SEC API as fallback
@@ -86,11 +88,13 @@ public class Form4Controller {
                 }
 
                 List<Form4> secApiResults = form4Service.fetchFromSecApi(
-                    symbol.toUpperCase(), start, end, size);
+                    symbol.toUpperCase(), start, end, safeSize);
 
                 if (!secApiResults.isEmpty()) {
-                    int startIdx = page * size;
-                    int endIdx = Math.min(startIdx + size, secApiResults.size());
+                    int startIdx = (int) Math.min(
+                            (long) safePage * safeSize,
+                            (long) Integer.MAX_VALUE);
+                    int endIdx = Math.min(startIdx + safeSize, secApiResults.size());
                     List<Form4> pageContent = startIdx < secApiResults.size()
                         ? secApiResults.subList(startIdx, endIdx)
                         : List.of();
@@ -115,7 +119,7 @@ public class Form4Controller {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "transactionDate"));
+        PageRequest pageRequest = PaginationUtils.pageRequest(page, size, "transactionDate");
         Page<Form4> results = form4Service.findByCik(cik, pageRequest);
         return ResponseEntity.ok(results);
     }
@@ -145,7 +149,7 @@ public class Form4Controller {
             if (!isValidDateRange(start, end)) {
                 return ResponseEntity.badRequest().build();
             }
-            PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "transactionDate"));
+            PageRequest pageRequest = PaginationUtils.pageRequest(page, size, "transactionDate");
             Page<Form4> results = form4Service.findByDateRange(start, end, pageRequest);
             return ResponseEntity.ok(results);
         } catch (DateTimeParseException e) {
@@ -171,7 +175,7 @@ public class Form4Controller {
             if (!isValidDateRange(start, end)) {
                 return ResponseEntity.badRequest().build();
             }
-            PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "transactionDate"));
+            PageRequest pageRequest = PaginationUtils.pageRequest(page, size, "transactionDate");
             Page<Form4> results = form4Service.findBySymbolAndDateRange(symbol.toUpperCase(), start, end, pageRequest);
             return ResponseEntity.ok(results);
         } catch (DateTimeParseException e) {

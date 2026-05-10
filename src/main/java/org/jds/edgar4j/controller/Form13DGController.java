@@ -13,9 +13,9 @@ import org.jds.edgar4j.repository.Form13DGRepository.ScheduleTypeCount;
 import org.jds.edgar4j.service.Form13DGService;
 import org.jds.edgar4j.service.Form13DGService.BeneficialOwnershipSnapshot;
 import org.jds.edgar4j.service.Form13DGService.OwnershipComparison;
+import org.jds.edgar4j.util.PaginationUtils;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -96,7 +96,7 @@ public class Form13DGController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "eventDate"));
+        PageRequest pageRequest = PaginationUtils.pageRequest(page, size, "eventDate");
         Page<Form13DG> results = form13DGService.findByScheduleType(scheduleType.toUpperCase(), pageRequest);
         return ResponseEntity.ok(results);
     }
@@ -161,7 +161,7 @@ public class Form13DGController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "eventDate"));
+        PageRequest pageRequest = PaginationUtils.pageRequest(page, size, "eventDate");
         Page<Form13DG> results = form13DGService.findByIssuerCik(issuerCik, pageRequest);
         return ResponseEntity.ok(results);
     }
@@ -175,7 +175,7 @@ public class Form13DGController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "eventDate"));
+        PageRequest pageRequest = PaginationUtils.pageRequest(page, size, "eventDate");
         Page<Form13DG> results = form13DGService.findByIssuerName(name, pageRequest);
         return ResponseEntity.ok(results);
     }
@@ -189,7 +189,7 @@ public class Form13DGController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "eventDate"));
+        PageRequest pageRequest = PaginationUtils.pageRequest(page, size, "eventDate");
         Page<Form13DG> results = form13DGService.findByCusip(cusip.toUpperCase(), pageRequest);
         return ResponseEntity.ok(results);
     }
@@ -205,7 +205,7 @@ public class Form13DGController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "eventDate"));
+        PageRequest pageRequest = PaginationUtils.pageRequest(page, size, "eventDate");
         Page<Form13DG> results = form13DGService.findByFilingPersonCik(filingPersonCik, pageRequest);
         return ResponseEntity.ok(results);
     }
@@ -219,7 +219,7 @@ public class Form13DGController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "eventDate"));
+        PageRequest pageRequest = PaginationUtils.pageRequest(page, size, "eventDate");
         Page<Form13DG> results = form13DGService.findByFilingPersonName(name, pageRequest);
         return ResponseEntity.ok(results);
     }
@@ -249,7 +249,7 @@ public class Form13DGController {
         try {
             LocalDate start = parseDate(startDate);
             LocalDate end = parseDate(endDate);
-            PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "eventDate"));
+            PageRequest pageRequest = PaginationUtils.pageRequest(page, size, "eventDate");
             Page<Form13DG> results = form13DGService.findByEventDateRange(start, end, pageRequest);
             return ResponseEntity.ok(results);
         } catch (DateTimeParseException e) {
@@ -271,7 +271,7 @@ public class Form13DGController {
         try {
             LocalDate start = parseDate(startDate);
             LocalDate end = parseDate(endDate);
-            PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "filedDate"));
+            PageRequest pageRequest = PaginationUtils.pageRequest(page, size, "filedDate");
             Page<Form13DG> results = form13DGService.findByFiledDateRange(start, end, pageRequest);
             return ResponseEntity.ok(results);
         } catch (DateTimeParseException e) {
@@ -291,7 +291,7 @@ public class Form13DGController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "percentOfClass"));
+        PageRequest pageRequest = PaginationUtils.pageRequest(page, size, "percentOfClass");
         Page<Form13DG> results = form13DGService.findByMinPercentOfClass(minPercent, pageRequest);
         return ResponseEntity.ok(results);
     }
@@ -304,7 +304,7 @@ public class Form13DGController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "percentOfClass"));
+        PageRequest pageRequest = PaginationUtils.pageRequest(page, size, "percentOfClass");
         Page<Form13DG> results = form13DGService.findTenPercentOwners(pageRequest);
         return ResponseEntity.ok(results);
     }
@@ -319,7 +319,7 @@ public class Form13DGController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "filedDate"));
+        PageRequest pageRequest = PaginationUtils.pageRequest(page, size, "filedDate");
         Page<Form13DG> results = form13DGService.findAmendments(pageRequest);
         return ResponseEntity.ok(results);
     }
@@ -332,7 +332,7 @@ public class Form13DGController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "filedDate"));
+        PageRequest pageRequest = PaginationUtils.pageRequest(page, size, "filedDate");
         Page<Form13DG> results = form13DGService.findInitialFilings(pageRequest);
         return ResponseEntity.ok(results);
     }

@@ -13,9 +13,9 @@ import org.jds.edgar4j.repository.Form13FRepository.PortfolioSnapshot;
 import org.jds.edgar4j.service.Form13FService;
 import org.jds.edgar4j.service.Form13FService.HoldingsComparison;
 import org.jds.edgar4j.service.Form13FService.InstitutionalOwnershipStats;
+import org.jds.edgar4j.util.PaginationUtils;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -71,7 +71,7 @@ public class Form13FController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "reportPeriod"));
+        PageRequest pageRequest = PaginationUtils.pageRequest(page, size, "reportPeriod");
         Page<Form13F> results = form13FService.findByCik(cik, pageRequest);
         return ResponseEntity.ok(results);
     }
@@ -85,7 +85,7 @@ public class Form13FController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "reportPeriod"));
+        PageRequest pageRequest = PaginationUtils.pageRequest(page, size, "reportPeriod");
         Page<Form13F> results = form13FService.findByFilerName(name, pageRequest);
         return ResponseEntity.ok(results);
     }
@@ -101,7 +101,7 @@ public class Form13FController {
 
         try {
             LocalDate reportPeriod = parseDate(period);
-            PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "totalValue"));
+            PageRequest pageRequest = PaginationUtils.pageRequest(page, size, "totalValue");
             Page<Form13F> results = form13FService.findByReportPeriod(reportPeriod, pageRequest);
             return ResponseEntity.ok(results);
         } catch (DateTimeParseException e) {
@@ -123,7 +123,7 @@ public class Form13FController {
         try {
             LocalDate start = parseDate(startDate);
             LocalDate end = parseDate(endDate);
-            PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "reportPeriod"));
+            PageRequest pageRequest = PaginationUtils.pageRequest(page, size, "reportPeriod");
             Page<Form13F> results = form13FService.findByReportPeriodRange(start, end, pageRequest);
             return ResponseEntity.ok(results);
         } catch (DateTimeParseException e) {
@@ -146,7 +146,7 @@ public class Form13FController {
         try {
             LocalDate start = parseDate(startDate);
             LocalDate end = parseDate(endDate);
-            PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "reportPeriod"));
+            PageRequest pageRequest = PaginationUtils.pageRequest(page, size, "reportPeriod");
             Page<Form13F> results = form13FService.findByCikAndReportPeriodRange(cik, start, end, pageRequest);
             return ResponseEntity.ok(results);
         } catch (DateTimeParseException e) {
@@ -186,7 +186,7 @@ public class Form13FController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "reportPeriod"));
+        PageRequest pageRequest = PaginationUtils.pageRequest(page, size, "reportPeriod");
         Page<Form13F> results = form13FService.findByHoldingCusip(cusip.toUpperCase(), pageRequest);
         return ResponseEntity.ok(results);
     }
@@ -200,7 +200,7 @@ public class Form13FController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "reportPeriod"));
+        PageRequest pageRequest = PaginationUtils.pageRequest(page, size, "reportPeriod");
         Page<Form13F> results = form13FService.findByHoldingIssuerName(name, pageRequest);
         return ResponseEntity.ok(results);
     }

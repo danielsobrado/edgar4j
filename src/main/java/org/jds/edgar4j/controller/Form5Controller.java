@@ -7,9 +7,9 @@ import java.util.List;
 
 import org.jds.edgar4j.model.Form5;
 import org.jds.edgar4j.service.Form5Service;
+import org.jds.edgar4j.util.PaginationUtils;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -56,7 +56,7 @@ public class Form5Controller {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "filedDate"));
+        PageRequest pageRequest = PaginationUtils.pageRequest(page, size, "filedDate");
         return ResponseEntity.ok(form5Service.findByCik(cik, pageRequest));
     }
 
@@ -66,7 +66,7 @@ public class Form5Controller {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "filedDate"));
+        PageRequest pageRequest = PaginationUtils.pageRequest(page, size, "filedDate");
         return ResponseEntity.ok(form5Service.findByTradingSymbol(symbol.toUpperCase(), pageRequest));
     }
 
@@ -80,7 +80,7 @@ public class Form5Controller {
         try {
             LocalDate start = parseDate(startDate);
             LocalDate end = parseDate(endDate);
-            PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "filedDate"));
+            PageRequest pageRequest = PaginationUtils.pageRequest(page, size, "filedDate");
             return ResponseEntity.ok(form5Service.findByFiledDateRange(start, end, pageRequest));
         } catch (DateTimeParseException e) {
             log.warn("Invalid date format: {} or {}", startDate, endDate);

@@ -9,6 +9,7 @@ import org.jds.edgar4j.dto.response.PaginatedResponse;
 import org.jds.edgar4j.model.CompanyTicker;
 import org.jds.edgar4j.service.CompanyService;
 import org.jds.edgar4j.service.FilingService;
+import org.jds.edgar4j.util.PaginationUtils;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -43,9 +44,11 @@ public class CompanyController {
             @Parameter(description = "Sort field") @RequestParam(defaultValue = "name") String sortBy,
             @Parameter(description = "Sort direction (asc/desc)") @RequestParam(defaultValue = "asc") String sortDir) {
 
+        int safePage = PaginationUtils.normalizePage(page);
+        int safeSize = PaginationUtils.normalizeSize(size);
         log.info("GET /api/companies?search={}&page={}&size={}", search, page, size);
         CompanySearchRequest request = CompanySearchRequest.builder()
-                .searchTerm(search).page(page).size(size).sortBy(sortBy).sortDir(sortDir)
+                .searchTerm(search).page(safePage).size(safeSize).sortBy(sortBy).sortDir(sortDir)
                 .build();
         return ResponseEntity.ok(ApiResponse.success(companyService.searchCompanies(request)));
     }
@@ -138,8 +141,11 @@ public class CompanyController {
             @Parameter(description = "Company ID") @PathVariable String id,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
+
+        int safePage = PaginationUtils.normalizePage(page);
+        int safeSize = PaginationUtils.normalizeSize(size);
         log.info("GET /api/companies/{}/filings?page={}&size={}", id, page, size);
-        return ResponseEntity.ok(ApiResponse.success(filingService.getFilingsByCompany(id, page, size)));
+        return ResponseEntity.ok(ApiResponse.success(filingService.getFilingsByCompany(id, safePage, safeSize)));
     }
 
     @Operation(summary = "Get company filings by CIK", description = "Retrieve SEC filings for a company by its CIK number")
@@ -148,7 +154,10 @@ public class CompanyController {
             @Parameter(description = "SEC CIK number", example = "0000320193") @PathVariable String cik,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
+
+        int safePage = PaginationUtils.normalizePage(page);
+        int safeSize = PaginationUtils.normalizeSize(size);
         log.info("GET /api/companies/cik/{}/filings?page={}&size={}", cik, page, size);
-        return ResponseEntity.ok(ApiResponse.success(filingService.getFilingsByCik(cik, page, size)));
+        return ResponseEntity.ok(ApiResponse.success(filingService.getFilingsByCik(cik, safePage, safeSize)));
     }
 }
