@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import jakarta.validation.Valid;
 
 @Slf4j
 @RestController
@@ -36,12 +37,12 @@ public class DataMigrationController {
     private final Map<String, MigrationStatusResponse> jobs = new ConcurrentHashMap<>();
 
     @PostMapping("/export")
-    public ResponseEntity<MigrationStatusResponse> exportData(@RequestBody MigrationRequest request) {
+    public ResponseEntity<MigrationStatusResponse> exportData(@RequestBody @Valid MigrationRequest request) {
         return ResponseEntity.accepted().body(startJob("export", request));
     }
 
     @PostMapping("/import")
-    public ResponseEntity<MigrationStatusResponse> importData(@RequestBody MigrationRequest request) {
+    public ResponseEntity<MigrationStatusResponse> importData(@RequestBody @Valid MigrationRequest request) {
         return ResponseEntity.accepted().body(startJob("import", request));
     }
 

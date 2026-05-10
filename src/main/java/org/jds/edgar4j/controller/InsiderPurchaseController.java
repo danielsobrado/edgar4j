@@ -8,6 +8,7 @@ import org.jds.edgar4j.dto.response.InsiderPurchaseSummary;
 import org.jds.edgar4j.dto.response.PaginatedResponse;
 import org.jds.edgar4j.service.InsiderPurchaseService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -17,6 +18,8 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -24,6 +27,7 @@ import lombok.extern.slf4j.Slf4j;
 @RestController
 @RequestMapping("/api/insider-purchases")
 @RequiredArgsConstructor
+@Validated
 @Tag(name = "Insider Purchases", description = "Recent insider purchase activity with price change tracking")
 public class InsiderPurchaseController {
 
@@ -40,7 +44,7 @@ public class InsiderPurchaseController {
     @GetMapping
     public ResponseEntity<ApiResponse<PaginatedResponse<InsiderPurchaseResponse>>> getInsiderPurchases(
             @Parameter(description = "Days to look back")
-            @RequestParam(defaultValue = "30") int lookbackDays,
+            @RequestParam(defaultValue = "30") @Min(1) @Max(3650) int lookbackDays,
             @Parameter(description = "Minimum market cap in USD")
             @RequestParam(required = false) Double minMarketCap,
             @Parameter(description = "Restrict results to S&P 500 constituents")

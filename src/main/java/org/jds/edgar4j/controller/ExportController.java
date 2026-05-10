@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -22,7 +23,7 @@ public class ExportController {
     private final ExportService exportService;
 
     @PostMapping("/csv")
-    public ResponseEntity<byte[]> exportToCsv(@RequestBody ExportRequest request) {
+    public ResponseEntity<byte[]> exportToCsv(@RequestBody @Valid ExportRequest request) {
         log.info("POST /api/export/csv: {}", request);
 
         byte[] csvData = exportService.exportToCsv(request);
@@ -38,7 +39,7 @@ public class ExportController {
     }
 
     @PostMapping("/json")
-    public ResponseEntity<byte[]> exportToJson(@RequestBody ExportRequest request) {
+    public ResponseEntity<byte[]> exportToJson(@RequestBody @Valid ExportRequest request) {
         log.info("POST /api/export/json: {}", request);
 
         byte[] jsonData = exportService.exportToJson(request);

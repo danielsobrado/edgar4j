@@ -21,6 +21,9 @@ import org.springframework.web.bind.annotation.RestController;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -39,7 +42,7 @@ public class RemoteEdgarController {
     public ResponseEntity<ApiResponse<List<RemoteTickerResponse>>> getRemoteTickers(
             @Parameter(description = "Source: all, exchanges, mf", example = "all") @RequestParam(defaultValue = "all") String source,
             @Parameter(description = "Free-text search across ticker, name, and CIK") @RequestParam(required = false) String search,
-            @Parameter(description = "Max rows returned (1-500)") @RequestParam(defaultValue = "100") int limit) {
+            @Parameter(description = "Max rows returned (1-500)") @RequestParam(defaultValue = "100") @Min(1) @Max(500) int limit) {
         log.info("GET /api/remote-edgar/tickers?source={}&search={}&limit={}", source, search, limit);
         List<RemoteTickerResponse> tickers = remoteEdgarService.getRemoteTickers(source, search, limit);
         return ResponseEntity.ok(ApiResponse.success(tickers));
@@ -49,7 +52,7 @@ public class RemoteEdgarController {
     @GetMapping("/submissions/{cik}")
     public ResponseEntity<ApiResponse<RemoteSubmissionResponse>> getRemoteSubmission(
             @Parameter(description = "SEC CIK number", example = "0000789019") @PathVariable String cik,
-            @Parameter(description = "Max recent filings returned (1-200)") @RequestParam(defaultValue = "50") int filingsLimit) {
+            @Parameter(description = "Max recent filings returned (1-200)") @RequestParam(defaultValue = "50") @Min(1) @Max(200) int filingsLimit) {
         log.info("GET /api/remote-edgar/submissions/{}?filingsLimit={}", cik, filingsLimit);
         RemoteSubmissionResponse submission = remoteEdgarService.getRemoteSubmission(cik, filingsLimit);
         return ResponseEntity.ok(ApiResponse.success(submission));
@@ -61,7 +64,7 @@ public class RemoteEdgarController {
     )
     @PostMapping("/filings/search")
     public ResponseEntity<ApiResponse<RemoteFilingSearchResponse>> searchRemoteFilings(
-            @RequestBody @jakarta.validation.Valid RemoteFilingSearchRequest request) {
+            @RequestBody @Valid RemoteFilingSearchRequest request) {
         log.info("POST /api/remote-edgar/filings/search: formType={}, dateFrom={}, dateTo={}, limit={}",
                 request.getFormType(), request.getDateFrom(), request.getDateTo(), request.getLimit());
         RemoteFilingSearchResponse response = remoteEdgarService.searchRemoteFilings(request);

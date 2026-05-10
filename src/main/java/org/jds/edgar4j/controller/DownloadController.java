@@ -1,12 +1,14 @@
 package org.jds.edgar4j.controller;
 
 import java.util.List;
+import java.util.Locale;
 
 import org.jds.edgar4j.dto.request.DownloadRequest;
 import org.jds.edgar4j.dto.response.ApiResponse;
 import org.jds.edgar4j.dto.response.DownloadJobResponse;
 import org.jds.edgar4j.dto.response.DownloadSummaryResponse;
 import org.jds.edgar4j.service.DownloadJobService;
+import org.jds.edgar4j.util.PaginationUtils;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,7 +18,11 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.validation.annotation.Validated;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -24,6 +30,7 @@ import lombok.extern.slf4j.Slf4j;
 @RestController
 @RequestMapping("/api/downloads")
 @RequiredArgsConstructor
+@Validated
 public class DownloadController {
 
     private final DownloadJobService downloadJobService;
@@ -31,20 +38,26 @@ public class DownloadController {
     @PostMapping("/tickers")
     public ResponseEntity<ApiResponse<DownloadJobResponse>> downloadTickers(
             @RequestParam(defaultValue = "TICKERS_ALL") String type,
-            @RequestBody(required = false) DownloadRequest request) {
+            @RequestBody(required = false) @Valid DownloadRequest request) {
         log.info("POST /api/downloads/tickers?type={}", type);
 
+        DownloadRequest.DownloadType requestedType = resolveDownloadType(type);
         DownloadRequest downloadRequest = request != null ? request : DownloadRequest.builder()
-                .type(DownloadRequest.DownloadType.valueOf(type))
+                .type(requestedType)
                 .build();
+        if (downloadRequest.getType() == null) {
+            downloadRequest.setType(requestedType);
+        }
 
         DownloadJobResponse job = downloadJobService.startDownload(downloadRequest);
         return ResponseEntity.ok(ApiResponse.success(job, "Download job started"));
     }
 
     @PostMapping("/submissions")
-    public ResponseEntity<ApiResponse<DownloadJobResponse>> downloadSubmissions(
-            @RequestBody DownloadRequest request) {
+    public ResponseEntity<ApiResponse<DownloadJobResponse>> downloadSubmissions(@RequestBody @Valid DownloadRequest request) {
+        if (request == null) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("Download request is required"));
+        }
         log.info("POST /api/downloads/submissions: cik={}", request.getCik());
 
         if (request.getCik() == null || request.getCik().isEmpty()) {
@@ -58,8 +71,10 @@ public class DownloadController {
     }
 
     @PostMapping("/remote-filings")
-    public ResponseEntity<ApiResponse<DownloadJobResponse>> downloadRemoteFilings(
-            @RequestBody DownloadRequest request) {
+    public ResponseEntity<ApiResponse<DownloadJobResponse>> downloadRemoteFilings(@RequestBody @Valid DownloadRequest request) {
+        if (request == null) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("Download request is required"));
+        }
         log.info("POST /api/downloads/remote-filings: formType={}, dateFrom={}, dateTo={}",
                 request.getFormType(), request.getDateFrom(), request.getDateTo());
 
@@ -78,8 +93,10 @@ public class DownloadController {
     }
 
     @PostMapping("/bulk")
-    public ResponseEntity<ApiResponse<DownloadJobResponse>> downloadBulk(
-            @RequestBody DownloadRequest request) {
+    public ResponseEntity<ApiResponse<DownloadJobResponse>> downloadBulk(@RequestBody @Valid DownloadRequest request) {
+        if (request == null || request.getType() == null) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("Download type is required for bulk downloads"));
+        }
         log.info("POST /api/downloads/bulk: type={}", request.getType());
         DownloadJobResponse job = downloadJobService.startDownload(request);
         return ResponseEntity.ok(ApiResponse.success(job, "Bulk download job started"));
@@ -87,9 +104,10 @@ public class DownloadController {
 
     @GetMapping("/jobs")
     public ResponseEntity<ApiResponse<List<DownloadJobResponse>>> getJobs(
-            @RequestParam(defaultValue = "10") int limit) {
-        log.info("GET /api/downloads/jobs?limit={}", limit);
-        List<DownloadJobResponse> jobs = downloadJobService.getRecentJobs(limit);
+            @RequestParam(defaultValue = "10") @Min(1) @Max(100) int limit) {
+        int safeLimit = PaginationUtils.normalizeSize(limit);
+        log.info("GET /api/downloads/jobs?limit={}", safeLimit);
+        List<DownloadJobResponse> jobs = downloadJobService.getRecentJobs(safeLimit);
         return ResponseEntity.ok(ApiResponse.success(jobs));
     }
 
@@ -119,5 +137,16 @@ public class DownloadController {
         log.info("DELETE /api/downloads/jobs/{}", id);
         downloadJobService.cancelJob(id);
         return ResponseEntity.ok(ApiResponse.success(null, "Job cancelled"));
+    }
+
+    private DownloadRequest.DownloadType resolveDownloadType(String type) {
+        try {
+            String normalizedType = type == null || type.isBlank()
+                    ? DownloadRequest.DownloadType.TICKERS_ALL.name()
+                    : type.trim().toUpperCase(Locale.ROOT);
+            return DownloadRequest.DownloadType.valueOf(normalizedType);
+        } catch (IllegalArgumentException ex) {
+            throw new IllegalArgumentException("Unsupported download type: " + type);
+        }
     }
 }

@@ -19,6 +19,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.validation.annotation.Validated;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -26,6 +27,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 
 /**
  * REST Controller for insider trading data operations
@@ -39,6 +43,7 @@ import java.util.concurrent.CompletableFuture;
 @Profile("resource-high & !resource-low")
 @RequestMapping("/api/v1/insider")
 @RequiredArgsConstructor
+@Validated
 public class InsiderController {
 
     private final InsiderCompanyDataPort companyRepository;
@@ -76,7 +81,10 @@ public class InsiderController {
      * Create a new company
      */
     @PostMapping("/companies")
-    public ResponseEntity<Company> createCompany(@RequestBody Company company) {
+    public ResponseEntity<Company> createCompany(@RequestBody @Valid Company company) {
+        if (company == null) {
+            return ResponseEntity.badRequest().build();
+        }
         log.info("Creating new company: {}", company.getCompanyName());
         Company savedCompany = companyRepository.save(company);
         return ResponseEntity.ok(savedCompany);
@@ -107,7 +115,10 @@ public class InsiderController {
      * Create a new insider
      */
     @PostMapping("/insiders")
-    public ResponseEntity<Insider> createInsider(@RequestBody Insider insider) {
+    public ResponseEntity<Insider> createInsider(@RequestBody @Valid Insider insider) {
+        if (insider == null) {
+            return ResponseEntity.badRequest().build();
+        }
         log.info("Creating new insider: {}", insider.getFullName());
         Insider savedInsider = insiderRepository.save(insider);
         return ResponseEntity.ok(savedInsider);
@@ -142,7 +153,7 @@ public class InsiderController {
      */
     @GetMapping("/transactions/recent")
     public ResponseEntity<List<InsiderTransaction>> getRecentTransactions(
-            @RequestParam(defaultValue = "30") int days) {
+            @RequestParam(defaultValue = "30") @Min(1) @Max(3650) int days) {
         log.info("Getting transactions from last {} days", days);
         LocalDate since = LocalDate.now().minusDays(days);
         List<InsiderTransaction> transactions = transactionRepository.findRecentTransactions(since);
@@ -165,7 +176,10 @@ public class InsiderController {
      * Create a new transaction
      */
     @PostMapping("/transactions")
-    public ResponseEntity<InsiderTransaction> createTransaction(@RequestBody InsiderTransaction transaction) {
+    public ResponseEntity<InsiderTransaction> createTransaction(@RequestBody @Valid InsiderTransaction transaction) {
+        if (transaction == null) {
+            return ResponseEntity.badRequest().build();
+        }
         log.info("Creating new transaction: {}", transaction.getAccessionNumber());
         InsiderTransaction savedTransaction = transactionRepository.save(transaction);
         return ResponseEntity.ok(savedTransaction);
@@ -363,7 +377,7 @@ public class InsiderController {
     @GetMapping("/analytics/company/{cik}")
     public ResponseEntity<InsiderAnalyticsService.CompanyInsiderMetrics> getCompanyMetrics(
             @PathVariable String cik,
-            @RequestParam(defaultValue = "90") int days) {
+            @RequestParam(defaultValue = "90") @Min(1) @Max(3650) int days) {
         log.info("Calculating company metrics for CIK: {} over {} days", cik, days);
         
         Optional<Company> company = companyRepository.findByCik(cik);
@@ -388,7 +402,7 @@ public class InsiderController {
     @GetMapping("/analytics/insider/{cik}")
     public ResponseEntity<InsiderAnalyticsService.InsiderMetrics> getInsiderMetrics(
             @PathVariable String cik,
-            @RequestParam(defaultValue = "90") int days) {
+            @RequestParam(defaultValue = "90") @Min(1) @Max(3650) int days) {
         log.info("Calculating insider metrics for CIK: {} over {} days", cik, days);
         
         LocalDate endDate = LocalDate.now();

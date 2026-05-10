@@ -31,6 +31,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -69,7 +70,7 @@ public class DividendController {
                description = "Runs a bounded dividend screener over the provided identifiers or the local company universe.")
     @PostMapping("/screen")
     public ResponseEntity<ApiResponse<DividendScreenResponse>> screen(
-            @RequestBody DividendScreenRequest request) {
+            @RequestBody @Valid DividendScreenRequest request) {
         log.info("POST /api/dividend/screen request={}", request);
         return ResponseEntity.ok(ApiResponse.success(dividendAnalysisService.screen(request)));
     }

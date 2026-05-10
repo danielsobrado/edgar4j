@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -33,7 +34,7 @@ public class SettingsController {
     }
 
     @PutMapping
-    public ResponseEntity<ApiResponse<SettingsResponse>> updateSettings(@RequestBody SettingsRequest request) {
+    public ResponseEntity<ApiResponse<SettingsResponse>> updateSettings(@RequestBody @Valid SettingsRequest request) {
         log.info("PUT /api/settings: {}", request);
         SettingsResponse settings = settingsService.updateSettings(request);
         return ResponseEntity.ok(ApiResponse.success(settings, "Settings updated successfully"));

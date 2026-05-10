@@ -3,6 +3,7 @@ package org.jds.edgar4j.controller;
 import java.util.Date;
 import java.util.List;
 
+import org.jds.edgar4j.config.AppConstants;
 import org.jds.edgar4j.dto.request.FilingSearchRequest;
 import org.jds.edgar4j.dto.response.ApiResponse;
 import org.jds.edgar4j.dto.response.FilingDetailResponse;
@@ -10,6 +11,7 @@ import org.jds.edgar4j.dto.response.FilingResponse;
 import org.jds.edgar4j.dto.response.PaginatedResponse;
 import org.jds.edgar4j.service.DashboardService;
 import org.jds.edgar4j.service.FilingService;
+import org.jds.edgar4j.util.PaginationUtils;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,13 +22,18 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.validation.annotation.Validated;
 
 @Slf4j
 @RestController
 @RequestMapping("/api/filings")
 @RequiredArgsConstructor
+@Validated
 public class FilingController {
 
     private final FilingService filingService;
@@ -38,19 +45,21 @@ public class FilingController {
             @RequestParam(required = false) String formType,
             @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date dateFrom,
             @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date dateTo,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "0") @Min(AppConstants.DEFAULT_PAGE) int page,
+            @RequestParam(defaultValue = "10") @Min(AppConstants.MIN_PAGE_SIZE) @Max(AppConstants.MAX_PAGE_SIZE) int size,
             @RequestParam(defaultValue = "fillingDate") String sortBy,
             @RequestParam(defaultValue = "desc") String sortDir) {
         log.info("GET /api/filings?cik={}&formType={}&page={}&size={}", cik, formType, page, size);
+        int safePage = PaginationUtils.normalizePage(page);
+        int safeSize = PaginationUtils.normalizeSize(size);
 
         FilingSearchRequest request = FilingSearchRequest.builder()
                 .cik(cik)
                 .formTypes(formType != null ? List.of(formType) : null)
                 .dateFrom(dateFrom)
                 .dateTo(dateTo)
-                .page(page)
-                .size(size)
+                .page(safePage)
+                .size(safeSize)
                 .sortBy(sortBy)
                 .sortDir(sortDir)
                 .build();
@@ -61,7 +70,7 @@ public class FilingController {
 
     @PostMapping("/search")
     public ResponseEntity<ApiResponse<PaginatedResponse<FilingResponse>>> searchFilings(
-            @RequestBody FilingSearchRequest request) {
+            @RequestBody @Valid FilingSearchRequest request) {
         log.info("POST /api/filings/search: {}", request);
 
         PaginatedResponse<FilingResponse> filings = filingService.searchFilings(request);
@@ -91,9 +100,10 @@ public class FilingController {
 
     @GetMapping("/recent")
     public ResponseEntity<ApiResponse<List<FilingResponse>>> getRecentFilings(
-            @RequestParam(defaultValue = "10") int limit) {
-        log.info("GET /api/filings/recent?limit={}", limit);
-        List<FilingResponse> filings = filingService.getRecentFilings(limit);
+            @RequestParam(defaultValue = "10") @Min(AppConstants.MIN_PAGE_SIZE) @Max(AppConstants.MAX_PAGE_SIZE) int limit) {
+        int safeLimit = PaginationUtils.normalizeSize(limit);
+        log.info("GET /api/filings/recent?limit={}", safeLimit);
+        List<FilingResponse> filings = filingService.getRecentFilings(safeLimit);
         return ResponseEntity.ok(ApiResponse.success(filings));
     }
 
