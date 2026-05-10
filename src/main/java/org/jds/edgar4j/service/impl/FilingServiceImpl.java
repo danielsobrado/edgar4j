@@ -3,6 +3,7 @@ package org.jds.edgar4j.service.impl;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.jds.edgar4j.config.AppConstants;
@@ -29,6 +30,15 @@ public class FilingServiceImpl implements FilingService {
 
     private final FillingDataPort fillingRepository;
     private final FilingSearchPort filingSearchPort;
+    private static final String DEFAULT_SORT_FIELD = "fillingDate";
+    private static final Set<String> ALLOWED_SORT_FIELDS = Set.of(
+            "fillingDate",
+            "reportDate",
+            "cik",
+            "company",
+            "accessionNumber",
+            "fileNumber"
+    );
 
     @Override
     public PaginatedResponse<FilingResponse> searchFilings(FilingSearchRequest request) {
@@ -37,18 +47,24 @@ public class FilingServiceImpl implements FilingService {
         String sortDirection = request.getSortDir();
         if (sortDirection == null || sortDirection.isBlank()) {
             sortDirection = AppConstants.DEFAULT_SORT_DIRECTION;
+        } else if (!"asc".equalsIgnoreCase(sortDirection) && !"desc".equalsIgnoreCase(sortDirection)) {
+            log.warn("Ignoring unsupported filing sort direction '{}'; using default '{}'",
+                    sortDirection, AppConstants.DEFAULT_SORT_DIRECTION);
+            sortDirection = AppConstants.DEFAULT_SORT_DIRECTION;
         }
 
-        String sortField = request.getSortBy();
-        if (sortField == null || sortField.isBlank()) {
-            sortField = "fillingDate";
-        }
+        String sortField = resolveSortField(request.getSortBy());
+        int page = normalizePage(request.getPage());
+        int size = normalizeSize(request.getSize());
+        request.setPage(page);
+        request.setSize(size);
+        request.setSortBy(sortField);
 
         Sort sort = Sort.by(
                 sortDirection.equalsIgnoreCase("desc") ? Sort.Direction.DESC : Sort.Direction.ASC,
                 sortField
         );
-        PageRequest pageRequest = PageRequest.of(request.getPage(), request.getSize(), sort);
+        PageRequest pageRequest = PageRequest.of(page, size, sort);
 
         Page<FilingSearchPort.SearchResult> page = filingSearchPort.search(toSearchCriteria(request), pageRequest);
 
@@ -79,32 +95,37 @@ public class FilingServiceImpl implements FilingService {
 
     @Override
     public PaginatedResponse<FilingResponse> getFilingsByCompany(String companyId, int page, int size) {
-        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "fillingDate"));
+        int safePage = normalizePage(page);
+        int safeSize = normalizeSize(size);
+        PageRequest pageRequest = PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, DEFAULT_SORT_FIELD));
         Page<Filling> filingsPage = fillingRepository.findByCompany(companyId, pageRequest);
 
         var content = filingsPage.getContent().stream()
                 .map(this::toFilingResponse)
                 .collect(Collectors.toList());
 
-        return PaginatedResponse.of(content, page, size, filingsPage.getTotalElements());
+        return PaginatedResponse.of(content, safePage, safeSize, filingsPage.getTotalElements());
     }
 
     @Override
     public PaginatedResponse<FilingResponse> getFilingsByCik(String cik, int page, int size) {
-        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "fillingDate"));
+        int safePage = normalizePage(page);
+        int safeSize = normalizeSize(size);
+        PageRequest pageRequest = PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, DEFAULT_SORT_FIELD));
         Page<Filling> filingsPage = fillingRepository.findByCik(cik, pageRequest);
 
         var content = filingsPage.getContent().stream()
                 .map(this::toFilingResponse)
                 .collect(Collectors.toList());
 
-        return PaginatedResponse.of(content, page, size, filingsPage.getTotalElements());
+        return PaginatedResponse.of(content, safePage, safeSize, filingsPage.getTotalElements());
     }
 
     @Override
     public List<FilingResponse> getRecentFilings(int limit) {
-        return fillingRepository.findTop10ByOrderByFillingDateDesc().stream()
-                .limit(limit)
+        int safeLimit = normalizeSize(limit);
+        PageRequest pageRequest = PageRequest.of(0, safeLimit, Sort.by(Sort.Direction.DESC, DEFAULT_SORT_FIELD));
+        return fillingRepository.findAllByOrderByFillingDateDesc(pageRequest).stream()
                 .map(this::toFilingResponse)
                 .collect(Collectors.toList());
     }
@@ -150,9 +171,37 @@ public class FilingServiceImpl implements FilingService {
             request.getDateFrom() == null ? null : java.time.Instant.ofEpochMilli(request.getDateFrom().getTime())
                 .atZone(java.time.ZoneId.systemDefault())
                 .toLocalDate(),
-            request.getDateTo() == null ? null : java.time.Instant.ofEpochMilli(request.getDateTo().getTime())
+                request.getDateTo() == null ? null : java.time.Instant.ofEpochMilli(request.getDateTo().getTime())
                 .atZone(java.time.ZoneId.systemDefault())
                 .toLocalDate());
+    }
+
+    private int normalizePage(int page) {
+        return Math.max(AppConstants.DEFAULT_PAGE, page);
+    }
+
+    private int normalizeSize(int size) {
+        if (size < AppConstants.MIN_PAGE_SIZE) {
+            return AppConstants.MIN_PAGE_SIZE;
+        }
+        if (size > AppConstants.MAX_PAGE_SIZE) {
+            return AppConstants.MAX_PAGE_SIZE;
+        }
+        return size;
+    }
+
+    private String resolveSortField(String sortField) {
+        if (sortField == null || sortField.isBlank()) {
+            return DEFAULT_SORT_FIELD;
+        }
+
+        String normalized = sortField.trim();
+        if (ALLOWED_SORT_FIELDS.contains(normalized)) {
+            return normalized;
+        }
+
+        log.warn("Ignoring unsupported filing sort field '{}'; using default '{}'", normalized, DEFAULT_SORT_FIELD);
+        return DEFAULT_SORT_FIELD;
     }
 
     private FilingResponse toFilingResponse(Filling f) {
