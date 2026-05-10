@@ -3,6 +3,7 @@ package org.jds.edgar4j.service.insider;
 import org.jds.edgar4j.model.insider.Company;
 import org.jds.edgar4j.model.insider.Insider;
 import org.jds.edgar4j.model.insider.InsiderTransaction;
+import org.jds.edgar4j.port.InsiderCompanyRelationshipDataPort;
 import org.jds.edgar4j.service.insider.impl.Form4ParserServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -35,6 +36,9 @@ class Form4ParserServiceTest {
 
     @Mock
     private InsiderService insiderService;
+
+    @Mock
+    private InsiderCompanyRelationshipDataPort relationshipRepository;
 
     private Form4ParserServiceImpl form4ParserService;
 
@@ -183,7 +187,7 @@ class Form4ParserServiceTest {
 
     @BeforeEach
     void setUp() {
-        form4ParserService = new Form4ParserServiceImpl(companyService, insiderService);
+        form4ParserService = new Form4ParserServiceImpl(companyService, insiderService, relationshipRepository);
     }
 
     @DisplayName("Should validate valid Form 4 XML")
