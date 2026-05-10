@@ -26,6 +26,8 @@ import java.util.List;
 @StepScope
 @RequiredArgsConstructor
 public class EdgarFilingReader implements ItemReader<String> {
+    private static final String SUPPORTED_FORM_TYPE = "FORM4";
+    private static final String DATE_PATTERN = "yyyy-MM-dd";
 
     private final EdgarApiService edgarApiService;
 
@@ -62,10 +64,23 @@ public class EdgarFilingReader implements ItemReader<String> {
             log.info("Initializing EdgarFilingReader with parameters: startDate={}, endDate={}, formType={}",
                     startDate, endDate, formType);
 
+            String normalizedFormType = normalizeFormType(formType);
+            if (!SUPPORTED_FORM_TYPE.equals(normalizedFormType)) {
+                log.warn("Unsupported formType '{}' configured. Supported types: {}. No filings will be read.",
+                        formType, SUPPORTED_FORM_TYPE);
+                this.accessionNumberIterator = List.of().iterator();
+                return;
+            }
+
             LocalDate start = parseDate(startDate);
             LocalDate end = parseDate(endDate);
+            LocalDate[] range = normalizeDateRange(start, end);
+            if (range[0] != start || range[1] != end) {
+                log.warn("Date range was adjusted: from {} to {} -> from {} to {}",
+                        start, end, range[0], range[1]);
+            }
 
-            List<String> accessionNumbers = fetchAccessionNumbers(start, end);
+            List<String> accessionNumbers = fetchAccessionNumbers(range[0], range[1]);
             this.accessionNumberIterator = accessionNumbers.iterator();
 
             log.info("Initialized reader with {} accession numbers", accessionNumbers.size());
@@ -101,10 +116,29 @@ public class EdgarFilingReader implements ItemReader<String> {
         }
 
         try {
-            return LocalDate.parse(dateString, DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+            return LocalDate.parse(dateString, DateTimeFormatter.ofPattern(DATE_PATTERN));
         } catch (Exception e) {
             log.warn("Failed to parse date: {}, using current date", dateString);
             return LocalDate.now();
         }
+    }
+
+    private LocalDate[] normalizeDateRange(LocalDate startDate, LocalDate endDate) {
+        LocalDate normalizedStart = startDate;
+        LocalDate normalizedEnd = endDate;
+
+        if (normalizedStart != null && normalizedEnd != null && normalizedStart.isAfter(normalizedEnd)) {
+            log.warn("startDate {} is after endDate {}; swapping values", normalizedStart, normalizedEnd);
+            return new LocalDate[] {normalizedEnd, normalizedStart};
+        }
+
+        return new LocalDate[] {normalizedStart, normalizedEnd};
+    }
+
+    private String normalizeFormType(String value) {
+        if (value == null || value.isBlank()) {
+            return SUPPORTED_FORM_TYPE;
+        }
+        return value.trim().toUpperCase(java.util.Locale.ROOT);
     }
 }

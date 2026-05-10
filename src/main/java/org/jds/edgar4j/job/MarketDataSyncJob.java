@@ -26,6 +26,10 @@ import lombok.extern.slf4j.Slf4j;
 @Component
 public class MarketDataSyncJob {
 
+    private static final int MIN_LOOKBACK_DAYS = 1;
+    private static final int MAX_LOOKBACK_DAYS = 365;
+    private static final int DEFAULT_LOOKBACK_DAYS = 30;
+
     private final CompanyMarketDataService companyMarketDataService;
     private final Sp500Service sp500Service;
     private final Form4DataPort form4Repository;
@@ -109,19 +113,26 @@ public class MarketDataSyncJob {
         }
 
         try {
-            LocalDate since = LocalDate.now().minusDays(Math.max(1, lookbackDays));
+            int effectiveLookbackDays = normalizeLookbackDays(lookbackDays);
+            int effectiveMaxTickers = normalizeMaxTickers(maxTickers);
+            LocalDate since = LocalDate.now().minusDays(effectiveLookbackDays);
             Set<String> trackedTickers = loadTrackedTickers(since);
             List<String> orderedTickers = trackedTickers.stream()
                     .sorted(String.CASE_INSENSITIVE_ORDER)
                     .toList();
 
+            if (orderedTickers.isEmpty()) {
+                log.info("No tracked tickers found for backfill");
+                return companyMarketDataService.backfillMissingMarketCaps(List.of(), batchSize, effectiveMaxTickers);
+            }
+
             log.info("Starting market-cap backfill at {} for {} tracked tickers (lookbackDays={}, maxTickers={})",
-                    LocalDateTime.now(), orderedTickers.size(), lookbackDays, maxTickers);
+                    LocalDateTime.now(), orderedTickers.size(), effectiveLookbackDays, effectiveMaxTickers);
 
             MarketCapBackfillResponse response = companyMarketDataService.backfillMissingMarketCaps(
                     orderedTickers,
                     batchSize,
-                    maxTickers);
+                    effectiveMaxTickers);
 
             log.info("Market-cap backfill completed: processed={} updated={} unresolved={} deferred={}",
                     response.getProcessedTickers(),
@@ -181,5 +192,25 @@ public class MarketDataSyncJob {
                 && "A".equalsIgnoreCase(transaction.getAcquiredDisposedCode())
                 && transaction.getTransactionDate() != null
                 && !transaction.getTransactionDate().isBefore(since);
+    }
+
+    private int normalizeLookbackDays(int lookbackDays) {
+        if (lookbackDays < MIN_LOOKBACK_DAYS) {
+            log.warn("Invalid lookbackDays value '{}'; using default {}", lookbackDays, DEFAULT_LOOKBACK_DAYS);
+            return DEFAULT_LOOKBACK_DAYS;
+        }
+        if (lookbackDays > MAX_LOOKBACK_DAYS) {
+            log.warn("lookbackDays value '{}' exceeds max {}; using max", lookbackDays, MAX_LOOKBACK_DAYS);
+            return MAX_LOOKBACK_DAYS;
+        }
+        return lookbackDays;
+    }
+
+    private int normalizeMaxTickers(int maxTickers) {
+        if (maxTickers < 0) {
+            log.warn("Negative maxTickers '{}' treated as unlimited", maxTickers);
+            return 0;
+        }
+        return maxTickers;
     }
 }

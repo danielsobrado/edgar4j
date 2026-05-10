@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -117,6 +118,29 @@ class MarketDataSyncJobTest {
 
         assertSame(expectedResponse, actualResponse);
         verify(companyMarketDataService).backfillMissingMarketCaps(List.of("AAPL", "MSFT", "TSLA"), 2, 25);
+        assertFalse(job.isRunning());
+    }
+
+    @Test
+    @DisplayName("triggerMarketCapBackfill should clamp invalid values and still execute")
+    void triggerMarketCapBackfillShouldClampInvalidValues() {
+        MarketDataSyncJob job = new MarketDataSyncJob(companyMarketDataService, sp500Service, form4Repository, true, 2);
+        MarketCapBackfillResponse expectedResponse = MarketCapBackfillResponse.builder()
+                .trackedTickers(1)
+                .candidateTickers(0)
+                .processedTickers(0)
+                .updatedTickers(0)
+                .build();
+
+        when(sp500Service.getAllTickers()).thenReturn(Set.of("AAPL"));
+        when(form4Repository.findRecentAcquisitions(any(LocalDate.class))).thenReturn(List.of());
+        when(companyMarketDataService.backfillMissingMarketCaps(any(List.class), any(Integer.class), any(Integer.class)))
+                .thenReturn(expectedResponse);
+
+        MarketCapBackfillResponse actualResponse = job.triggerMarketCapBackfill(-1, 0);
+
+        assertNotNull(actualResponse);
+        verify(companyMarketDataService).backfillMissingMarketCaps(List.of("AAPL"), 2, 0);
         assertFalse(job.isRunning());
     }
 }

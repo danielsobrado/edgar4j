@@ -3,6 +3,7 @@ package org.jds.edgar4j.batch.components;
 import org.jds.edgar4j.batch.processor.Form4DocumentProcessor;
 import org.jds.edgar4j.batch.reader.EdgarFilingReader;
 import org.jds.edgar4j.batch.writer.InsiderTransactionWriter;
+import org.jds.edgar4j.exception.Form4DocumentProcessingException;
 import org.jds.edgar4j.model.insider.InsiderTransaction;
 import org.jds.edgar4j.port.InsiderTransactionDataPort;
 import org.jds.edgar4j.service.insider.EdgarApiService;
@@ -178,6 +179,31 @@ class BatchComponentsTest {
         assertTrue(result.isEmpty());
     }
 
+    @DisplayName("Form4DocumentProcessor should skip blank accession number without service calls")
+    @Test
+    void testForm4DocumentProcessorSkipsBlankAccession() throws Exception {
+        List<InsiderTransaction> result = form4DocumentProcessor.process("   ");
+
+        assertNotNull(result);
+        assertTrue(result.isEmpty());
+        verifyNoInteractions(edgarApiService, form4ParserService);
+    }
+
+    @DisplayName("Form4DocumentProcessor should fail fast when configured")
+    @Test
+    void testForm4DocumentProcessorFailsFastWhenConfigured() throws Exception {
+        String accessionNumber = "0001234567-24-000001";
+        String xmlContent = createTestXmlContent();
+
+        when(edgarApiService.getForm4Document(accessionNumber)).thenReturn(xmlContent);
+        when(form4ParserService.parseForm4Xml(xmlContent, accessionNumber))
+                .thenThrow(new RuntimeException("Parsing Error"));
+
+        ReflectionTestUtils.setField(form4DocumentProcessor, "failOnProcessingError", true);
+
+        assertThrows(Form4DocumentProcessingException.class, () -> form4DocumentProcessor.process(accessionNumber));
+    }
+
     @DisplayName("InsiderTransactionWriter should write transactions successfully")
     @Test
     void testInsiderTransactionWriter() throws Exception {
@@ -238,6 +264,36 @@ class BatchComponentsTest {
         assertDoesNotThrow(() -> {
             String item = edgarFilingReader.read();
         });
+    }
+
+    @DisplayName("EdgarFilingReader should skip execution for unsupported formType")
+    @Test
+    void testEdgarFilingReaderUnsupportedFormType() throws Exception {
+        ReflectionTestUtils.setField(edgarFilingReader, "startDate", "2024-01-15");
+        ReflectionTestUtils.setField(edgarFilingReader, "endDate", "2024-01-15");
+        ReflectionTestUtils.setField(edgarFilingReader, "formType", "FORM8-K");
+
+        String item = edgarFilingReader.read();
+
+        assertNull(item);
+        verify(edgarApiService, never()).getForm4FilingsByDateRange(any(LocalDate.class), any(LocalDate.class));
+    }
+
+    @DisplayName("EdgarFilingReader should normalize reversed date ranges")
+    @Test
+    void testEdgarFilingReaderReversedDateRange() throws Exception {
+        when(edgarApiService.getForm4FilingsByDateRange(any(LocalDate.class), any(LocalDate.class)))
+                .thenReturn(List.of("ACC-0001", "ACC-0002"));
+
+        ReflectionTestUtils.setField(edgarFilingReader, "startDate", "2024-01-20");
+        ReflectionTestUtils.setField(edgarFilingReader, "endDate", "2024-01-10");
+
+        String first = edgarFilingReader.read();
+        String second = edgarFilingReader.read();
+
+        assertEquals("ACC-0001", first);
+        assertEquals("ACC-0002", second);
+        verify(edgarApiService, times(1)).getForm4FilingsByDateRange(any(LocalDate.class), any(LocalDate.class));
     }
 
     private String createTestXmlContent() {

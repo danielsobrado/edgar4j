@@ -7,6 +7,7 @@ import org.jds.edgar4j.model.insider.InsiderTransaction;
 import org.jds.edgar4j.service.insider.EdgarApiService;
 import org.jds.edgar4j.service.insider.Form4ParserService;
 import org.springframework.batch.infrastructure.item.ItemProcessor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -22,12 +23,20 @@ import java.util.List;
 @Component
 @RequiredArgsConstructor
 public class Form4DocumentProcessor implements ItemProcessor<String, List<InsiderTransaction>> {
+    private static final String ERROR_MSG = "Failed to process Form 4 document {}";
 
     private final EdgarApiService edgarApiService;
     private final Form4ParserService form4ParserService;
+    @Value("${edgar4j.batch.fail-on-item-error:false}")
+    private boolean failOnProcessingError;
 
     @Override
     public List<InsiderTransaction> process(String accessionNumber) throws Exception {
+        if (accessionNumber == null || accessionNumber.isBlank()) {
+            log.warn("Skipping blank accession number");
+            return List.of();
+        }
+
         log.debug("Processing Form 4 document: {}", accessionNumber);
 
         try {
@@ -54,7 +63,15 @@ public class Form4DocumentProcessor implements ItemProcessor<String, List<Inside
         } catch (Exception e) {
             Form4DocumentProcessingException processingException =
                     new Form4DocumentProcessingException(accessionNumber, e);
-            log.error("Error processing Form 4 document {}", accessionNumber, processingException);
+            if (failOnProcessingError) {
+                log.error(ERROR_MSG, accessionNumber, processingException);
+                throw processingException;
+            }
+
+            log.warn("Failed to process Form 4 document {}: {}",
+                    accessionNumber,
+                    processingException.getMessage());
+            log.debug("Processing details", processingException);
 
             // Return empty list to continue processing other documents
             return List.of();
