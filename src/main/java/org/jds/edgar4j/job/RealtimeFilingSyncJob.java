@@ -167,6 +167,7 @@ public class RealtimeFilingSyncJob {
             Set<String> seenAccessions = new LinkedHashSet<>();
             Set<String> refreshedSubmissionCiks = new LinkedHashSet<>();
             Map<String, FilingDirectory> filingDirectoryCache = new ConcurrentHashMap<>();
+            Set<String> unhandledFormTypes = new LinkedHashSet<>();
 
             for (int page = 0; page < config.maxPages(); page++) {
                 List<EftsSearchResponse.Hit> hits = fetchPage(config, startDate, endDate, page);
@@ -194,7 +195,7 @@ public class RealtimeFilingSyncJob {
                                 hit.getSource(),
                                 refreshedSubmissionCiks,
                                 filingDirectoryCache);
-                        if (filing != null && routeFiling(filing)) {
+                        if (filing != null && routeFiling(filing, unhandledFormTypes)) {
                             newFilings++;
                         }
                     } catch (Exception e) {
@@ -208,6 +209,13 @@ public class RealtimeFilingSyncJob {
                 if (hits.size() < config.pageSize()) {
                     break;
                 }
+            }
+
+            if (!unhandledFormTypes.isEmpty()) {
+                log.warn(
+                        "Realtime filing sync skipped {} unsupported form type(s): {}",
+                        unhandledFormTypes.size(),
+                        unhandledFormTypes);
             }
 
             lastSyncNewCount.set(newFilings);
@@ -416,7 +424,7 @@ public class RealtimeFilingSyncJob {
         return isXmlDocument(normalizedPrimary) ? normalizedPrimary : null;
     }
 
-    private boolean routeFiling(ResolvedFiling filing) {
+    private boolean routeFiling(ResolvedFiling filing, Set<String> unhandledFormTypes) {
         String formType = filing.formType();
 
         if (isForm3(formType)) {
@@ -508,7 +516,10 @@ public class RealtimeFilingSyncJob {
                     form20FService::save);
         }
 
-        log.debug("Realtime filing sync does not yet route form type {}", formType);
+        if (unhandledFormTypes != null && unhandledFormTypes.add(formType)) {
+            log.warn("Realtime filing sync does not route form type {} (accession={}, cik={})", formType,
+                    filing.accessionNumber(), filing.cik());
+        }
         return false;
     }
 
