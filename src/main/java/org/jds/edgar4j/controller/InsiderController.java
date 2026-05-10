@@ -14,9 +14,9 @@ import org.jds.edgar4j.service.analytics.InsiderAnalyticsService;
 import org.jds.edgar4j.service.enrichment.CompanyEnrichmentService;
 import org.jds.edgar4j.service.provider.MarketDataProvider;
 import org.jds.edgar4j.service.provider.MarketDataService;
+import org.jds.edgar4j.util.PaginationUtils;
 import org.springframework.context.annotation.Profile;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.validation.annotation.Validated;
@@ -130,9 +130,11 @@ public class InsiderController {
     @GetMapping("/transactions/company/{cik}")
     public ResponseEntity<Page<InsiderTransaction>> getTransactionsByCompany(
             @PathVariable String cik, 
-            Pageable pageable) {
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
         log.info("Getting transactions for company CIK: {}", cik);
-        Page<InsiderTransaction> transactions = transactionRepository.findByCompanyCik(cik, pageable);
+        Page<InsiderTransaction> transactions = transactionRepository.findByCompanyCik(
+                cik, PaginationUtils.pageRequest(page, size, "transactionDate", "desc"));
         return ResponseEntity.ok(transactions);
     }
 
@@ -141,10 +143,12 @@ public class InsiderController {
      */
     @GetMapping("/transactions/insider/{cik}")
     public ResponseEntity<Page<InsiderTransaction>> getTransactionsByInsider(
-            @PathVariable String cik, 
-            Pageable pageable) {
+            @PathVariable String cik,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
         log.info("Getting transactions for insider CIK: {}", cik);
-        Page<InsiderTransaction> transactions = transactionRepository.findByInsiderCik(cik, pageable);
+        Page<InsiderTransaction> transactions = transactionRepository.findByInsiderCik(
+                cik, PaginationUtils.pageRequest(page, size, "transactionDate", "desc"));
         return ResponseEntity.ok(transactions);
     }
 
