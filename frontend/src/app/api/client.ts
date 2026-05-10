@@ -52,21 +52,9 @@ class ApiClient {
     return this.unwrapResponse<T>(response.data);
   }
 
-  /** Use when the backend returns the object directly (no ApiResponse wrapper). */
-  async getRaw<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
-    const response = await this.client.get<T>(url, config);
-    return response.data;
-  }
-
   async post<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> {
     const response = await this.client.post<ApiResponse<T> | T>(url, data, config);
     return this.unwrapResponse<T>(response.data);
-  }
-
-  /** Use when the backend returns the object directly (no ApiResponse wrapper). */
-  async postRaw<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> {
-    const response = await this.client.post<T>(url, data, config);
-    return response.data;
   }
 
   async put<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> {
