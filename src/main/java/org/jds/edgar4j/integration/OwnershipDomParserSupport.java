@@ -3,8 +3,6 @@ package org.jds.edgar4j.integration;
 import java.util.ArrayList;
 import java.util.List;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 
 import javax.xml.parsers.DocumentBuilderFactory;
 
@@ -14,7 +12,6 @@ import org.w3c.dom.NodeList;
 
 final class OwnershipDomParserSupport {
 
-    private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ISO_LOCAL_DATE;
     private static final String TRANSACTION_TYPE_NON_DERIVATIVE = "NON_DERIVATIVE";
     private static final String TRANSACTION_TYPE_DERIVATIVE = "DERIVATIVE";
 
@@ -59,7 +56,7 @@ final class OwnershipDomParserSupport {
         Element table = getFirstElement(root, "nonDerivativeTable");
         if (table == null) return entries;
 
-        NodeList nodes = table.getElementsByTagName(elementTag);
+        NodeList nodes = getElementList(table, elementTag);
         for (int i = 0; i < nodes.getLength(); i++) {
             Element tx = (Element) nodes.item(i);
             Form4Transaction transaction = new Form4Transaction();
@@ -112,7 +109,7 @@ final class OwnershipDomParserSupport {
         Element table = getFirstElement(root, "derivativeTable");
         if (table == null) return entries;
 
-        NodeList nodes = table.getElementsByTagName(elementTag);
+        NodeList nodes = getElementList(table, elementTag);
         for (int i = 0; i < nodes.getLength(); i++) {
             Element tx = (Element) nodes.item(i);
             Form4Transaction transaction = new Form4Transaction();
@@ -188,14 +185,7 @@ final class OwnershipDomParserSupport {
     }
 
     static LocalDate parseDate(String dateStr) {
-        if (dateStr == null || dateStr.trim().isEmpty()) {
-            return null;
-        }
-        try {
-            return LocalDate.parse(dateStr.trim(), DATE_FORMAT);
-        } catch (DateTimeParseException e) {
-            return null;
-        }
+        return ParserDateUtils.parseDate(dateStr);
     }
 
     static Float parseFloat(String value) {
@@ -204,9 +194,33 @@ final class OwnershipDomParserSupport {
         }
         try {
             String cleaned = value.replaceAll("[^0-9.\\-]", "");
+            if (cleaned.isEmpty()) return null;
             return Float.parseFloat(cleaned);
         } catch (NumberFormatException e) {
             return null;
         }
+    }
+
+    private static NodeList getElementList(Element root, String elementTag) {
+        NodeList nodes = root.getElementsByTagName(elementTag);
+        if (nodes.getLength() > 0) {
+            return nodes;
+        }
+
+        int colon = elementTag.indexOf(':');
+        if (colon > 0) {
+            String localName = elementTag.substring(colon + 1);
+            nodes = root.getElementsByTagName(localName);
+            if (nodes.getLength() > 0) {
+                return nodes;
+            }
+
+            NodeList wildcardNodes = root.getElementsByTagNameNS("*", localName);
+            if (wildcardNodes.getLength() > 0) {
+                return wildcardNodes;
+            }
+        }
+
+        return root.getElementsByTagNameNS("*", elementTag);
     }
 }

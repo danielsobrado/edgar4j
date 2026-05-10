@@ -279,30 +279,35 @@ public class InlineXbrlFactExtractor {
 
         // Get the direct text content, excluding nested fact elements
         value.append(getDirectTextContent(element));
-
-        // Check for continuation
-        String continuedAt = element.attr("continuedAt");
-        if (!continuedAt.isEmpty()) {
-            List<Element> continuations = continuationMap.get(continuedAt);
-            if (continuations != null) {
-                for (Element cont : continuations) {
-                    value.append(getDirectTextContent(cont));
-
-                    // Check for chained continuation
-                    String nextContinuation = cont.attr("continuedAt");
-                    if (!nextContinuation.isEmpty()) {
-                        List<Element> nextConts = continuationMap.get(nextContinuation);
-                        if (nextConts != null) {
-                            for (Element nextCont : nextConts) {
-                                value.append(getDirectTextContent(nextCont));
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        appendContinuationText(element.attr("continuedAt"), continuationMap, value, new HashSet<>(), 0);
 
         return value.toString().trim();
+    }
+
+    private void appendContinuationText(String continuationId,
+                                        Map<String, List<Element>> continuationMap,
+                                        StringBuilder value,
+                                        Set<String> visitedContinuationIds,
+                                        int depth) {
+        if (continuationId == null || continuationId.isEmpty()) {
+            return;
+        }
+        if (depth > 32) {
+            return;
+        }
+        if (!visitedContinuationIds.add(continuationId)) {
+            return;
+        }
+
+        List<Element> continuations = continuationMap.get(continuationId);
+        if (continuations == null) {
+            return;
+        }
+
+        for (Element cont : continuations) {
+            value.append(getDirectTextContent(cont));
+            appendContinuationText(cont.attr("continuedAt"), continuationMap, value, visitedContinuationIds, depth + 1);
+        }
     }
 
     /**
@@ -376,7 +381,13 @@ public class InlineXbrlFactExtractor {
      */
     private Elements findFactElementsManually(Document document) {
         Elements results = new Elements();
-        findFactElementsRecursive(document.body(), results);
+        Element root = document.body();
+        if (root == null) {
+            root = document.children().isEmpty() ? null : document.child(0);
+        }
+        if (root != null) {
+            findFactElementsRecursive(root, results);
+        }
         return results;
     }
 

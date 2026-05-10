@@ -2,8 +2,6 @@ package org.jds.edgar4j.integration;
 
 import java.io.StringReader;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -32,9 +30,6 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Component
 public class Form13DGParser {
-
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-    private static final DateTimeFormatter DATE_FORMATTER_ALT = DateTimeFormatter.ofPattern("MM/dd/yyyy");
 
     private JAXBContext jaxbContext;
     private DocumentBuilderFactory documentBuilderFactory;
@@ -453,67 +448,11 @@ public class Form13DGParser {
     }
 
     private LocalDate parseDate(String dateStr) {
-        if (dateStr == null || dateStr.trim().isEmpty()) {
-            return null;
-        }
-        try {
-            String cleaned = dateStr.trim();
-            String dateOnly = cleaned.length() >= 10 ? cleaned.substring(0, 10) : cleaned;
-            if (dateOnly.length() >= 10 && dateOnly.charAt(4) == '-' && dateOnly.charAt(7) == '-') {
-                LocalDate dashedDate = parseWithFormatter(dateOnly, DATE_FORMATTER);
-                if (dashedDate != null) {
-                    return dashedDate;
-                }
-            }
-
-            // Try standard format first: yyyy-MM-dd
-            if (cleaned.length() == 10 && cleaned.contains("-")) {
-                return LocalDate.parse(cleaned, DATE_FORMATTER);
-            }
-
-            // Try alternate format: MM/dd/yyyy
-            if (cleaned.contains("/")) {
-                LocalDate slashDate = parseWithFormatter(cleaned, DATE_FORMATTER_ALT);
-                if (slashDate != null) {
-                    return slashDate;
-                }
-            }
-
-            // Try format: MMDDYYYY
-            if (cleaned.length() == 8) {
-                LocalDate yyyyMmDd = parseWithFormatter(cleaned, "yyyyMMdd");
-                if (yyyyMmDd != null) {
-                    return yyyyMmDd;
-                }
-
-                return LocalDate.of(
-                    Integer.parseInt(cleaned.substring(4, 8)),
-                    Integer.parseInt(cleaned.substring(0, 2)),
-                    Integer.parseInt(cleaned.substring(2, 4))
-                );
-            }
-
-            return LocalDate.parse(cleaned, DATE_FORMATTER);
-        } catch (DateTimeParseException | NumberFormatException e) {
+        LocalDate parsed = ParserDateUtils.parseDate(dateStr);
+        if (parsed == null && dateStr != null && !dateStr.trim().isEmpty()) {
             log.warn("Failed to parse date: {}", dateStr);
-            return null;
         }
-    }
-
-    private LocalDate parseWithFormatter(String value, String pattern) {
-        try {
-            return LocalDate.parse(value, DateTimeFormatter.ofPattern(pattern));
-        } catch (DateTimeParseException e) {
-            return null;
-        }
-    }
-
-    private LocalDate parseWithFormatter(String value, DateTimeFormatter formatter) {
-        try {
-            return LocalDate.parse(value, formatter);
-        } catch (DateTimeParseException e) {
-            return null;
-        }
+        return parsed;
     }
 
     private Long parseLong(String value) {
