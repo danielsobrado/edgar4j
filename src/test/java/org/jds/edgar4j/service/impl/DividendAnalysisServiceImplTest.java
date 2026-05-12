@@ -115,9 +115,13 @@ class DividendAnalysisServiceImplTest {
                 dividendMetricsService,
                 new DividendAlertsService());
         DividendMetricCatalogService dividendMetricCatalogService = new DividendMetricCatalogService();
+        DividendCompanyContextService dividendCompanyContextService = new DividendCompanyContextService(
+                companyService,
+                dividendFilingAnalysisService);
         dividendAnalysisService = new DividendAnalysisServiceImpl(
                 companyService,
                 companyMarketDataService,
+                dividendCompanyContextService,
                 dividendFilingAnalysisService,
                 dividendHistoryAnalysisService,
                 dividendOverviewComputationService,

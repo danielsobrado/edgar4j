@@ -5,17 +5,13 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
-import org.jds.edgar4j.dto.request.CompanySearchRequest;
 import org.jds.edgar4j.dto.request.DividendScreenRequest;
-import org.jds.edgar4j.dto.response.CompanyListResponse;
 import org.jds.edgar4j.dto.response.CompanyResponse;
 import org.jds.edgar4j.dto.response.DividendAlertsResponse;
 import org.jds.edgar4j.dto.response.DividendComparisonResponse;
@@ -61,6 +57,7 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
 
     private final CompanyService companyService;
     private final CompanyMarketDataService companyMarketDataService;
+    private final DividendCompanyContextService dividendCompanyContextService;
     private final DividendFilingAnalysisService dividendFilingAnalysisService;
     private final DividendHistoryAnalysisService dividendHistoryAnalysisService;
     private final DividendOverviewComputationService dividendOverviewComputationService;
@@ -70,7 +67,7 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
 
     @Override
     public DividendOverviewResponse getOverview(String tickerOrCik) {
-        AnalysisContext context = analyze(tickerOrCik);
+        DividendAnalysisContext context = analyze(tickerOrCik);
         return buildOverview(context);
     }
 
@@ -82,7 +79,7 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
 
         String normalizedPeriod = dividendMetricCatalogService.normalizeHistoryPeriod(period);
         List<String> requestedMetrics = dividendMetricCatalogService.normalizeHistoryMetrics(metrics);
-        AnalysisContext context = analyze(tickerOrCik);
+        DividendAnalysisContext context = analyze(tickerOrCik);
         List<HistoryRowData> rows = dividendHistoryAnalysisService.limitHistoryRows(context.historyRows(), years);
 
         List<DividendHistoryResponse.MetricSeries> series = requestedMetrics.stream()
@@ -106,7 +103,7 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
 
     @Override
     public DividendAlertsResponse getAlerts(String tickerOrCik, boolean activeOnly) {
-        AnalysisContext context = analyze(tickerOrCik);
+        DividendAnalysisContext context = analyze(tickerOrCik);
         List<DividendAlertsResponse.AlertEvent> historicalAlerts = dividendHistoryAnalysisService.buildHistoricalAlerts(
                 context.historyRows(),
                 context.alerts(),
@@ -126,12 +123,12 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
 
     @Override
     public DividendEventsResponse getEvents(String tickerOrCik, LocalDate since) {
-        CompanyResponse company = resolveCompany(tickerOrCik)
+        CompanyResponse company = dividendCompanyContextService.resolveCompany(tickerOrCik)
                 .orElseThrow(() -> new ResourceNotFoundException("Company", "tickerOrCik", tickerOrCik));
 
-        String cik = normalizeCik(company.getCik())
+        String cik = dividendCompanyContextService.normalizeCik(company.getCik())
                 .orElseThrow(() -> new IllegalArgumentException("Company CIK is unavailable"));
-        String ticker = normalizeTicker(company.getTicker()).orElseGet(() ->
+        String ticker = dividendCompanyContextService.normalizeTicker(company.getTicker()).orElseGet(() ->
                 companyService.getTickerByCik(cik).orElse(null));
 
         List<Filling> filings = dividendFilingAnalysisService.loadRecentFilings(cik);
@@ -149,12 +146,12 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
 
     @Override
     public DividendEvidenceResponse getEvidence(String tickerOrCik, String accessionNumber) {
-        CompanyResponse company = resolveCompany(tickerOrCik)
+        CompanyResponse company = dividendCompanyContextService.resolveCompany(tickerOrCik)
                 .orElseThrow(() -> new ResourceNotFoundException("Company", "tickerOrCik", tickerOrCik));
 
-        String cik = normalizeCik(company.getCik())
+        String cik = dividendCompanyContextService.normalizeCik(company.getCik())
                 .orElseThrow(() -> new IllegalArgumentException("Company CIK is unavailable"));
-        String ticker = normalizeTicker(company.getTicker()).orElseGet(() ->
+        String ticker = dividendCompanyContextService.normalizeTicker(company.getTicker()).orElseGet(() ->
                 companyService.getTickerByCik(cik).orElse(null));
 
         List<Filling> filings = dividendFilingAnalysisService.loadRecentFilings(cik);
@@ -175,7 +172,7 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
 
     @Override
     public DividendComparisonResponse compare(List<String> tickersOrCiks, List<String> metrics) {
-        List<String> identifiers = normalizeIdentifiers(tickersOrCiks);
+        List<String> identifiers = dividendCompanyContextService.normalizeIdentifiers(tickersOrCiks);
         if (identifiers.isEmpty()) {
             throw new IllegalArgumentException("At least one ticker or CIK is required for comparison");
         }
@@ -186,7 +183,7 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
 
         for (String identifier : identifiers) {
             try {
-                AnalysisContext context = analyze(identifier);
+                DividendAnalysisContext context = analyze(identifier);
                 rows.add(buildComparisonRow(context, requestedMetrics));
             } catch (RuntimeException e) {
                 warnings.add("Could not analyze " + identifier + ": " + e.getMessage());
@@ -221,7 +218,7 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
                 normalizedRequest.getCandidateLimit(),
                 DividendScreeningService.DEFAULT_SCREEN_CANDIDATES));
         List<String> warnings = new ArrayList<>();
-        List<String> identifiers = resolveScreenIdentifiers(normalizedRequest, candidateLimit, warnings);
+        List<String> identifiers = dividendCompanyContextService.resolveScreenIdentifiers(normalizedRequest, candidateLimit, warnings);
         if (identifiers.isEmpty()) {
             throw new ResourceNotFoundException("Dividend screen candidates", "request", normalizedRequest);
         }
@@ -232,7 +229,7 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
 
         for (String identifier : identifiers) {
             try {
-                AnalysisContext context = analyze(identifier);
+                DividendAnalysisContext context = analyze(identifier);
                 DividendScreeningService.ScreeningCandidate screeningCandidate = toScreeningCandidate(context);
                 if (dividendScreeningService.matchesScreenFilters(
                         screeningCandidate,
@@ -247,7 +244,7 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
         }
 
         Comparator<DividendScreenResponse.ScreenResult> comparator = dividendScreeningService.buildScreenComparator(
-                blankToNull(normalizedRequest.getSort()),
+                dividendCompanyContextService.blankToNull(normalizedRequest.getSort()),
                 normalizedRequest.getDirection(),
                 dividendMetricCatalogService.metricIds());
         List<DividendScreenResponse.ScreenResult> sortedResults = results.stream()
@@ -273,13 +270,13 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
                 .build();
     }
 
-    private AnalysisContext analyze(String tickerOrCik) {
-        CompanyResponse company = resolveCompany(tickerOrCik)
+    private DividendAnalysisContext analyze(String tickerOrCik) {
+        CompanyResponse company = dividendCompanyContextService.resolveCompany(tickerOrCik)
                 .orElseThrow(() -> new ResourceNotFoundException("Company", "tickerOrCik", tickerOrCik));
 
-        String cik = normalizeCik(company.getCik())
+        String cik = dividendCompanyContextService.normalizeCik(company.getCik())
                 .orElseThrow(() -> new IllegalArgumentException("Company CIK is unavailable"));
-        String ticker = normalizeTicker(company.getTicker()).orElseGet(() ->
+        String ticker = dividendCompanyContextService.normalizeTicker(company.getTicker()).orElseGet(() ->
                 companyService.getTickerByCik(cik).orElse(null));
 
         List<Filling> filings = dividendFilingAnalysisService.loadRecentFilings(cik);
@@ -316,7 +313,7 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
         DividendOverviewResponse.Evidence evidence = buildEvidence(latestAnnual, latestCurrentReport);
         List<HistoryRowData> historyRows = dividendHistoryAnalysisService.buildHistoryRows(annualAnalyses, trend);
 
-        return new AnalysisContext(
+        return new DividendAnalysisContext(
                 companySummary,
                 computed.snapshot(),
                 computed.confidence(),
@@ -334,7 +331,7 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
                 computed.rating());
     }
 
-    private DividendOverviewResponse buildOverview(AnalysisContext context) {
+    private DividendOverviewResponse buildOverview(DividendAnalysisContext context) {
         return DividendOverviewResponse.builder()
                 .company(context.companySummary())
                 .viability(DividendOverviewResponse.ViabilitySummary.builder()
@@ -355,7 +352,7 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
     }
 
     private DividendComparisonResponse.ComparisonRow buildComparisonRow(
-            AnalysisContext context,
+            DividendAnalysisContext context,
             List<String> requestedMetrics) {
         Map<String, Double> values = new LinkedHashMap<>();
         for (String metric : requestedMetrics) {
@@ -375,7 +372,7 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
     }
 
     private DividendScreenResponse.ScreenResult buildScreenResult(
-            AnalysisContext context,
+            DividendAnalysisContext context,
             List<String> requestedMetrics) {
         Map<String, Double> values = new LinkedHashMap<>();
         for (String metric : requestedMetrics) {
@@ -394,57 +391,7 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
                 .build();
     }
 
-    private List<String> normalizeIdentifiers(List<String> identifiers) {
-        LinkedHashSet<String> normalized = new LinkedHashSet<>();
-        if (identifiers == null) {
-            return List.of();
-        }
-
-        for (String rawIdentifier : identifiers) {
-            if (rawIdentifier == null) {
-                continue;
-            }
-
-            for (String token : rawIdentifier.split(",")) {
-                String identifier = blankToNull(token);
-                if (identifier != null) {
-                    normalized.add(identifier);
-                }
-            }
-        }
-
-        return List.copyOf(normalized);
-    }
-
-    private List<String> resolveScreenIdentifiers(
-            DividendScreenRequest request,
-            int candidateLimit,
-            List<String> warnings) {
-        List<String> explicitIdentifiers = normalizeIdentifiers(request.getTickersOrCiks());
-        if (!explicitIdentifiers.isEmpty()) {
-            return explicitIdentifiers.stream().limit(candidateLimit).toList();
-        }
-
-        if (blankToNull(request.getSearchTerm()) == null) {
-            warnings.add("No tickersOrCiks or searchTerm were provided, so the screen used the first "
-                    + candidateLimit + " locally stored companies.");
-        }
-
-        CompanySearchRequest companySearch = CompanySearchRequest.builder()
-                .searchTerm(blankToNull(request.getSearchTerm()))
-                .page(0)
-                .size(candidateLimit)
-                .sortBy("name")
-                .sortDir("asc")
-                .build();
-        List<CompanyListResponse> candidates = companyService.searchCompanies(companySearch).getContent();
-        return candidates.stream()
-                .map(candidate -> firstNonBlank(candidate.getTicker(), candidate.getCik()))
-                .filter(Objects::nonNull)
-                .toList();
-    }
-
-    private Map<String, Double> buildComparisonMetricValues(AnalysisContext context) {
+    private Map<String, Double> buildComparisonMetricValues(DividendAnalysisContext context) {
         return dividendMetricCatalogService.metricIds().stream()
                 .collect(
                         LinkedHashMap::new,
@@ -452,7 +399,7 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
                         Map::putAll);
     }
 
-    private DividendScreeningService.ScreeningCandidate toScreeningCandidate(AnalysisContext context) {
+    private DividendScreeningService.ScreeningCandidate toScreeningCandidate(DividendAnalysisContext context) {
         return new DividendScreeningService.ScreeningCandidate(
                 context.companySummary(),
                 context.alerts(),
@@ -462,20 +409,7 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
                 buildComparisonMetricValues(context));
     }
 
-    private Optional<CompanyResponse> resolveCompany(String tickerOrCik) {
-        String identifier = tickerOrCik == null ? "" : tickerOrCik.trim();
-        if (identifier.isEmpty()) {
-            throw new IllegalArgumentException("tickerOrCik is required");
-        }
-
-        if (identifier.chars().allMatch(Character::isDigit)) {
-            return companyService.getCompanyByCik(identifier);
-        }
-
-        return companyService.getCompanyByTicker(identifier.toUpperCase(Locale.ROOT));
-    }
-
-    private Double getComparisonMetricValue(AnalysisContext context, String metric) {
+    private Double getComparisonMetricValue(DividendAnalysisContext context, String metric) {
         if (context == null || metric == null) {
             return null;
         }
@@ -508,21 +442,7 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
             CompanyResponse company,
             String ticker,
             List<Filling> filings) {
-        LocalDate lastFilingDate = filings.stream()
-                .map(dividendFilingAnalysisService::resolveSortableFilingDate)
-                .filter(Objects::nonNull)
-                .findFirst()
-                .orElse(null);
-
-        return DividendOverviewResponse.CompanySummary.builder()
-                .cik(normalizeCik(company.getCik()).orElse(company.getCik()))
-                .ticker(ticker)
-                .name(firstNonBlank(company.getName(), ticker, company.getCik()))
-                .sector(blankToNull(company.getSicDescription()))
-                .fiscalYearEnd(formatFiscalYearEnd(company.getFiscalYearEnd()))
-                .lastFilingDate(lastFilingDate)
-                .dataFreshness(Instant.now())
-                .build();
+        return dividendCompanyContextService.buildCompanySummary(company, ticker, filings);
     }
 
     private DividendOverviewResponse.Evidence buildEvidence(AnalyzedFilingData latestAnnual, Filling latestCurrentReport) {
@@ -544,78 +464,6 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
                 .filingDate(dividendFilingAnalysisService.toLocalDate(filing.getFillingDate()))
                 .url(url)
                 .build();
-    }
-
-    private String formatFiscalYearEnd(Long fiscalYearEnd) {
-        if (fiscalYearEnd == null) {
-            return null;
-        }
-        return String.format("%04d", fiscalYearEnd);
-    }
-
-    private Optional<String> normalizeCik(String cik) {
-        String normalized = blankToNull(cik);
-        if (normalized == null) {
-            return Optional.empty();
-        }
-
-        String digits = normalized.replaceAll("[^0-9]", "");
-        if (digits.isEmpty()) {
-            return Optional.empty();
-        }
-
-        try {
-            return Optional.of(String.format("%010d", Long.parseLong(digits)));
-        } catch (NumberFormatException e) {
-            return Optional.empty();
-        }
-    }
-
-    private Optional<String> normalizeTicker(String ticker) {
-        String normalized = blankToNull(ticker);
-        return normalized != null ? Optional.of(normalized.toUpperCase(Locale.ROOT)) : Optional.empty();
-    }
-
-
-    private String blankToNull(String value) {
-        if (value == null) {
-            return null;
-        }
-
-        String trimmed = value.trim();
-        return trimmed.isEmpty() ? null : trimmed;
-    }
-
-    private String firstNonBlank(String... values) {
-        if (values == null) {
-            return null;
-        }
-
-        for (String value : values) {
-            if (value != null && !value.isBlank()) {
-                return value;
-            }
-        }
-
-        return null;
-    }
-
-    private record AnalysisContext(
-            DividendOverviewResponse.CompanySummary companySummary,
-            DividendOverviewResponse.Snapshot snapshot,
-            Map<String, DividendOverviewResponse.MetricConfidence> confidence,
-            List<DividendOverviewResponse.Alert> alerts,
-            DividendOverviewResponse.Coverage coverage,
-            DividendOverviewResponse.Balance balance,
-            List<DividendOverviewResponse.TrendPoint> trend,
-            DividendOverviewResponse.Evidence evidence,
-            Double referencePrice,
-            List<String> warnings,
-            AnalyzedFilingData latestAnnual,
-            AnalyzedFilingData latestBalance,
-            List<HistoryRowData> historyRows,
-            int score,
-            DividendOverviewResponse.DividendRating rating) {
     }
 
 }
