@@ -1,14 +1,9 @@
 package org.jds.edgar4j.service.impl;
 
-import java.math.BigDecimal;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -37,13 +32,10 @@ import org.jds.edgar4j.model.Filling;
 import org.jds.edgar4j.service.CompanyMarketDataService;
 import org.jds.edgar4j.service.CompanyService;
 import org.jds.edgar4j.service.DividendAnalysisService;
-import org.jds.edgar4j.service.dividend.DividendAlertsService;
-import org.jds.edgar4j.service.dividend.DividendMetricsService;
 import org.jds.edgar4j.service.dividend.DividendEvidenceService;
 import org.jds.edgar4j.service.dividend.DividendScreeningService;
 import org.jds.edgar4j.service.impl.DividendFilingAnalysisService.AnalyzedFilingData;
 import org.jds.edgar4j.service.impl.DividendFilingAnalysisService.DividendFactPoint;
-import org.jds.edgar4j.service.impl.DividendHistoryAnalysisService.HistoryMetricDefinition;
 import org.jds.edgar4j.service.impl.DividendHistoryAnalysisService.HistoryRowData;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -67,24 +59,12 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
     private static final Set<String> CURRENT_REPORT_FORMS = Set.of(
             "8-K", "8-K/A");
 
-    private static final String HISTORY_PERIOD_FY = "FY";
-    private static final List<String> DEFAULT_HISTORY_METRICS = List.of(
-            "dps_declared",
-            "fcf_payout",
-            "earnings_payout");
-    private static final List<String> DEFAULT_COMPARISON_METRICS = List.of(
-            "fcf_payout",
-            "dps_cagr_5y",
-            "net_debt_to_ebitda");
-    private static final Map<String, HistoryMetricDefinition> HISTORY_METRIC_DEFINITIONS = createHistoryMetricDefinitions();
-    private static final Map<String, MetricDefinitionData> METRIC_DEFINITIONS = createMetricDefinitions();
-
     private final CompanyService companyService;
     private final CompanyMarketDataService companyMarketDataService;
     private final DividendFilingAnalysisService dividendFilingAnalysisService;
     private final DividendHistoryAnalysisService dividendHistoryAnalysisService;
-    private final DividendMetricsService dividendMetricsService;
-    private final DividendAlertsService dividendAlertsService;
+    private final DividendOverviewComputationService dividendOverviewComputationService;
+    private final DividendMetricCatalogService dividendMetricCatalogService;
     private final DividendScreeningService dividendScreeningService;
     private final DividendEvidenceService dividendEvidenceService;
 
@@ -100,13 +80,14 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
             throw new IllegalArgumentException("years must be greater than 0");
         }
 
-        String normalizedPeriod = normalizeHistoryPeriod(period);
-        List<String> requestedMetrics = normalizeMetrics(metrics);
+        String normalizedPeriod = dividendMetricCatalogService.normalizeHistoryPeriod(period);
+        List<String> requestedMetrics = dividendMetricCatalogService.normalizeHistoryMetrics(metrics);
         AnalysisContext context = analyze(tickerOrCik);
         List<HistoryRowData> rows = dividendHistoryAnalysisService.limitHistoryRows(context.historyRows(), years);
 
         List<DividendHistoryResponse.MetricSeries> series = requestedMetrics.stream()
-                .map(metric -> dividendHistoryAnalysisService.buildMetricSeries(metric, rows, HISTORY_METRIC_DEFINITIONS))
+                .map(metric -> dividendHistoryAnalysisService.buildMetricSeries(
+                        metric, rows, dividendMetricCatalogService.historyMetricDefinitions()))
                 .toList();
         List<DividendHistoryResponse.HistoryRow> responseRows = rows.stream()
                 .map(row -> dividendHistoryAnalysisService.toHistoryRow(row, requestedMetrics))
@@ -199,7 +180,7 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
             throw new IllegalArgumentException("At least one ticker or CIK is required for comparison");
         }
 
-        List<String> requestedMetrics = normalizeComparisonMetrics(metrics);
+        List<String> requestedMetrics = dividendMetricCatalogService.normalizeComparisonMetrics(metrics);
         List<DividendComparisonResponse.ComparisonRow> rows = new ArrayList<>();
         List<String> warnings = new ArrayList<>();
 
@@ -216,11 +197,8 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
             throw new ResourceNotFoundException("Dividend comparison", "tickersOrCiks", identifiers);
         }
 
-        List<DividendMetricDefinitionResponse> responseMetrics = requestedMetrics.stream()
-                .map(METRIC_DEFINITIONS::get)
-                .filter(Objects::nonNull)
-                .map(this::toMetricDefinitionResponse)
-                .toList();
+        List<DividendMetricDefinitionResponse> responseMetrics =
+                dividendMetricCatalogService.metricDefinitions(requestedMetrics);
 
         return DividendComparisonResponse.builder()
                 .metrics(responseMetrics)
@@ -231,9 +209,7 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
 
     @Override
     public List<DividendMetricDefinitionResponse> getMetricDefinitions() {
-        return METRIC_DEFINITIONS.values().stream()
-                .map(this::toMetricDefinitionResponse)
-                .toList();
+        return dividendMetricCatalogService.allMetricDefinitions();
     }
 
     @Override
@@ -250,12 +226,8 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
             throw new ResourceNotFoundException("Dividend screen candidates", "request", normalizedRequest);
         }
 
-        List<String> requestedMetrics = resolveScreenMetrics(normalizedRequest);
-        Map<String, String> metricFormatHints = METRIC_DEFINITIONS.entrySet().stream()
-                .collect(
-                        LinkedHashMap::new,
-                        (map, entry) -> map.put(entry.getKey(), entry.getValue().formatHint()),
-                        Map::putAll);
+        List<String> requestedMetrics = dividendMetricCatalogService.resolveScreenMetrics(normalizedRequest);
+        Map<String, String> metricFormatHints = dividendMetricCatalogService.metricFormatHints();
         List<DividendScreenResponse.ScreenResult> results = new ArrayList<>();
 
         for (String identifier : identifiers) {
@@ -265,7 +237,7 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
                 if (dividendScreeningService.matchesScreenFilters(
                         screeningCandidate,
                         normalizedRequest.getFilters(),
-                        METRIC_DEFINITIONS.keySet(),
+                        dividendMetricCatalogService.metricIds(),
                         metricFormatHints)) {
                     results.add(dividendScreeningService.buildScreenResult(screeningCandidate, requestedMetrics));
                 }
@@ -277,7 +249,7 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
         Comparator<DividendScreenResponse.ScreenResult> comparator = dividendScreeningService.buildScreenComparator(
                 blankToNull(normalizedRequest.getSort()),
                 normalizedRequest.getDirection(),
-                METRIC_DEFINITIONS.keySet());
+                dividendMetricCatalogService.metricIds());
         List<DividendScreenResponse.ScreenResult> sortedResults = results.stream()
                 .sorted(comparator)
                 .toList();
@@ -290,11 +262,8 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
                 size,
                 sortedResults.size());
 
-        List<DividendMetricDefinitionResponse> metricDefinitions = requestedMetrics.stream()
-                .map(METRIC_DEFINITIONS::get)
-                .filter(Objects::nonNull)
-                .map(this::toMetricDefinitionResponse)
-                .toList();
+        List<DividendMetricDefinitionResponse> metricDefinitions =
+                dividendMetricCatalogService.metricDefinitions(requestedMetrics);
 
         return DividendScreenResponse.builder()
                 .metrics(metricDefinitions)
@@ -328,134 +297,41 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
         List<DividendFactPoint> dividendFacts = dividendFilingAnalysisService.loadDividendFactSeries(cik);
         List<DividendOverviewResponse.TrendPoint> trend = dividendFilingAnalysisService.buildTrend(dividendFacts, annualAnalyses);
 
-        Double revenue = dividendFilingAnalysisService.getMetric(latestAnnual,
-                List.of("Revenue"),
-                List.of("Revenues", "RevenueFromContractWithCustomerExcludingAssessedTax"));
-        Double operatingCashFlow = dividendFilingAnalysisService.getMetric(latestAnnual,
-                List.of("OperatingCashFlow"),
-                List.of("NetCashProvidedByUsedInOperatingActivities"));
-        Double capitalExpenditures = dividendMetricsService.magnitude(dividendFilingAnalysisService.getMetric(latestAnnual,
-                List.of("CapitalExpenditures"),
-                List.of("PaymentsToAcquirePropertyPlantAndEquipment", "PaymentsToAcquireProductiveAssets")));
-        Double dividendsPaid = dividendMetricsService.magnitude(dividendFilingAnalysisService.getMetric(latestAnnual,
-                List.of("DividendsPaid", "PaymentsOfDividendsCommonStock"),
-                List.of("PaymentsOfDividendsCommonStock", "DividendsCommonStockCash", "PaymentsOfOrdinaryDividends")));
-        Double freeCashFlow = operatingCashFlow != null && capitalExpenditures != null
-                ? operatingCashFlow - capitalExpenditures
-                : null;
-
-        Double cash = dividendFilingAnalysisService.getMetric(latestBalance,
-                List.of("Cash"),
-                List.of("CashAndCashEquivalentsAtCarryingValue"));
-        Double longTermDebt = dividendMetricsService.magnitude(dividendFilingAnalysisService.getMetric(latestBalance,
-                List.of("LongTermDebt"),
-                List.of("LongTermDebt")));
-        Double shortTermDebt = dividendMetricsService.magnitude(dividendFilingAnalysisService.getMetric(latestBalance,
-                List.of("DebtCurrent", "ShortTermDebt"),
-                List.of("DebtCurrent", "LongTermDebtCurrent", "ShortTermBorrowings")));
-        Double grossDebt = longTermDebt == null && shortTermDebt == null
-                ? null
-                : dividendMetricsService.defaultIfNull(longTermDebt) + dividendMetricsService.defaultIfNull(shortTermDebt);
-        Double netDebt = grossDebt != null && cash != null ? grossDebt - cash : null;
-        Double operatingIncome = dividendFilingAnalysisService.getMetric(latestAnnual,
-                List.of("OperatingIncome"),
-                List.of("OperatingIncomeLoss"));
-        Double depreciationAmortization = dividendMetricsService.magnitude(dividendFilingAnalysisService.getMetric(latestAnnual,
-                List.of("DepreciationAmortization"),
-                List.of("DepreciationDepletionAndAmortization", "DepreciationAndAmortization")));
-        Double ebitdaProxy = operatingIncome != null && depreciationAmortization != null
-                ? operatingIncome + depreciationAmortization
-                : null;
-        Double interestExpense = dividendMetricsService.magnitude(dividendFilingAnalysisService.getMetric(latestAnnual,
-                List.of("InterestExpense"),
-                List.of("InterestExpense", "InterestExpenseDebt")));
-        Double currentAssets = dividendFilingAnalysisService.getMetric(latestBalance,
-                List.of("TotalCurrentAssets"),
-                List.of("AssetsCurrent"));
-        Double currentLiabilities = dividendFilingAnalysisService.getMetric(latestBalance,
-                List.of("TotalCurrentLiabilities"),
-                List.of("LiabilitiesCurrent"));
-
-        Double cashCoverage = dividendMetricsService.safeDivide(freeCashFlow, dividendsPaid);
-        Double retainedCash = freeCashFlow != null && dividendsPaid != null ? freeCashFlow - dividendsPaid : null;
-        Double netDebtToEbitda = ebitdaProxy != null && ebitdaProxy > 0d ? dividendMetricsService.safeDivide(netDebt, ebitdaProxy) : null;
-        Double currentRatio = dividendMetricsService.safeDivide(currentAssets, currentLiabilities);
-        Double interestCoverage = dividendMetricsService.safeDivide(operatingIncome, interestExpense);
-        Double fcfMargin = dividendMetricsService.safeDivide(freeCashFlow, revenue);
-
         Double referencePrice = Optional.ofNullable(ticker)
                 .flatMap(companyMarketDataService::getStoredMarketData)
                 .map(CompanyMarketData::getCurrentPrice)
                 .filter(price -> price != null && price > 0d)
                 .orElse(null);
-
-        Double dpsLatest = dividendMetricsService.findLatestDividendPerShare(trend);
-        Double dpsCagr5y = dividendMetricsService.calculateDividendCagr(trend, 5);
-        Integer uninterruptedYears = dividendMetricsService.countUninterruptedYears(trend);
-        Integer consecutiveRaises = dividendMetricsService.countConsecutiveRaises(trend);
-        Double dividendYield = referencePrice != null && referencePrice > 0d && dpsLatest != null
-                ? dpsLatest / referencePrice
-                : null;
-
-        DividendOverviewResponse.Snapshot snapshot = DividendOverviewResponse.Snapshot.builder()
-                .dpsLatest(dpsLatest)
-                .dpsCagr5y(dpsCagr5y)
-                .fcfPayoutRatio(freeCashFlow != null && freeCashFlow > 0d ? dividendMetricsService.safeDivide(dividendsPaid, freeCashFlow) : null)
-                .uninterruptedYears(uninterruptedYears)
-                .consecutiveRaises(consecutiveRaises)
-                .netDebtToEbitda(netDebtToEbitda)
-                .interestCoverage(interestCoverage)
-                .currentRatio(currentRatio)
-                .fcfMargin(fcfMargin)
-                .dividendYield(dividendYield)
-                .build();
-
-        List<DividendOverviewResponse.Alert> alerts = dividendAlertsService.buildAlerts(trend, snapshot);
-        int score = dividendAlertsService.buildScore(snapshot, alerts);
-        DividendOverviewResponse.DividendRating rating = dividendAlertsService.toRating(score);
-
+        DividendOverviewComputationService.OverviewComputation computed = dividendOverviewComputationService.computeOverview(
+                annualCandidates,
+                annualAnalyses,
+                quarterlyCandidates,
+                quarterlyAnalyses,
+                latestAnnual,
+                latestBalance,
+                trend,
+                dividendFacts,
+                referencePrice);
         DividendOverviewResponse.CompanySummary companySummary = buildCompanySummary(company, ticker, filings);
-        DividendOverviewResponse.Coverage coverage = DividendOverviewResponse.Coverage.builder()
-                .revenue(revenue)
-                .operatingCashFlow(operatingCashFlow)
-                .capitalExpenditures(capitalExpenditures)
-                .freeCashFlow(freeCashFlow)
-                .dividendsPaid(dividendsPaid)
-                .cashCoverage(cashCoverage)
-                .retainedCash(retainedCash)
-                .build();
-        DividendOverviewResponse.Balance balance = DividendOverviewResponse.Balance.builder()
-                .cash(cash)
-                .grossDebt(grossDebt)
-                .netDebt(netDebt)
-                .ebitdaProxy(ebitdaProxy)
-                .netDebtToEbitda(netDebtToEbitda)
-                .currentRatio(currentRatio)
-                .interestCoverage(interestCoverage)
-                .build();
-        Map<String, DividendOverviewResponse.MetricConfidence> confidence = buildConfidence(
-                snapshot, trend, dividendFacts, latestAnnual, latestBalance, referencePrice);
         DividendOverviewResponse.Evidence evidence = buildEvidence(latestAnnual, latestCurrentReport);
-        List<String> warnings = buildWarnings(annualCandidates, annualAnalyses, quarterlyCandidates, quarterlyAnalyses,
-                latestAnnual, latestBalance, dividendFacts, referencePrice);
         List<HistoryRowData> historyRows = dividendHistoryAnalysisService.buildHistoryRows(annualAnalyses, trend);
 
         return new AnalysisContext(
                 companySummary,
-                snapshot,
-                confidence,
-                alerts,
-                coverage,
-                balance,
+                computed.snapshot(),
+                computed.confidence(),
+                computed.alerts(),
+                computed.coverage(),
+                computed.balance(),
                 trend,
                 evidence,
                 referencePrice,
-                warnings,
+                computed.warnings(),
                 latestAnnual,
                 latestBalance,
                 historyRows,
-                score,
-                rating);
+                computed.score(),
+                computed.rating());
     }
 
     private DividendOverviewResponse buildOverview(AnalysisContext context) {
@@ -518,94 +394,6 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
                 .build();
     }
 
-    private String normalizeHistoryPeriod(String period) {
-        String normalized = blankToNull(period);
-        if (normalized == null) {
-            return HISTORY_PERIOD_FY;
-        }
-
-        String upper = normalized.toUpperCase(Locale.ROOT);
-        if (HISTORY_PERIOD_FY.equals(upper) || "ANNUAL".equals(upper) || "YEARLY".equals(upper)) {
-            return HISTORY_PERIOD_FY;
-        }
-
-        throw new IllegalArgumentException("Unsupported history period: " + period + ". Only FY is currently supported.");
-    }
-
-    private List<String> normalizeMetrics(List<String> metrics) {
-        List<String> requested = metrics == null || metrics.isEmpty() ? DEFAULT_HISTORY_METRICS : metrics;
-        LinkedHashSet<String> normalized = new LinkedHashSet<>();
-
-        for (String rawMetric : requested) {
-            if (rawMetric == null) {
-                continue;
-            }
-
-            for (String token : rawMetric.split(",")) {
-                String metric = blankToNull(token);
-                if (metric == null) {
-                    continue;
-                }
-
-                String normalizedMetric = metric.toLowerCase(Locale.ROOT);
-                if (!HISTORY_METRIC_DEFINITIONS.containsKey(normalizedMetric)) {
-                    throw new IllegalArgumentException(
-                            "Unsupported dividend history metric: " + metric
-                                    + ". Supported metrics: " + String.join(", ", HISTORY_METRIC_DEFINITIONS.keySet()));
-                }
-                normalized.add(normalizedMetric);
-            }
-        }
-
-        return normalized.isEmpty() ? DEFAULT_HISTORY_METRICS : List.copyOf(normalized);
-    }
-
-    private List<String> normalizeComparisonMetrics(List<String> metrics) {
-        List<String> requested = metrics == null || metrics.isEmpty() ? DEFAULT_COMPARISON_METRICS : metrics;
-        LinkedHashSet<String> normalized = new LinkedHashSet<>();
-
-        for (String rawMetric : requested) {
-            if (rawMetric == null) {
-                continue;
-            }
-
-            for (String token : rawMetric.split(",")) {
-                String metric = blankToNull(token);
-                if (metric == null) {
-                    continue;
-                }
-
-                String normalizedMetric = metric.toLowerCase(Locale.ROOT);
-                if (!METRIC_DEFINITIONS.containsKey(normalizedMetric)) {
-                    throw new IllegalArgumentException(
-                            "Unsupported dividend comparison metric: " + metric
-                                    + ". Supported metrics: " + String.join(", ", METRIC_DEFINITIONS.keySet()));
-                }
-                normalized.add(normalizedMetric);
-            }
-        }
-
-        return normalized.isEmpty() ? DEFAULT_COMPARISON_METRICS : List.copyOf(normalized);
-    }
-
-    private List<String> resolveScreenMetrics(DividendScreenRequest request) {
-        LinkedHashSet<String> metrics = new LinkedHashSet<>(normalizeComparisonMetrics(request.getMetrics()));
-        if (request.getFilters() != null && request.getFilters().getMetrics() != null) {
-            request.getFilters().getMetrics().keySet().stream()
-                    .map(this::blankToNull)
-                    .filter(Objects::nonNull)
-                    .map(metric -> metric.toLowerCase(Locale.ROOT))
-                    .forEach(metrics::add);
-        }
-
-        String sortMetric = blankToNull(request.getSort());
-        if (sortMetric != null && METRIC_DEFINITIONS.containsKey(sortMetric.toLowerCase(Locale.ROOT))) {
-            metrics.add(sortMetric.toLowerCase(Locale.ROOT));
-        }
-
-        return List.copyOf(metrics);
-    }
-
     private List<String> normalizeIdentifiers(List<String> identifiers) {
         LinkedHashSet<String> normalized = new LinkedHashSet<>();
         if (identifiers == null) {
@@ -657,7 +445,7 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
     }
 
     private Map<String, Double> buildComparisonMetricValues(AnalysisContext context) {
-        return METRIC_DEFINITIONS.keySet().stream()
+        return dividendMetricCatalogService.metricIds().stream()
                 .collect(
                         LinkedHashMap::new,
                         (map, metric) -> map.put(metric, getComparisonMetricValue(context, metric)),
@@ -672,102 +460,6 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
                 context.rating(),
                 context.warnings(),
                 buildComparisonMetricValues(context));
-    }
-
-    private static Map<String, HistoryMetricDefinition> createHistoryMetricDefinitions() {
-        Map<String, HistoryMetricDefinition> definitions = new LinkedHashMap<>();
-        definitions.put("dps_declared", new HistoryMetricDefinition("dps_declared", "Dividend Per Share", "USD/share"));
-        definitions.put("eps_diluted", new HistoryMetricDefinition("eps_diluted", "Diluted EPS", "USD/share"));
-        definitions.put("earnings_payout", new HistoryMetricDefinition("earnings_payout", "Earnings Payout Ratio", "ratio"));
-        definitions.put("revenue", new HistoryMetricDefinition("revenue", "Revenue", "USD"));
-        definitions.put("operating_cash_flow", new HistoryMetricDefinition("operating_cash_flow", "Operating Cash Flow", "USD"));
-        definitions.put("capital_expenditures", new HistoryMetricDefinition("capital_expenditures", "Capital Expenditures", "USD"));
-        definitions.put("free_cash_flow", new HistoryMetricDefinition("free_cash_flow", "Free Cash Flow", "USD"));
-        definitions.put("dividends_paid", new HistoryMetricDefinition("dividends_paid", "Dividends Paid", "USD"));
-        definitions.put("fcf_payout", new HistoryMetricDefinition("fcf_payout", "Free Cash Flow Payout Ratio", "ratio"));
-        definitions.put("cash_coverage", new HistoryMetricDefinition("cash_coverage", "Cash Coverage", "ratio"));
-        definitions.put("retained_cash", new HistoryMetricDefinition("retained_cash", "Retained Cash After Dividends", "USD"));
-        definitions.put("cash", new HistoryMetricDefinition("cash", "Cash", "USD"));
-        definitions.put("gross_debt", new HistoryMetricDefinition("gross_debt", "Gross Debt", "USD"));
-        definitions.put("net_debt", new HistoryMetricDefinition("net_debt", "Net Debt", "USD"));
-        definitions.put("net_debt_to_ebitda", new HistoryMetricDefinition("net_debt_to_ebitda", "Net Debt To EBITDA", "ratio"));
-        definitions.put("current_ratio", new HistoryMetricDefinition("current_ratio", "Current Ratio", "ratio"));
-        definitions.put("interest_coverage", new HistoryMetricDefinition("interest_coverage", "Interest Coverage", "ratio"));
-        definitions.put("fcf_margin", new HistoryMetricDefinition("fcf_margin", "Free Cash Flow Margin", "ratio"));
-        return Map.copyOf(definitions);
-    }
-
-    private static Map<String, MetricDefinitionData> createMetricDefinitions() {
-        Map<String, MetricDefinitionData> definitions = new LinkedHashMap<>();
-        definitions.put("dps_latest", metric("dps_latest", "Latest Dividend / Share", "USD/share", "currency",
-                "overview", "Most recent annual dividend per share used by the overview snapshot."));
-        definitions.put("dps_cagr_5y", metric("dps_cagr_5y", "Dividend CAGR (5Y)", "percent", "percent",
-                "overview", "Five-year compound annual growth rate for annual dividend per share."));
-        definitions.put("fcf_payout", metric("fcf_payout", "Free Cash Flow Payout Ratio", "percent", "percent",
-                "overview", "Dividends paid divided by free cash flow."));
-        definitions.put("uninterrupted_years", metric("uninterrupted_years", "Uninterrupted Years", "years", "count",
-                "overview", "Consecutive annual periods with a non-zero dividend."));
-        definitions.put("consecutive_raises", metric("consecutive_raises", "Consecutive Raises", "years", "count",
-                "overview", "Consecutive annual periods in which dividend per share increased."));
-        definitions.put("net_debt_to_ebitda", metric("net_debt_to_ebitda", "Net Debt To EBITDA", "x", "multiple",
-                "overview", "Net debt divided by EBITDA proxy."));
-        definitions.put("interest_coverage", metric("interest_coverage", "Interest Coverage", "x", "multiple",
-                "overview", "Operating income divided by interest expense."));
-        definitions.put("current_ratio", metric("current_ratio", "Current Ratio", "x", "multiple",
-                "overview", "Current assets divided by current liabilities."));
-        definitions.put("fcf_margin", metric("fcf_margin", "Free Cash Flow Margin", "percent", "percent",
-                "overview", "Free cash flow divided by revenue."));
-        definitions.put("dividend_yield", metric("dividend_yield", "Dividend Yield", "percent", "percent",
-                "overview", "Estimated dividend yield using stored market price."));
-        definitions.put("score", metric("score", "Viability Score", "score", "score",
-                "overview", "Composite dividend viability score on a 0-100 scale."));
-        definitions.put("active_alerts", metric("active_alerts", "Active Alerts", "count", "count",
-                "overview", "Number of currently active dividend pressure alerts."));
-
-        HISTORY_METRIC_DEFINITIONS.values().forEach(definition -> definitions.put(
-                definition.id(),
-                metric(
-                        definition.id(),
-                        definition.label(),
-                        switch (definition.id()) {
-                            case "dps_declared", "eps_diluted" -> "USD/share";
-                            case "revenue", "operating_cash_flow", "capital_expenditures", "free_cash_flow",
-                                    "dividends_paid", "retained_cash", "cash", "gross_debt", "net_debt" -> "USD";
-                            case "net_debt_to_ebitda", "interest_coverage", "current_ratio", "cash_coverage" -> "x";
-                            default -> "percent";
-                        },
-                        switch (definition.id()) {
-                            case "dps_declared", "eps_diluted" -> "currency";
-                            case "revenue", "operating_cash_flow", "capital_expenditures", "free_cash_flow",
-                                    "dividends_paid", "retained_cash", "cash", "gross_debt", "net_debt" -> "compact_currency";
-                            case "net_debt_to_ebitda", "interest_coverage", "current_ratio", "cash_coverage" -> "multiple";
-                            default -> "percent";
-                        },
-                        "history",
-                        "Annual history metric returned by the dividend history endpoint.")));
-
-        return Map.copyOf(definitions);
-    }
-
-    private static MetricDefinitionData metric(
-            String id,
-            String label,
-            String unit,
-            String formatHint,
-            String group,
-            String description) {
-        return new MetricDefinitionData(id, label, unit, formatHint, group, description);
-    }
-
-    private DividendMetricDefinitionResponse toMetricDefinitionResponse(MetricDefinitionData definition) {
-        return DividendMetricDefinitionResponse.builder()
-                .id(definition.id())
-                .label(definition.label())
-                .unit(definition.unit())
-                .formatHint(definition.formatHint())
-                .group(definition.group())
-                .description(definition.description())
-                .build();
     }
 
     private Optional<CompanyResponse> resolveCompany(String tickerOrCik) {
@@ -854,100 +546,6 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
                 .build();
     }
 
-    private Map<String, DividendOverviewResponse.MetricConfidence> buildConfidence(
-            DividendOverviewResponse.Snapshot snapshot,
-            List<DividendOverviewResponse.TrendPoint> trend,
-            List<DividendFactPoint> dividendFacts,
-            AnalyzedFilingData latestAnnual,
-            AnalyzedFilingData latestBalance,
-            Double referencePrice) {
-        Map<String, DividendOverviewResponse.MetricConfidence> confidence = new LinkedHashMap<>();
-
-        int dividendPointCount = (int) trend.stream().filter(point -> point.getDividendsPerShare() != null).count();
-        confidence.put("dpsLatest", !dividendFacts.isEmpty()
-                ? DividendOverviewResponse.MetricConfidence.HIGH
-                : dividendFilingAnalysisService.hasDirectDividendsPerShare(latestAnnual)
-                        ? DividendOverviewResponse.MetricConfidence.MEDIUM
-                        : snapshot.getDpsLatest() != null
-                                ? DividendOverviewResponse.MetricConfidence.LOW_MEDIUM
-                                : DividendOverviewResponse.MetricConfidence.LOW);
-        confidence.put("dpsCagr5y", dividendPointCount >= 6
-                ? (!dividendFacts.isEmpty()
-                        ? DividendOverviewResponse.MetricConfidence.HIGH
-                        : DividendOverviewResponse.MetricConfidence.MEDIUM)
-                : DividendOverviewResponse.MetricConfidence.LOW);
-        confidence.put("fcfPayoutRatio", snapshot.getFcfPayoutRatio() != null
-                ? DividendOverviewResponse.MetricConfidence.MEDIUM
-                : DividendOverviewResponse.MetricConfidence.LOW);
-        confidence.put("uninterruptedYears", dividendPointCount >= 6
-                ? DividendOverviewResponse.MetricConfidence.HIGH
-                : dividendPointCount >= 2
-                        ? DividendOverviewResponse.MetricConfidence.MEDIUM
-                        : DividendOverviewResponse.MetricConfidence.LOW);
-        confidence.put("consecutiveRaises", dividendPointCount >= 6
-                ? DividendOverviewResponse.MetricConfidence.MEDIUM
-                : dividendPointCount >= 2
-                        ? DividendOverviewResponse.MetricConfidence.LOW_MEDIUM
-                        : DividendOverviewResponse.MetricConfidence.LOW);
-        confidence.put("netDebtToEbitda", snapshot.getNetDebtToEbitda() != null
-                ? DividendOverviewResponse.MetricConfidence.LOW_MEDIUM
-                : DividendOverviewResponse.MetricConfidence.LOW);
-        confidence.put("interestCoverage", snapshot.getInterestCoverage() != null
-                ? DividendOverviewResponse.MetricConfidence.MEDIUM
-                : DividendOverviewResponse.MetricConfidence.LOW);
-        confidence.put("currentRatio", latestBalance != null && snapshot.getCurrentRatio() != null
-                ? DividendOverviewResponse.MetricConfidence.HIGH
-                : DividendOverviewResponse.MetricConfidence.LOW);
-        confidence.put("fcfMargin", snapshot.getFcfMargin() != null
-                ? DividendOverviewResponse.MetricConfidence.MEDIUM
-                : DividendOverviewResponse.MetricConfidence.LOW);
-        confidence.put("dividendYield", referencePrice != null && snapshot.getDividendYield() != null
-                ? DividendOverviewResponse.MetricConfidence.MEDIUM
-                : DividendOverviewResponse.MetricConfidence.LOW);
-
-        return confidence;
-    }
-
-    private List<String> buildWarnings(
-            List<Filling> annualCandidates,
-            List<AnalyzedFilingData> annualAnalyses,
-            List<Filling> quarterlyCandidates,
-            List<AnalyzedFilingData> quarterlyAnalyses,
-            AnalyzedFilingData latestAnnual,
-            AnalyzedFilingData latestBalance,
-            List<DividendFactPoint> dividendFacts,
-            Double referencePrice) {
-        List<String> warnings = new ArrayList<>();
-
-        if (latestAnnual == null) {
-            warnings.add("No analyzable annual XBRL filing was available, so payout and profitability metrics are limited.");
-        } else if (annualAnalyses.size() < annualCandidates.size()) {
-            warnings.add("Some recent annual filings could not be parsed for XBRL analysis and were excluded from the overview.");
-        }
-
-        if (annualAnalyses.size() < 6) {
-            warnings.add("Fewer than six annual XBRL filings were available, so long-range dividend trend coverage is limited.");
-        }
-
-        if (quarterlyCandidates.isEmpty() || quarterlyAnalyses.isEmpty()) {
-            if (latestBalance != null && latestAnnual != null && latestBalance == latestAnnual) {
-                warnings.add("No recent quarterly balance-sheet filing was available, so liquidity and leverage use the latest annual report.");
-            } else if (latestBalance == null) {
-                warnings.add("No recent balance-sheet filing was available, so liquidity and leverage metrics could not be computed.");
-            }
-        }
-
-        if (dividendFacts.isEmpty()) {
-            warnings.add("SEC companyfacts dividend history was unavailable, so streak metrics rely on filing-level XBRL only.");
-        }
-
-        if (referencePrice == null) {
-            warnings.add("Stored market-price data is unavailable, so dividend yield could not be estimated.");
-        }
-
-        return warnings;
-    }
-
     private String formatFiscalYearEnd(Long fiscalYearEnd) {
         if (fiscalYearEnd == null) {
             return null;
@@ -988,21 +586,6 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
         return trimmed.isEmpty() ? null : trimmed;
     }
 
-    @SafeVarargs
-    private final <T> T firstNonNull(T... values) {
-        if (values == null) {
-            return null;
-        }
-
-        for (T value : values) {
-            if (value != null) {
-                return value;
-            }
-        }
-
-        return null;
-    }
-
     private String firstNonBlank(String... values) {
         if (values == null) {
             return null;
@@ -1033,15 +616,6 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
             List<HistoryRowData> historyRows,
             int score,
             DividendOverviewResponse.DividendRating rating) {
-    }
-
-    private record MetricDefinitionData(
-            String id,
-            String label,
-            String unit,
-            String formatHint,
-            String group,
-            String description) {
     }
 
 }
