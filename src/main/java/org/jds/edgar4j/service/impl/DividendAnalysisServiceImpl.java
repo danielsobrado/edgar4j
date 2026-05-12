@@ -32,13 +32,8 @@ import org.jds.edgar4j.dto.response.DividendOverviewResponse;
 import org.jds.edgar4j.dto.response.DividendScreenResponse;
 import org.jds.edgar4j.dto.response.PaginatedResponse;
 import org.jds.edgar4j.exception.ResourceNotFoundException;
-import org.jds.edgar4j.integration.SecApiClient;
-import org.jds.edgar4j.integration.SecApiConfig;
-import org.jds.edgar4j.integration.SecResponseParser;
-import org.jds.edgar4j.integration.model.SecCompanyFactsResponse;
 import org.jds.edgar4j.model.CompanyMarketData;
 import org.jds.edgar4j.model.Filling;
-import org.jds.edgar4j.port.FillingDataPort;
 import org.jds.edgar4j.service.CompanyMarketDataService;
 import org.jds.edgar4j.service.CompanyService;
 import org.jds.edgar4j.service.DividendAnalysisService;
@@ -46,11 +41,8 @@ import org.jds.edgar4j.service.dividend.DividendAlertsService;
 import org.jds.edgar4j.service.dividend.DividendMetricsService;
 import org.jds.edgar4j.service.dividend.DividendEvidenceService;
 import org.jds.edgar4j.service.dividend.DividendScreeningService;
-import org.jds.edgar4j.validation.UrlAllowlistValidator;
-import org.jds.edgar4j.xbrl.XbrlService;
-import org.jds.edgar4j.xbrl.model.XbrlInstance;
-import org.jds.edgar4j.xbrl.sec.SecFilingExtractor;
-import org.jds.edgar4j.xbrl.standardization.ConceptStandardizer;
+import org.jds.edgar4j.service.impl.DividendFilingAnalysisService.AnalyzedFilingData;
+import org.jds.edgar4j.service.impl.DividendFilingAnalysisService.DividendFactPoint;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -63,8 +55,6 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class DividendAnalysisServiceImpl implements DividendAnalysisService {
 
-    private static final Duration XBRL_TIMEOUT = Duration.ofSeconds(45);
-    private static final int RECENT_FILING_LIMIT = 80;
     private static final int ANALYSIS_ANNUAL_LIMIT = 6;
     private static final int ANALYSIS_QUARTERLY_LIMIT = 2;
 
@@ -75,16 +65,6 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
     private static final Set<String> CURRENT_REPORT_FORMS = Set.of(
             "8-K", "8-K/A");
 
-    private static final List<String> DIRECT_DPS_STANDARD_KEYS = List.of(
-            "DividendsPerShare",
-            "CommonStockDividendsPerShareDeclared",
-            "CommonStockDividendsPerShareCashPaid",
-            "CommonStockDividendsPerShareDeclaredAndPaid");
-    private static final List<String> DIRECT_DPS_FINANCIAL_KEYS = List.of(
-            "CommonStockDividendsPerShareDeclared",
-            "CommonStockDividendsPerShareCashPaid",
-            "CommonStockDividendsPerShareDeclaredAndPaid",
-            "DividendsPerShare");
     private static final String HISTORY_PERIOD_FY = "FY";
     private static final List<String> DEFAULT_HISTORY_METRICS = List.of(
             "dps_declared",
@@ -98,13 +78,8 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
     private static final Map<String, MetricDefinitionData> METRIC_DEFINITIONS = createMetricDefinitions();
 
     private final CompanyService companyService;
-    private final FillingDataPort fillingRepository;
     private final CompanyMarketDataService companyMarketDataService;
-    private final SecApiClient secApiClient;
-    private final SecResponseParser secResponseParser;
-    private final SecApiConfig secApiConfig;
-    private final XbrlService xbrlService;
-    private final UrlAllowlistValidator urlAllowlistValidator;
+    private final DividendFilingAnalysisService dividendFilingAnalysisService;
     private final DividendMetricsService dividendMetricsService;
     private final DividendAlertsService dividendAlertsService;
     private final DividendScreeningService dividendScreeningService;
@@ -169,9 +144,9 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
         String ticker = normalizeTicker(company.getTicker()).orElseGet(() ->
                 companyService.getTickerByCik(cik).orElse(null));
 
-        List<Filling> filings = loadRecentFilings(cik);
-        List<Filling> currentReports = selectFilings(filings, CURRENT_REPORT_FORMS, false, 12);
-        List<Filling> annualReports = selectFilings(filings, ANNUAL_FORMS, false, 2);
+        List<Filling> filings = dividendFilingAnalysisService.loadRecentFilings(cik);
+        List<Filling> currentReports = dividendFilingAnalysisService.selectFilings(filings, CURRENT_REPORT_FORMS, false, 12);
+        List<Filling> annualReports = dividendFilingAnalysisService.selectFilings(filings, ANNUAL_FORMS, false, 2);
 
         return dividendEvidenceService.buildEvents(
                 buildCompanySummary(company, ticker, filings),
@@ -192,7 +167,7 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
         String ticker = normalizeTicker(company.getTicker()).orElseGet(() ->
                 companyService.getTickerByCik(cik).orElse(null));
 
-        List<Filling> filings = loadRecentFilings(cik);
+        List<Filling> filings = dividendFilingAnalysisService.loadRecentFilings(cik);
         Filling filing = dividendEvidenceService.resolveFilingByAccession(filings, accessionNumber)
                 .orElseThrow(() -> new ResourceNotFoundException("Filing evidence", "accessionNumber", accessionNumber));
 
@@ -329,64 +304,66 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
         String ticker = normalizeTicker(company.getTicker()).orElseGet(() ->
                 companyService.getTickerByCik(cik).orElse(null));
 
-        List<Filling> filings = loadRecentFilings(cik);
-        List<Filling> annualCandidates = selectFilings(filings, ANNUAL_FORMS, true, ANALYSIS_ANNUAL_LIMIT);
-        List<Filling> quarterlyCandidates = selectFilings(filings, QUARTERLY_FORMS, true, ANALYSIS_QUARTERLY_LIMIT);
-        Filling latestCurrentReport = selectLatestCurrentReport(filings);
+        List<Filling> filings = dividendFilingAnalysisService.loadRecentFilings(cik);
+        List<Filling> annualCandidates = dividendFilingAnalysisService.selectFilings(
+                filings, ANNUAL_FORMS, true, ANALYSIS_ANNUAL_LIMIT);
+        List<Filling> quarterlyCandidates = dividendFilingAnalysisService.selectFilings(
+                filings, QUARTERLY_FORMS, true, ANALYSIS_QUARTERLY_LIMIT);
+        Filling latestCurrentReport = dividendFilingAnalysisService.selectLatestCurrentReport(filings, CURRENT_REPORT_FORMS);
 
-        List<AnalyzedFilingData> annualAnalyses = analyzeFilings(annualCandidates);
-        List<AnalyzedFilingData> quarterlyAnalyses = analyzeFilings(quarterlyCandidates);
+        List<AnalyzedFilingData> annualAnalyses = dividendFilingAnalysisService.analyzeFilings(annualCandidates);
+        List<AnalyzedFilingData> quarterlyAnalyses = dividendFilingAnalysisService.analyzeFilings(quarterlyCandidates);
         AnalyzedFilingData latestAnnual = annualAnalyses.isEmpty() ? null : annualAnalyses.get(0);
         AnalyzedFilingData latestBalance = !quarterlyAnalyses.isEmpty() ? quarterlyAnalyses.get(0) : latestAnnual;
 
-        List<DividendFactPoint> dividendFacts = loadDividendFactSeries(cik);
-        List<DividendOverviewResponse.TrendPoint> trend = buildTrend(dividendFacts, annualAnalyses);
+        List<DividendFactPoint> dividendFacts = dividendFilingAnalysisService.loadDividendFactSeries(cik);
+        List<DividendOverviewResponse.TrendPoint> trend = dividendFilingAnalysisService.buildTrend(dividendFacts, annualAnalyses);
 
-        Double revenue = getMetric(latestAnnual,
+        Double revenue = dividendFilingAnalysisService.getMetric(latestAnnual,
                 List.of("Revenue"),
                 List.of("Revenues", "RevenueFromContractWithCustomerExcludingAssessedTax"));
-        Double operatingCashFlow = getMetric(latestAnnual,
+        Double operatingCashFlow = dividendFilingAnalysisService.getMetric(latestAnnual,
                 List.of("OperatingCashFlow"),
                 List.of("NetCashProvidedByUsedInOperatingActivities"));
-        Double capitalExpenditures = dividendMetricsService.magnitude(getMetric(latestAnnual,
+        Double capitalExpenditures = dividendMetricsService.magnitude(dividendFilingAnalysisService.getMetric(latestAnnual,
                 List.of("CapitalExpenditures"),
                 List.of("PaymentsToAcquirePropertyPlantAndEquipment", "PaymentsToAcquireProductiveAssets")));
-        Double dividendsPaid = dividendMetricsService.magnitude(getMetric(latestAnnual,
+        Double dividendsPaid = dividendMetricsService.magnitude(dividendFilingAnalysisService.getMetric(latestAnnual,
                 List.of("DividendsPaid", "PaymentsOfDividendsCommonStock"),
                 List.of("PaymentsOfDividendsCommonStock", "DividendsCommonStockCash", "PaymentsOfOrdinaryDividends")));
         Double freeCashFlow = operatingCashFlow != null && capitalExpenditures != null
                 ? operatingCashFlow - capitalExpenditures
                 : null;
 
-        Double cash = getMetric(latestBalance,
+        Double cash = dividendFilingAnalysisService.getMetric(latestBalance,
                 List.of("Cash"),
                 List.of("CashAndCashEquivalentsAtCarryingValue"));
-        Double longTermDebt = dividendMetricsService.magnitude(getMetric(latestBalance,
+        Double longTermDebt = dividendMetricsService.magnitude(dividendFilingAnalysisService.getMetric(latestBalance,
                 List.of("LongTermDebt"),
                 List.of("LongTermDebt")));
-        Double shortTermDebt = dividendMetricsService.magnitude(getMetric(latestBalance,
+        Double shortTermDebt = dividendMetricsService.magnitude(dividendFilingAnalysisService.getMetric(latestBalance,
                 List.of("DebtCurrent", "ShortTermDebt"),
                 List.of("DebtCurrent", "LongTermDebtCurrent", "ShortTermBorrowings")));
         Double grossDebt = longTermDebt == null && shortTermDebt == null
                 ? null
                 : dividendMetricsService.defaultIfNull(longTermDebt) + dividendMetricsService.defaultIfNull(shortTermDebt);
         Double netDebt = grossDebt != null && cash != null ? grossDebt - cash : null;
-        Double operatingIncome = getMetric(latestAnnual,
+        Double operatingIncome = dividendFilingAnalysisService.getMetric(latestAnnual,
                 List.of("OperatingIncome"),
                 List.of("OperatingIncomeLoss"));
-        Double depreciationAmortization = dividendMetricsService.magnitude(getMetric(latestAnnual,
+        Double depreciationAmortization = dividendMetricsService.magnitude(dividendFilingAnalysisService.getMetric(latestAnnual,
                 List.of("DepreciationAmortization"),
                 List.of("DepreciationDepletionAndAmortization", "DepreciationAndAmortization")));
         Double ebitdaProxy = operatingIncome != null && depreciationAmortization != null
                 ? operatingIncome + depreciationAmortization
                 : null;
-        Double interestExpense = dividendMetricsService.magnitude(getMetric(latestAnnual,
+        Double interestExpense = dividendMetricsService.magnitude(dividendFilingAnalysisService.getMetric(latestAnnual,
                 List.of("InterestExpense"),
                 List.of("InterestExpense", "InterestExpenseDebt")));
-        Double currentAssets = getMetric(latestBalance,
+        Double currentAssets = dividendFilingAnalysisService.getMetric(latestBalance,
                 List.of("TotalCurrentAssets"),
                 List.of("AssetsCurrent"));
-        Double currentLiabilities = getMetric(latestBalance,
+        Double currentLiabilities = dividendFilingAnalysisService.getMetric(latestBalance,
                 List.of("TotalCurrentLiabilities"),
                 List.of("LiabilitiesCurrent"));
 
@@ -706,8 +683,8 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
         }
 
         return annualAnalyses.stream()
-                .sorted(Comparator.comparing(this::resolveSortableAnalysisDate))
-                .map(annual -> toHistoryRowData(annual, trendByPeriodEnd.get(resolvePeriodEnd(annual))))
+                .sorted(Comparator.comparing(dividendFilingAnalysisService::resolveSortableAnalysisDate))
+                .map(annual -> toHistoryRowData(annual, trendByPeriodEnd.get(dividendFilingAnalysisService.resolvePeriodEnd(annual))))
                 .filter(Objects::nonNull)
                 .toList();
     }
@@ -715,21 +692,21 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
     private HistoryRowData toHistoryRowData(
             AnalyzedFilingData annual,
             DividendOverviewResponse.TrendPoint trendPoint) {
-        LocalDate periodEnd = resolvePeriodEnd(annual);
+        LocalDate periodEnd = dividendFilingAnalysisService.resolvePeriodEnd(annual);
         if (annual == null || periodEnd == null) {
             return null;
         }
 
-        Double revenue = getMetric(annual,
+        Double revenue = dividendFilingAnalysisService.getMetric(annual,
                 List.of("Revenue"),
                 List.of("Revenues", "RevenueFromContractWithCustomerExcludingAssessedTax"));
-        Double operatingCashFlow = getMetric(annual,
+        Double operatingCashFlow = dividendFilingAnalysisService.getMetric(annual,
                 List.of("OperatingCashFlow"),
                 List.of("NetCashProvidedByUsedInOperatingActivities"));
-        Double capitalExpenditures = dividendMetricsService.magnitude(getMetric(annual,
+        Double capitalExpenditures = dividendMetricsService.magnitude(dividendFilingAnalysisService.getMetric(annual,
                 List.of("CapitalExpenditures"),
                 List.of("PaymentsToAcquirePropertyPlantAndEquipment", "PaymentsToAcquireProductiveAssets")));
-        Double dividendsPaid = dividendMetricsService.magnitude(getMetric(annual,
+        Double dividendsPaid = dividendMetricsService.magnitude(dividendFilingAnalysisService.getMetric(annual,
                 List.of("DividendsPaid", "PaymentsOfDividendsCommonStock"),
                 List.of("PaymentsOfDividendsCommonStock", "DividendsCommonStockCash", "PaymentsOfOrdinaryDividends")));
         Double freeCashFlow = operatingCashFlow != null && capitalExpenditures != null
@@ -737,10 +714,10 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
                 : null;
         Double dividendsPerShare = trendPoint != null && trendPoint.getDividendsPerShare() != null
                 ? trendPoint.getDividendsPerShare()
-                : getDividendsPerShare(annual);
+                : dividendFilingAnalysisService.getDividendsPerShare(annual);
         Double earningsPerShare = trendPoint != null && trendPoint.getEarningsPerShare() != null
                 ? trendPoint.getEarningsPerShare()
-                : getMetric(annual, List.of("EarningsPerShareDiluted"), List.of("EarningsPerShareDiluted"));
+                : dividendFilingAnalysisService.getMetric(annual, List.of("EarningsPerShareDiluted"), List.of("EarningsPerShareDiluted"));
         Double earningsPayoutRatio = earningsPerShare != null && earningsPerShare > 0d && dividendsPerShare != null
                 ? dividendMetricsService.safeDivide(dividendsPerShare, earningsPerShare)
                 : null;
@@ -749,36 +726,36 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
                 : null;
         Double cashCoverage = dividendMetricsService.safeDivide(freeCashFlow, dividendsPaid);
         Double retainedCash = freeCashFlow != null && dividendsPaid != null ? freeCashFlow - dividendsPaid : null;
-        Double cash = getMetric(annual,
+        Double cash = dividendFilingAnalysisService.getMetric(annual,
                 List.of("Cash"),
                 List.of("CashAndCashEquivalentsAtCarryingValue"));
-        Double longTermDebt = dividendMetricsService.magnitude(getMetric(annual,
+        Double longTermDebt = dividendMetricsService.magnitude(dividendFilingAnalysisService.getMetric(annual,
                 List.of("LongTermDebt"),
                 List.of("LongTermDebt")));
-        Double shortTermDebt = dividendMetricsService.magnitude(getMetric(annual,
+        Double shortTermDebt = dividendMetricsService.magnitude(dividendFilingAnalysisService.getMetric(annual,
                 List.of("DebtCurrent", "ShortTermDebt"),
                 List.of("DebtCurrent", "LongTermDebtCurrent", "ShortTermBorrowings")));
         Double grossDebt = longTermDebt == null && shortTermDebt == null
                 ? null
                 : dividendMetricsService.defaultIfNull(longTermDebt) + dividendMetricsService.defaultIfNull(shortTermDebt);
         Double netDebt = grossDebt != null && cash != null ? grossDebt - cash : null;
-        Double operatingIncome = getMetric(annual,
+        Double operatingIncome = dividendFilingAnalysisService.getMetric(annual,
                 List.of("OperatingIncome"),
                 List.of("OperatingIncomeLoss"));
-        Double depreciationAmortization = dividendMetricsService.magnitude(getMetric(annual,
+        Double depreciationAmortization = dividendMetricsService.magnitude(dividendFilingAnalysisService.getMetric(annual,
                 List.of("DepreciationAmortization"),
                 List.of("DepreciationDepletionAndAmortization", "DepreciationAndAmortization")));
         Double ebitdaProxy = operatingIncome != null && depreciationAmortization != null
                 ? operatingIncome + depreciationAmortization
                 : null;
-        Double interestExpense = dividendMetricsService.magnitude(getMetric(annual,
+        Double interestExpense = dividendMetricsService.magnitude(dividendFilingAnalysisService.getMetric(annual,
                 List.of("InterestExpense"),
                 List.of("InterestExpense", "InterestExpenseDebt")));
         Double netDebtToEbitda = ebitdaProxy != null && ebitdaProxy > 0d ? dividendMetricsService.safeDivide(netDebt, ebitdaProxy) : null;
-        Double currentAssets = getMetric(annual,
+        Double currentAssets = dividendFilingAnalysisService.getMetric(annual,
                 List.of("TotalCurrentAssets"),
                 List.of("AssetsCurrent"));
-        Double currentLiabilities = getMetric(annual,
+        Double currentLiabilities = dividendFilingAnalysisService.getMetric(annual,
                 List.of("TotalCurrentLiabilities"),
                 List.of("LiabilitiesCurrent"));
         Double currentRatio = dividendMetricsService.safeDivide(currentAssets, currentLiabilities);
@@ -787,7 +764,7 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
 
         return new HistoryRowData(
                 periodEnd,
-                toLocalDate(annual.filing().getFillingDate()),
+                dividendFilingAnalysisService.toLocalDate(annual.filing().getFillingDate()),
                 annual.filing().getAccessionNumber(),
                 dividendsPerShare,
                 earningsPerShare,
@@ -893,12 +870,12 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
         }
 
         LocalDate currentPeriodEnd = firstNonNull(
-                resolvePeriodEnd(context.latestBalance()),
-                resolvePeriodEnd(context.latestAnnual()),
+                dividendFilingAnalysisService.resolvePeriodEnd(context.latestBalance()),
+                dividendFilingAnalysisService.resolvePeriodEnd(context.latestAnnual()),
                 context.companySummary().getLastFilingDate());
         LocalDate currentFilingDate = firstNonNull(
-                context.latestBalance() != null ? toLocalDate(context.latestBalance().filing().getFillingDate()) : null,
-                context.latestAnnual() != null ? toLocalDate(context.latestAnnual().filing().getFillingDate()) : null,
+                context.latestBalance() != null ? dividendFilingAnalysisService.toLocalDate(context.latestBalance().filing().getFillingDate()) : null,
+                context.latestAnnual() != null ? dividendFilingAnalysisService.toLocalDate(context.latestAnnual().filing().getFillingDate()) : null,
                 context.companySummary().getLastFilingDate());
         String currentAccessionNumber = firstNonBlank(
                 context.latestBalance() != null ? context.latestBalance().filing().getAccessionNumber() : null,
@@ -1166,287 +1143,12 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
         return context.historyRows().get(context.historyRows().size() - 1);
     }
 
-    private List<Filling> loadRecentFilings(String cik) {
-        LinkedHashMap<String, Filling> merged = new LinkedHashMap<>();
-
-        try {
-            fillingRepository.findByCik(
-                            cik,
-                            PageRequest.of(0, RECENT_FILING_LIMIT, Sort.by(Sort.Direction.DESC, "fillingDate")))
-                    .getContent()
-                    .forEach(filing -> putIfAbsent(merged, filing));
-        } catch (Exception e) {
-            log.debug("Could not load local filings for {}", cik, e);
-        }
-
-        try {
-            String submissionsJson = secApiClient.fetchSubmissions(cik);
-            secResponseParser.toFillings(secResponseParser.parseSubmissionResponse(submissionsJson))
-                    .forEach(filing -> putIfAbsent(merged, filing));
-        } catch (Exception e) {
-            log.debug("Could not load SEC submissions fallback for {}", cik, e);
-        }
-
-        return merged.values().stream()
-                .sorted(Comparator.comparing(this::resolveSortableFilingDate, Comparator.reverseOrder()))
-                .toList();
-    }
-
-    private void putIfAbsent(Map<String, Filling> merged, Filling candidate) {
-        if (candidate == null) {
-            return;
-        }
-
-        String accessionNumber = blankToNull(candidate.getAccessionNumber());
-        String key = accessionNumber != null
-                ? accessionNumber
-                : "%s|%s|%s".formatted(
-                        blankToNull(candidate.getCik()),
-                        normalizeFormType(candidate.getFormType() != null ? candidate.getFormType().getNumber() : null),
-                        resolveSortableFilingDate(candidate));
-        merged.putIfAbsent(key, candidate);
-    }
-
-    private List<Filling> selectFilings(List<Filling> filings, Set<String> allowedForms, boolean xbrlOnly, int limit) {
-        return filings.stream()
-                .filter(filing -> allowedForms.contains(normalizeFormType(filing.getFormType() != null
-                        ? filing.getFormType().getNumber()
-                        : null)))
-                .filter(filing -> !xbrlOnly || hasUsableXbrlDocument(filing))
-                .limit(limit)
-                .toList();
-    }
-
-    private Filling selectLatestCurrentReport(List<Filling> filings) {
-        return filings.stream()
-                .filter(filing -> CURRENT_REPORT_FORMS.contains(normalizeFormType(filing.getFormType() != null
-                        ? filing.getFormType().getNumber()
-                        : null)))
-                .findFirst()
-                .orElse(null);
-    }
-
-    private List<AnalyzedFilingData> analyzeFilings(List<Filling> filings) {
-        List<AnalyzedFilingData> analyses = new ArrayList<>();
-        for (Filling filing : filings) {
-            analyzeFiling(filing).ifPresent(analyses::add);
-        }
-        analyses.sort(Comparator.comparing(this::resolveSortableAnalysisDate, Comparator.reverseOrder()));
-        return analyses;
-    }
-
-    private Optional<AnalyzedFilingData> analyzeFiling(Filling filing) {
-        String filingUrl = resolveFilingUrl(filing);
-        if (filingUrl == null) {
-            return Optional.empty();
-        }
-
-        try {
-            XbrlInstance instance = xbrlService.parseFromUrl(filingUrl).block(XBRL_TIMEOUT);
-            if (instance == null) {
-                return Optional.empty();
-            }
-
-            ConceptStandardizer.StandardizedData standardized = xbrlService.standardize(instance);
-            return Optional.of(new AnalyzedFilingData(
-                    filing,
-                    filingUrl,
-                    standardized != null ? standardized.getLatestValues() : Map.of(),
-                    xbrlService.getKeyFinancials(instance),
-                    xbrlService.extractSecMetadata(instance)));
-        } catch (Exception e) {
-            log.debug("Could not analyze filing {} for dividend overview",
-                    filing != null ? filing.getAccessionNumber() : null,
-                    e);
-            return Optional.empty();
-        }
-    }
-
-    private List<DividendFactPoint> loadDividendFactSeries(String cik) {
-        try {
-            SecCompanyFactsResponse companyFacts = secResponseParser.parseCompanyFactsResponse(secApiClient.fetchCompanyFacts(cik));
-            return extractAnnualDividendSeries(companyFacts);
-        } catch (Exception e) {
-            log.debug("Could not load dividend company facts for {}", cik, e);
-            return List.of();
-        }
-    }
-
-    private List<DividendFactPoint> extractAnnualDividendSeries(SecCompanyFactsResponse companyFacts) {
-        if (companyFacts == null || companyFacts.getFacts() == null || companyFacts.getFacts().isEmpty()) {
-            return List.of();
-        }
-
-        TreeAccumulator<DividendFactPoint> series = new TreeAccumulator<>();
-        List<TagPriority> priorities = List.of(
-                new TagPriority("us-gaap", "CommonStockDividendsPerShareDeclared", 0),
-                new TagPriority("us-gaap", "CommonStockDividendsPerShareCashPaid", 1),
-                new TagPriority("us-gaap", "CommonStockDividendsPerShareDeclaredAndPaid", 2));
-
-        for (TagPriority priority : priorities) {
-            SecCompanyFactsResponse.ConceptFacts conceptFacts = getConceptFacts(companyFacts, priority.taxonomy(), priority.tag());
-            if (conceptFacts == null || conceptFacts.getUnits() == null) {
-                continue;
-            }
-
-            conceptFacts.getUnits().values().forEach(entries -> {
-                if (entries == null) {
-                    return;
-                }
-
-                for (SecCompanyFactsResponse.FactEntry entry : entries) {
-                    if (!isAnnualDividendFact(entry)) {
-                        continue;
-                    }
-
-                    LocalDate periodEnd = parseDate(entry.getEnd());
-                    Double value = toDouble(entry.getVal());
-                    if (periodEnd == null || value == null) {
-                        continue;
-                    }
-
-                    DividendFactPoint candidate = new DividendFactPoint(
-                            periodEnd,
-                            parseDate(entry.getFiled()),
-                            blankToNull(entry.getAccn()),
-                            dividendMetricsService.magnitude(value),
-                            priority.priority());
-                    series.put(periodEnd, candidate, this::isBetterFactCandidate);
-                }
-            });
-        }
-
-        return series.values();
-    }
-
-    private SecCompanyFactsResponse.ConceptFacts getConceptFacts(
-            SecCompanyFactsResponse companyFacts,
-            String taxonomy,
-            String tag) {
-        Map<String, SecCompanyFactsResponse.ConceptFacts> taxonomyFacts = companyFacts.getFacts().get(taxonomy);
-        return taxonomyFacts != null ? taxonomyFacts.get(tag) : null;
-    }
-
-    private boolean isAnnualDividendFact(SecCompanyFactsResponse.FactEntry entry) {
-        if (entry == null || entry.getVal() == null) {
-            return false;
-        }
-
-        String form = normalizeFormType(entry.getForm());
-        if (!ANNUAL_FORMS.contains(form)) {
-            return false;
-        }
-
-        String fiscalPeriod = blankToNull(entry.getFp());
-        if (fiscalPeriod != null) {
-            return "FY".equalsIgnoreCase(fiscalPeriod);
-        }
-
-        LocalDate start = parseDate(entry.getStart());
-        LocalDate end = parseDate(entry.getEnd());
-        return start != null && end != null && ChronoUnit.DAYS.between(start, end) >= 300;
-    }
-
-    private boolean isBetterFactCandidate(DividendFactPoint candidate, DividendFactPoint current) {
-        if (current == null) {
-            return true;
-        }
-
-        if (candidate.sourcePriority() != current.sourcePriority()) {
-            return candidate.sourcePriority() < current.sourcePriority();
-        }
-
-        LocalDate candidateFiled = candidate.filedDate() != null ? candidate.filedDate() : LocalDate.MIN;
-        LocalDate currentFiled = current.filedDate() != null ? current.filedDate() : LocalDate.MIN;
-        return candidateFiled.isAfter(currentFiled);
-    }
-
-    private List<DividendOverviewResponse.TrendPoint> buildTrend(
-            List<DividendFactPoint> dividendFacts,
-            List<AnalyzedFilingData> annualAnalyses) {
-        Map<LocalDate, TrendAccumulator> byPeriodEnd = new LinkedHashMap<>();
-
-        for (DividendFactPoint fact : dividendFacts) {
-            if (fact.periodEnd() == null) {
-                continue;
-            }
-            TrendAccumulator accumulator = byPeriodEnd.computeIfAbsent(fact.periodEnd(), TrendAccumulator::new);
-            accumulator.dividendsPerShare = fact.dividendsPerShare();
-            accumulator.filingDate = fact.filedDate();
-            accumulator.accessionNumber = firstNonBlank(accumulator.accessionNumber, fact.accessionNumber());
-        }
-
-        for (AnalyzedFilingData annual : annualAnalyses) {
-            LocalDate periodEnd = resolvePeriodEnd(annual);
-            if (periodEnd == null) {
-                continue;
-            }
-
-            TrendAccumulator accumulator = byPeriodEnd.computeIfAbsent(periodEnd, TrendAccumulator::new);
-            accumulator.filingDate = firstNonNull(accumulator.filingDate, toLocalDate(annual.filing().getFillingDate()));
-            accumulator.accessionNumber = firstNonBlank(accumulator.accessionNumber, annual.filing().getAccessionNumber());
-            accumulator.earningsPerShare = firstNonNull(accumulator.earningsPerShare,
-                    getMetric(annual, List.of("EarningsPerShareDiluted"), List.of("EarningsPerShareDiluted")));
-            if (accumulator.dividendsPerShare == null) {
-                accumulator.dividendsPerShare = getDividendsPerShare(annual);
-            }
-        }
-
-        return byPeriodEnd.values().stream()
-                .map(TrendAccumulator::toResponse)
-                .filter(point -> point.getDividendsPerShare() != null || point.getEarningsPerShare() != null)
-                .sorted(Comparator.comparing(DividendOverviewResponse.TrendPoint::getPeriodEnd))
-                .toList();
-    }
-
-    private Double getDividendsPerShare(AnalyzedFilingData filing) {
-        Double directValue = getMetric(filing, DIRECT_DPS_STANDARD_KEYS, DIRECT_DPS_FINANCIAL_KEYS);
-        if (directValue != null) {
-            return directValue;
-        }
-
-        Double dividendsPaid = dividendMetricsService.magnitude(getMetric(filing,
-                List.of("DividendsPaid", "PaymentsOfDividendsCommonStock"),
-                List.of("PaymentsOfDividendsCommonStock", "DividendsCommonStockCash", "PaymentsOfOrdinaryDividends")));
-        return dividendMetricsService.safeDivide(dividendsPaid, getSharesOutstanding(filing));
-    }
-
-    private Double getSharesOutstanding(AnalyzedFilingData filing) {
-        return firstNonNull(
-                getMetric(filing, List.of("SharesOutstanding"), List.of("CommonStockSharesOutstanding")),
-                filing != null && filing.secMetadata() != null && filing.secMetadata().getSharesOutstanding() != null
-                        ? filing.secMetadata().getSharesOutstanding().doubleValue()
-                        : null);
-    }
-
-    private Double getMetric(AnalyzedFilingData filing, List<String> standardizedKeys, List<String> financialKeys) {
-        if (filing == null) {
-            return null;
-        }
-
-        for (String key : standardizedKeys) {
-            BigDecimal value = filing.standardizedValues().get(key);
-            if (value != null) {
-                return value.doubleValue();
-            }
-        }
-
-        for (String key : financialKeys) {
-            BigDecimal value = filing.keyFinancials().get(key);
-            if (value != null) {
-                return value.doubleValue();
-            }
-        }
-
-        return null;
-    }
-
     private DividendOverviewResponse.CompanySummary buildCompanySummary(
             CompanyResponse company,
             String ticker,
             List<Filling> filings) {
         LocalDate lastFilingDate = filings.stream()
-                .map(this::resolveSortableFilingDate)
+                .map(dividendFilingAnalysisService::resolveSortableFilingDate)
                 .filter(Objects::nonNull)
                 .findFirst()
                 .orElse(null);
@@ -1466,7 +1168,7 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
         return DividendOverviewResponse.Evidence.builder()
                 .latestAnnualReport(toSourceFiling(latestAnnual != null ? latestAnnual.filing() : null,
                         latestAnnual != null ? latestAnnual.filingUrl() : null))
-                .latestCurrentReport(toSourceFiling(latestCurrentReport, resolveFilingUrl(latestCurrentReport)))
+                .latestCurrentReport(toSourceFiling(latestCurrentReport, dividendFilingAnalysisService.resolveFilingUrl(latestCurrentReport)))
                 .build();
     }
 
@@ -1478,7 +1180,7 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
         return DividendOverviewResponse.SourceFiling.builder()
                 .formType(filing.getFormType() != null ? filing.getFormType().getNumber() : null)
                 .accessionNumber(filing.getAccessionNumber())
-                .filingDate(toLocalDate(filing.getFillingDate()))
+                .filingDate(dividendFilingAnalysisService.toLocalDate(filing.getFillingDate()))
                 .url(url)
                 .build();
     }
@@ -1495,7 +1197,7 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
         int dividendPointCount = (int) trend.stream().filter(point -> point.getDividendsPerShare() != null).count();
         confidence.put("dpsLatest", !dividendFacts.isEmpty()
                 ? DividendOverviewResponse.MetricConfidence.HIGH
-                : hasDirectDividendsPerShare(latestAnnual)
+                : dividendFilingAnalysisService.hasDirectDividendsPerShare(latestAnnual)
                         ? DividendOverviewResponse.MetricConfidence.MEDIUM
                         : snapshot.getDpsLatest() != null
                                 ? DividendOverviewResponse.MetricConfidence.LOW_MEDIUM
@@ -1535,15 +1237,6 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
                 : DividendOverviewResponse.MetricConfidence.LOW);
 
         return confidence;
-    }
-
-    private boolean hasDirectDividendsPerShare(AnalyzedFilingData filing) {
-        if (filing == null) {
-            return false;
-        }
-
-        return DIRECT_DPS_STANDARD_KEYS.stream().anyMatch(key -> filing.standardizedValues().containsKey(key))
-                || DIRECT_DPS_FINANCIAL_KEYS.stream().anyMatch(key -> filing.keyFinancials().containsKey(key));
     }
 
     private List<String> buildWarnings(
@@ -1586,83 +1279,6 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
         return warnings;
     }
 
-    private String resolveFilingUrl(Filling filing) {
-        if (filing == null) {
-            return null;
-        }
-
-        String cik = blankToNull(filing.getCik());
-        String accessionNumber = blankToNull(filing.getAccessionNumber());
-        String primaryDocument = blankToNull(filing.getPrimaryDocument());
-        if (cik != null && accessionNumber != null && primaryDocument != null) {
-            String generatedUrl = secApiConfig.getFilingUrl(cik, accessionNumber, primaryDocument);
-            if (isAllowedUrl(generatedUrl)) {
-                return generatedUrl;
-            }
-        }
-
-        String rawUrl = blankToNull(filing.getUrl());
-        if (rawUrl == null) {
-            return null;
-        }
-
-        String resolvedUrl = rawUrl.contains("://")
-                ? rawUrl
-                : secApiConfig.getArchiveUrl(rawUrl);
-        return isAllowedUrl(resolvedUrl) ? resolvedUrl : null;
-    }
-
-    private boolean isAllowedUrl(String url) {
-        if (url == null) {
-            return false;
-        }
-
-        try {
-            urlAllowlistValidator.validateXbrlUrl(url);
-            return true;
-        } catch (IllegalArgumentException e) {
-            log.debug("Skipping disallowed filing URL {}", url);
-            return false;
-        }
-    }
-
-    private boolean hasUsableXbrlDocument(Filling candidate) {
-        return candidate != null
-                && (candidate.isXBRL() || candidate.isInlineXBRL())
-                && resolveFilingUrl(candidate) != null;
-    }
-
-    private LocalDate resolvePeriodEnd(AnalyzedFilingData filing) {
-        if (filing == null) {
-            return null;
-        }
-
-        if (filing.secMetadata() != null && filing.secMetadata().getDocumentPeriodEndDate() != null) {
-            return filing.secMetadata().getDocumentPeriodEndDate();
-        }
-        return firstNonNull(toLocalDate(filing.filing().getReportDate()), toLocalDate(filing.filing().getFillingDate()));
-    }
-
-    private LocalDate resolveSortableFilingDate(Filling filing) {
-        if (filing == null) {
-            return LocalDate.MIN;
-        }
-
-        return firstNonNull(toLocalDate(filing.getFillingDate()), toLocalDate(filing.getReportDate()), LocalDate.MIN);
-    }
-
-    private LocalDate resolveSortableAnalysisDate(AnalyzedFilingData filing) {
-        return firstNonNull(resolvePeriodEnd(filing), toLocalDate(filing.filing().getFillingDate()), LocalDate.MIN);
-    }
-
-    private LocalDate toLocalDate(Date date) {
-        if (date == null) {
-            return null;
-        }
-
-        return date.toInstant().atZone(ZoneOffset.UTC).toLocalDate();
-    }
-
     private String formatFiscalYearEnd(Long fiscalYearEnd) {
         if (fiscalYearEnd == null) {
             return null;
@@ -1693,27 +1309,6 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
         return normalized != null ? Optional.of(normalized.toUpperCase(Locale.ROOT)) : Optional.empty();
     }
 
-    private String normalizeFormType(String formType) {
-        String normalized = blankToNull(formType);
-        return normalized != null ? normalized.toUpperCase(Locale.ROOT) : null;
-    }
-
-    private LocalDate parseDate(String value) {
-        String normalized = blankToNull(value);
-        if (normalized == null) {
-            return null;
-        }
-
-        try {
-            return LocalDate.parse(normalized);
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    private Double toDouble(BigDecimal value) {
-        return value != null ? value.doubleValue() : null;
-    }
 
     private String blankToNull(String value) {
         if (value == null) {
@@ -1751,17 +1346,6 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
         }
 
         return null;
-    }
-
-    private record TagPriority(String taxonomy, String tag, int priority) {
-    }
-
-    private record DividendFactPoint(
-            LocalDate periodEnd,
-            LocalDate filedDate,
-            String accessionNumber,
-            Double dividendsPerShare,
-            int sourcePriority) {
     }
 
     private record AnalysisContext(
@@ -1830,53 +1414,5 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
             LocalDate periodEnd,
             LocalDate filingDate,
             String accessionNumber) {
-    }
-
-    private record AnalyzedFilingData(
-            Filling filing,
-            String filingUrl,
-            Map<String, BigDecimal> standardizedValues,
-            Map<String, BigDecimal> keyFinancials,
-            SecFilingExtractor.SecFilingMetadata secMetadata) {
-    }
-
-    private static final class TrendAccumulator {
-        private final LocalDate periodEnd;
-        private LocalDate filingDate;
-        private String accessionNumber;
-        private Double dividendsPerShare;
-        private Double earningsPerShare;
-
-        private TrendAccumulator(LocalDate periodEnd) {
-            this.periodEnd = periodEnd;
-        }
-
-        private DividendOverviewResponse.TrendPoint toResponse() {
-            return DividendOverviewResponse.TrendPoint.builder()
-                    .periodEnd(periodEnd)
-                    .filingDate(filingDate)
-                    .accessionNumber(accessionNumber)
-                    .dividendsPerShare(dividendsPerShare)
-                    .earningsPerShare(earningsPerShare)
-                    .build();
-        }
-    }
-
-    private static final class TreeAccumulator<T> {
-        private final Map<LocalDate, T> values = new LinkedHashMap<>();
-
-        private void put(LocalDate key, T candidate, java.util.function.BiPredicate<T, T> chooser) {
-            T current = values.get(key);
-            if (current == null || chooser.test(candidate, current)) {
-                values.put(key, candidate);
-            }
-        }
-
-        private List<T> values() {
-            return values.entrySet().stream()
-                    .sorted(Map.Entry.comparingByKey())
-                    .map(Map.Entry::getValue)
-                    .toList();
-        }
     }
 }

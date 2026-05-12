@@ -90,6 +90,7 @@ class DividendAnalysisServiceImplTest {
 
     @BeforeEach
     void setUp() {
+        DividendMetricsService dividendMetricsService = new DividendMetricsService();
         DividendEventExtractor dividendEventExtractor = new DividendEventExtractor(new org.jds.edgar4j.integration.Form8KParser());
         dividendEvidenceService = new DividendEvidenceService(
                 secApiClient,
@@ -97,16 +98,19 @@ class DividendAnalysisServiceImplTest {
                 urlAllowlistValidator,
                 dividendEventExtractor);
         dividendScreeningService = new DividendScreeningService();
-        dividendAnalysisService = new DividendAnalysisServiceImpl(
-                companyService,
+        DividendFilingAnalysisService dividendFilingAnalysisService = new DividendFilingAnalysisService(
                 fillingRepository,
-                companyMarketDataService,
                 secApiClient,
                 secResponseParser,
                 secApiConfig,
                 xbrlService,
                 urlAllowlistValidator,
-                new DividendMetricsService(),
+                dividendMetricsService);
+        dividendAnalysisService = new DividendAnalysisServiceImpl(
+                companyService,
+                companyMarketDataService,
+                dividendFilingAnalysisService,
+                dividendMetricsService,
                 new DividendAlertsService(),
                 dividendScreeningService,
                 dividendEvidenceService);
