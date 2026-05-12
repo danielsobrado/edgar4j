@@ -118,6 +118,9 @@ class DividendAnalysisServiceImplTest {
         DividendCompanyContextService dividendCompanyContextService = new DividendCompanyContextService(
                 companyService,
                 dividendFilingAnalysisService);
+        DividendPeerAnalysisService dividendPeerAnalysisService = new DividendPeerAnalysisService(
+                dividendHistoryAnalysisService,
+                dividendMetricCatalogService);
         dividendAnalysisService = new DividendAnalysisServiceImpl(
                 companyService,
                 companyMarketDataService,
@@ -126,6 +129,7 @@ class DividendAnalysisServiceImplTest {
                 dividendHistoryAnalysisService,
                 dividendOverviewComputationService,
                 dividendMetricCatalogService,
+                dividendPeerAnalysisService,
                 dividendScreeningService,
                 dividendEvidenceService);
     }

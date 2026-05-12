@@ -1,13 +1,10 @@
 package org.jds.edgar4j.service.impl;
 
-import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
@@ -33,8 +30,6 @@ import org.jds.edgar4j.service.dividend.DividendScreeningService;
 import org.jds.edgar4j.service.impl.DividendFilingAnalysisService.AnalyzedFilingData;
 import org.jds.edgar4j.service.impl.DividendFilingAnalysisService.DividendFactPoint;
 import org.jds.edgar4j.service.impl.DividendHistoryAnalysisService.HistoryRowData;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import lombok.RequiredArgsConstructor;
@@ -62,6 +57,7 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
     private final DividendHistoryAnalysisService dividendHistoryAnalysisService;
     private final DividendOverviewComputationService dividendOverviewComputationService;
     private final DividendMetricCatalogService dividendMetricCatalogService;
+    private final DividendPeerAnalysisService dividendPeerAnalysisService;
     private final DividendScreeningService dividendScreeningService;
     private final DividendEvidenceService dividendEvidenceService;
 
@@ -184,7 +180,7 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
         for (String identifier : identifiers) {
             try {
                 DividendAnalysisContext context = analyze(identifier);
-                rows.add(buildComparisonRow(context, requestedMetrics));
+                rows.add(dividendPeerAnalysisService.buildComparisonRow(context, requestedMetrics));
             } catch (RuntimeException e) {
                 warnings.add("Could not analyze " + identifier + ": " + e.getMessage());
             }
@@ -230,13 +226,14 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
         for (String identifier : identifiers) {
             try {
                 DividendAnalysisContext context = analyze(identifier);
-                DividendScreeningService.ScreeningCandidate screeningCandidate = toScreeningCandidate(context);
+                DividendScreeningService.ScreeningCandidate screeningCandidate =
+                        dividendPeerAnalysisService.toScreeningCandidate(context);
                 if (dividendScreeningService.matchesScreenFilters(
                         screeningCandidate,
                         normalizedRequest.getFilters(),
                         dividendMetricCatalogService.metricIds(),
                         metricFormatHints)) {
-                    results.add(dividendScreeningService.buildScreenResult(screeningCandidate, requestedMetrics));
+                    results.add(dividendPeerAnalysisService.buildScreenResult(context, requestedMetrics));
                 }
             } catch (RuntimeException e) {
                 warnings.add("Could not analyze " + identifier + ": " + e.getMessage());
@@ -349,93 +346,6 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
                 .referencePrice(context.referencePrice())
                 .warnings(context.warnings())
                 .build();
-    }
-
-    private DividendComparisonResponse.ComparisonRow buildComparisonRow(
-            DividendAnalysisContext context,
-            List<String> requestedMetrics) {
-        Map<String, Double> values = new LinkedHashMap<>();
-        for (String metric : requestedMetrics) {
-            values.put(metric, getComparisonMetricValue(context, metric));
-        }
-
-        return DividendComparisonResponse.ComparisonRow.builder()
-                .company(context.companySummary())
-                .viability(DividendOverviewResponse.ViabilitySummary.builder()
-                        .rating(context.rating())
-                        .activeAlerts(context.alerts().size())
-                        .score(context.score())
-                        .build())
-                .values(values)
-                .warnings(context.warnings())
-                .build();
-    }
-
-    private DividendScreenResponse.ScreenResult buildScreenResult(
-            DividendAnalysisContext context,
-            List<String> requestedMetrics) {
-        Map<String, Double> values = new LinkedHashMap<>();
-        for (String metric : requestedMetrics) {
-            values.put(metric, getComparisonMetricValue(context, metric));
-        }
-
-        return DividendScreenResponse.ScreenResult.builder()
-                .company(context.companySummary())
-                .viability(DividendOverviewResponse.ViabilitySummary.builder()
-                        .rating(context.rating())
-                        .activeAlerts(context.alerts().size())
-                        .score(context.score())
-                        .build())
-                .values(values)
-                .warnings(context.warnings())
-                .build();
-    }
-
-    private Map<String, Double> buildComparisonMetricValues(DividendAnalysisContext context) {
-        return dividendMetricCatalogService.metricIds().stream()
-                .collect(
-                        LinkedHashMap::new,
-                        (map, metric) -> map.put(metric, getComparisonMetricValue(context, metric)),
-                        Map::putAll);
-    }
-
-    private DividendScreeningService.ScreeningCandidate toScreeningCandidate(DividendAnalysisContext context) {
-        return new DividendScreeningService.ScreeningCandidate(
-                context.companySummary(),
-                context.alerts(),
-                context.score(),
-                context.rating(),
-                context.warnings(),
-                buildComparisonMetricValues(context));
-    }
-
-    private Double getComparisonMetricValue(DividendAnalysisContext context, String metric) {
-        if (context == null || metric == null) {
-            return null;
-        }
-
-        return switch (metric) {
-            case "dps_latest" -> context.snapshot().getDpsLatest();
-            case "dps_cagr_5y" -> context.snapshot().getDpsCagr5y();
-            case "fcf_payout" -> context.snapshot().getFcfPayoutRatio();
-            case "uninterrupted_years" -> context.snapshot().getUninterruptedYears() != null
-                    ? context.snapshot().getUninterruptedYears().doubleValue()
-                    : null;
-            case "consecutive_raises" -> context.snapshot().getConsecutiveRaises() != null
-                    ? context.snapshot().getConsecutiveRaises().doubleValue()
-                    : null;
-            case "net_debt_to_ebitda" -> context.snapshot().getNetDebtToEbitda();
-            case "interest_coverage" -> context.snapshot().getInterestCoverage();
-            case "current_ratio" -> context.snapshot().getCurrentRatio();
-            case "fcf_margin" -> context.snapshot().getFcfMargin();
-            case "dividend_yield" -> context.snapshot().getDividendYield();
-            case "score" -> Double.valueOf(context.score());
-            case "active_alerts" -> Double.valueOf(context.alerts().size());
-            default -> {
-                HistoryRowData latestHistoryRow = dividendHistoryAnalysisService.latestHistoryRow(context.historyRows());
-                yield latestHistoryRow != null ? dividendHistoryAnalysisService.getHistoryMetricValue(latestHistoryRow, metric) : null;
-            }
-        };
     }
 
     private DividendOverviewResponse.CompanySummary buildCompanySummary(
