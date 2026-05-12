@@ -59,6 +59,7 @@ import static org.mockito.Mockito.when;
     "spring.quartz.auto-startup=false"
 })
 @Transactional
+@SuppressWarnings("removal")
 public class SpringBatchIntegrationTest {
 
     @Autowired

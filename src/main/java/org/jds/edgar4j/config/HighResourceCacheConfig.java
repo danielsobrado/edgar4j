@@ -19,10 +19,11 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
 import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
-import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
+import org.springframework.data.redis.serializer.GenericJacksonJsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
+import tools.jackson.databind.ObjectMapper;
 
 import lombok.RequiredArgsConstructor;
 
@@ -41,6 +42,7 @@ public class HighResourceCacheConfig {
     private static final Duration SP500_CACHE_TTL = Duration.ofHours(1);
 
     private final MarketDataProviderProperties marketDataProviderProperties;
+    private final ObjectMapper objectMapper;
 
     @Bean
     @ConditionalOnProperty(prefix = "spring.cache", name = "type", havingValue = "redis", matchIfMissing = true)
@@ -115,7 +117,7 @@ public class HighResourceCacheConfig {
     }
 
     private RedisCacheConfiguration baseConfiguration(Duration ttl) {
-        GenericJackson2JsonRedisSerializer serializer = new GenericJackson2JsonRedisSerializer();
+        GenericJacksonJsonRedisSerializer serializer = new GenericJacksonJsonRedisSerializer(objectMapper.copy());
         RedisSerializationContext.SerializationPair<Object> valueSerializer = RedisSerializationContext.SerializationPair
                 .fromSerializer(serializer);
 

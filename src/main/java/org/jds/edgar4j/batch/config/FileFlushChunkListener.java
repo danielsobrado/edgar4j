@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 @Component
 @Profile("resource-low")
 @RequiredArgsConstructor
+@SuppressWarnings("removal")
 public class FileFlushChunkListener implements ChunkListener<Object, Object> {
 
     private final FileStorageEngine fileStorageEngine;

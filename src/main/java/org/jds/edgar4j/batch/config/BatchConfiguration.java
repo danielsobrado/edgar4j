@@ -36,6 +36,7 @@ import java.util.List;
 @Configuration
 @ConditionalOnBean(JobRepository.class)
 @RequiredArgsConstructor
+@SuppressWarnings("removal")
 public class BatchConfiguration {
 
     private final EdgarFilingReader edgarFilingReader;
