@@ -106,10 +106,15 @@ class DividendAnalysisServiceImplTest {
                 xbrlService,
                 urlAllowlistValidator,
                 dividendMetricsService);
+        DividendHistoryAnalysisService dividendHistoryAnalysisService = new DividendHistoryAnalysisService(
+                dividendMetricsService,
+                new DividendAlertsService(),
+                dividendFilingAnalysisService);
         dividendAnalysisService = new DividendAnalysisServiceImpl(
                 companyService,
                 companyMarketDataService,
                 dividendFilingAnalysisService,
+                dividendHistoryAnalysisService,
                 dividendMetricsService,
                 new DividendAlertsService(),
                 dividendScreeningService,
