@@ -25,6 +25,7 @@ vi.mock('../api', () => ({
     getAlerts: vi.fn(),
     getEvents: vi.fn(),
     getEvidence: vi.fn(),
+    reconcileCompany: vi.fn(),
     compare: vi.fn(),
     screen: vi.fn(),
   },

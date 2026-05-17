@@ -14,11 +14,15 @@ import org.jds.edgar4j.dto.response.DividendHistoryResponse;
 import org.jds.edgar4j.dto.response.DividendMetricDefinitionResponse;
 import org.jds.edgar4j.dto.response.DividendOverviewResponse;
 import org.jds.edgar4j.dto.response.DividendQualityResponse;
+import org.jds.edgar4j.dto.response.DividendReconciliationResponse;
 import org.jds.edgar4j.dto.response.DividendScreenResponse;
 import org.jds.edgar4j.dto.response.DividendSyncStatusResponse;
+import org.jds.edgar4j.model.DividendAnalysisSnapshot;
 import org.jds.edgar4j.service.DividendAnalysisService;
 import org.jds.edgar4j.service.DividendQualityService;
+import org.jds.edgar4j.service.DividendReconciliationService;
 import org.jds.edgar4j.service.DividendSyncService;
+import org.jds.edgar4j.service.dividend.DividendAnalysisSnapshotService;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -47,6 +51,8 @@ public class DividendController {
     private final DividendAnalysisService dividendAnalysisService;
     private final DividendSyncService dividendSyncService;
     private final DividendQualityService dividendQualityService;
+    private final DividendReconciliationService dividendReconciliationService;
+    private final DividendAnalysisSnapshotService dividendAnalysisSnapshotService;
 
     @Operation(summary = "Compare dividend viability across companies",
                description = "Returns a compact peer-comparison view for multiple tickers or SEC CIKs.")
@@ -88,6 +94,29 @@ public class DividendController {
         log.info("POST /api/dividend/{}/sync refreshMarketData={}", tickerOrCik, refreshMarketData);
         return ResponseEntity.ok(ApiResponse.success(
                 dividendSyncService.syncCompany(tickerOrCik, refreshMarketData)));
+    }
+
+    @Operation(summary = "Reconcile dividend analysis against live sources",
+               description = "Refreshes live SEC and optional market-data inputs, rebuilds dashboard data, persists the snapshot, and marks it live-reconciled.")
+    @PostMapping("/{tickerOrCik}/reconcile")
+    public ResponseEntity<ApiResponse<DividendReconciliationResponse>> reconcileCompany(
+            @Parameter(description = "Ticker symbol or SEC CIK", example = "AAPL")
+            @PathVariable String tickerOrCik,
+            @Parameter(description = "Refresh market data during reconciliation.", example = "true")
+            @RequestParam(defaultValue = "true") boolean refreshMarketData) {
+        log.info("POST /api/dividend/{}/reconcile refreshMarketData={}", tickerOrCik, refreshMarketData);
+        return ResponseEntity.ok(ApiResponse.success(
+                dividendReconciliationService.reconcile(tickerOrCik, refreshMarketData)));
+    }
+
+    @Operation(summary = "Get persisted dividend analysis snapshot",
+               description = "Returns the last persisted overview, history, alerts, events, and reconciliation metadata for a ticker or SEC CIK.")
+    @GetMapping("/{tickerOrCik}/snapshot")
+    public ResponseEntity<ApiResponse<DividendAnalysisSnapshot>> getSnapshot(
+            @Parameter(description = "Ticker symbol or SEC CIK", example = "AAPL")
+            @PathVariable String tickerOrCik) {
+        log.info("GET /api/dividend/{}/snapshot", tickerOrCik);
+        return ResponseEntity.ok(ApiResponse.success(dividendAnalysisSnapshotService.getSnapshot(tickerOrCik)));
     }
 
     @Operation(summary = "Get stored dividend sync status",

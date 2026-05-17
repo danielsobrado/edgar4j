@@ -14,12 +14,16 @@ import org.jds.edgar4j.dto.response.DividendHistoryResponse;
 import org.jds.edgar4j.dto.response.DividendMetricDefinitionResponse;
 import org.jds.edgar4j.dto.response.DividendOverviewResponse;
 import org.jds.edgar4j.dto.response.DividendQualityResponse;
+import org.jds.edgar4j.dto.response.DividendReconciliationResponse;
 import org.jds.edgar4j.dto.request.DividendScreenRequest;
 import org.jds.edgar4j.dto.response.DividendScreenResponse;
 import org.jds.edgar4j.dto.response.DividendSyncStatusResponse;
+import org.jds.edgar4j.model.DividendAnalysisSnapshot;
 import org.jds.edgar4j.service.DividendAnalysisService;
 import org.jds.edgar4j.service.DividendQualityService;
+import org.jds.edgar4j.service.DividendReconciliationService;
 import org.jds.edgar4j.service.DividendSyncService;
+import org.jds.edgar4j.service.dividend.DividendAnalysisSnapshotService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -41,6 +45,12 @@ class DividendControllerTest {
     @Mock
     private DividendQualityService dividendQualityService;
 
+    @Mock
+    private DividendReconciliationService dividendReconciliationService;
+
+    @Mock
+    private DividendAnalysisSnapshotService dividendAnalysisSnapshotService;
+
     private DividendController dividendController;
 
     @BeforeEach
@@ -48,7 +58,9 @@ class DividendControllerTest {
         dividendController = new DividendController(
                 dividendAnalysisService,
                 dividendSyncService,
-                dividendQualityService);
+                dividendQualityService,
+                dividendReconciliationService,
+                dividendAnalysisSnapshotService);
     }
 
     @Test
@@ -158,6 +170,55 @@ class DividendControllerTest {
         assertNotNull(response.getBody());
         assertEquals(true, response.getBody().isSuccess());
         assertSame(syncStatus, response.getBody().getData());
+    }
+
+    @Test
+    @DisplayName("reconcileCompany should wrap live reconciliation response in ApiResponse.success")
+    void reconcileCompanyShouldReturnRefreshedDashboardData() {
+        DividendOverviewResponse overview = DividendOverviewResponse.builder()
+                .company(DividendOverviewResponse.CompanySummary.builder()
+                        .ticker("AAPL")
+                        .cik("0000320193")
+                        .build())
+                .build();
+        DividendReconciliationResponse reconciliation = DividendReconciliationResponse.builder()
+                .company(overview.getCompany())
+                .overview(overview)
+                .history(DividendHistoryResponse.builder().company(overview.getCompany()).build())
+                .alerts(DividendAlertsResponse.builder().company(overview.getCompany()).build())
+                .events(DividendEventsResponse.builder().company(overview.getCompany()).build())
+                .warnings(java.util.List.of())
+                .build();
+
+        when(dividendReconciliationService.reconcile("AAPL", true)).thenReturn(reconciliation);
+
+        ResponseEntity<ApiResponse<DividendReconciliationResponse>> response =
+                dividendController.reconcileCompany("AAPL", true);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals(true, response.getBody().isSuccess());
+        assertSame(reconciliation, response.getBody().getData());
+    }
+
+    @Test
+    @DisplayName("getSnapshot should wrap the persisted snapshot in ApiResponse.success")
+    void getSnapshotShouldReturnApiResponse() {
+        DividendAnalysisSnapshot snapshot = DividendAnalysisSnapshot.builder()
+                .id("0000320193")
+                .cik("0000320193")
+                .ticker("AAPL")
+                .source(DividendAnalysisSnapshot.SnapshotSource.LIVE_RECONCILED)
+                .build();
+
+        when(dividendAnalysisSnapshotService.getSnapshot("AAPL")).thenReturn(snapshot);
+
+        ResponseEntity<ApiResponse<DividendAnalysisSnapshot>> response = dividendController.getSnapshot("AAPL");
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals(true, response.getBody().isSuccess());
+        assertSame(snapshot, response.getBody().getData());
     }
 
     @Test

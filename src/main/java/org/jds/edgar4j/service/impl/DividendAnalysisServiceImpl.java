@@ -26,6 +26,7 @@ import org.jds.edgar4j.model.Filling;
 import org.jds.edgar4j.service.CompanyMarketDataService;
 import org.jds.edgar4j.service.CompanyService;
 import org.jds.edgar4j.service.DividendAnalysisService;
+import org.jds.edgar4j.service.dividend.DividendAnalysisSnapshotService;
 import org.jds.edgar4j.service.dividend.DividendAlertResolutionService;
 import org.jds.edgar4j.service.dividend.DividendAlertsService;
 import org.jds.edgar4j.service.dividend.DividendEvidenceService;
@@ -65,11 +66,14 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
     private final DividendEvidenceService dividendEvidenceService;
     private final DividendAlertResolutionService dividendAlertResolutionService;
     private final DividendAlertsService dividendAlertsService;
+    private final DividendAnalysisSnapshotService dividendAnalysisSnapshotService;
 
     @Override
     public DividendOverviewResponse getOverview(String tickerOrCik) {
         DividendAnalysisContext context = analyze(tickerOrCik, true);
-        return buildOverview(context);
+        DividendOverviewResponse overview = buildOverview(context);
+        dividendAnalysisSnapshotService.saveOverview(overview);
+        return overview;
     }
 
     @Override
@@ -91,7 +95,7 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
                 .map(row -> dividendHistoryAnalysisService.toHistoryRow(row, requestedMetrics))
                 .toList();
 
-        return DividendHistoryResponse.builder()
+        DividendHistoryResponse history = DividendHistoryResponse.builder()
                 .company(context.companySummary())
                 .period(normalizedPeriod)
                 .yearsRequested(years)
@@ -100,6 +104,8 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
                 .rows(responseRows)
                 .warnings(context.warnings())
                 .build();
+        dividendAnalysisSnapshotService.saveHistory(history);
+        return history;
     }
 
     @Override
@@ -118,13 +124,17 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
                         historicalAlerts,
                         activeOnly);
 
-        return DividendAlertsResponse.builder()
+        DividendAlertsResponse alerts = DividendAlertsResponse.builder()
                 .company(context.companySummary())
                 .activeOnly(activeOnly)
                 .activeAlerts(context.alerts())
                 .historicalAlerts(decoratedHistoricalAlerts)
                 .warnings(context.warnings())
                 .build();
+        if (!activeOnly) {
+            dividendAnalysisSnapshotService.saveAlerts(alerts);
+        }
+        return alerts;
     }
 
     @Override
@@ -169,13 +179,17 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
         List<Filling> currentReports = dividendFilingAnalysisService.selectFilings(filings, CURRENT_REPORT_FORMS, false, 12);
         List<Filling> annualReports = dividendFilingAnalysisService.selectFilings(filings, ANNUAL_FORMS, false, 2);
 
-        return dividendEvidenceService.buildEvents(
+        DividendEventsResponse events = dividendEvidenceService.buildEvents(
                 buildCompanySummary(company, ticker, filings),
                 ticker,
                 currentReports,
                 annualReports,
                 filings,
                 since);
+        if (since == null) {
+            dividendAnalysisSnapshotService.saveEvents(events);
+        }
+        return events;
     }
 
     @Override

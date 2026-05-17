@@ -34,11 +34,13 @@ import org.jds.edgar4j.integration.model.SecCompanyFactsResponse;
 import org.jds.edgar4j.model.CompanyMarketData;
 import org.jds.edgar4j.model.Filling;
 import org.jds.edgar4j.model.FormType;
+import org.jds.edgar4j.port.DividendAnalysisSnapshotDataPort;
 import org.jds.edgar4j.port.DividendAlertResolutionDataPort;
 import org.jds.edgar4j.port.FillingDataPort;
 import org.jds.edgar4j.port.NormalizedXbrlFactDataPort;
 import org.jds.edgar4j.service.CompanyMarketDataService;
 import org.jds.edgar4j.service.CompanyService;
+import org.jds.edgar4j.service.dividend.DividendAnalysisSnapshotService;
 import org.jds.edgar4j.service.dividend.DividendAlertResolutionService;
 import org.jds.edgar4j.service.dividend.DividendAlertsService;
 import org.jds.edgar4j.service.dividend.DividendEventExtractor;
@@ -93,6 +95,9 @@ class DividendAnalysisServiceImplTest {
     @Mock
     private DividendAlertResolutionDataPort dividendAlertResolutionDataPort;
 
+    @Mock
+    private DividendAnalysisSnapshotDataPort dividendAnalysisSnapshotDataPort;
+
     private DividendAnalysisServiceImpl dividendAnalysisService;
     private DividendEvidenceService dividendEvidenceService;
     private DividendScreeningService dividendScreeningService;
@@ -144,7 +149,8 @@ class DividendAnalysisServiceImplTest {
                 dividendScreeningService,
                 dividendEvidenceService,
                 new DividendAlertResolutionService(dividendAlertResolutionDataPort),
-                dividendAlertsService);
+                dividendAlertsService,
+                new DividendAnalysisSnapshotService(dividendAnalysisSnapshotDataPort));
     }
 
     @Test

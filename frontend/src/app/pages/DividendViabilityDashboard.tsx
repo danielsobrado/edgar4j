@@ -140,6 +140,12 @@ type AlertActionState =
   | { status: 'error'; message: string }
   | { status: 'success'; message: string };
 
+type ReconcileState =
+  | { status: 'idle' }
+  | { status: 'loading' }
+  | { status: 'error'; message: string }
+  | { status: 'success'; message: string };
+
 async function resolveDividendQuery(identifier: string): Promise<string> {
   const trimmed = identifier.trim();
   if (!trimmed) {
@@ -206,6 +212,7 @@ export function DividendViabilityDashboard() {
   const [screenDirection, setScreenDirection] = React.useState<'ASC' | 'DESC'>('DESC');
   const [screenRatings, setScreenRatings] = React.useState<DividendRating[]>(['SAFE', 'STABLE']);
   const [alertActionState, setAlertActionState] = React.useState<AlertActionState>({ status: 'idle' });
+  const [reconcileState, setReconcileState] = React.useState<ReconcileState>({ status: 'idle' });
   const [state, setState] = React.useState<DashboardState>(
     searchParams.get('company') ? { status: 'loading', query: searchParams.get('company') ?? '' } : { status: 'idle' },
   );
@@ -222,6 +229,7 @@ export function DividendViabilityDashboard() {
       setEvidenceState({ status: 'idle' });
       setComparisonState({ status: 'idle' });
       setCompareInput('');
+      setReconcileState({ status: 'idle' });
       return;
     }
 
@@ -229,6 +237,7 @@ export function DividendViabilityDashboard() {
     setEvidenceState({ status: 'idle' });
     setComparisonState({ status: 'idle' });
     setAlertActionState({ status: 'idle' });
+    setReconcileState({ status: 'idle' });
     setCompareInput('');
 
     async function run() {
@@ -386,6 +395,38 @@ export function DividendViabilityDashboard() {
       setAlertActionState({
         status: 'error',
         message: error instanceof Error ? error.message : 'Failed to reopen alert.',
+      });
+    }
+  };
+
+  const reconcileLive = async () => {
+    if (!company) {
+      return;
+    }
+    const identifier = company.ticker || company.cik;
+    setReconcileState({ status: 'loading' });
+    try {
+      const reconciliation = await dividendApi.reconcileCompany(identifier, { refreshMarketData: true });
+      setState({
+        status: 'success',
+        query: identifier,
+        result: {
+          overview: reconciliation.overview,
+          history: reconciliation.history,
+          alerts: reconciliation.alerts,
+          events: reconciliation.events,
+        },
+      });
+      setReconcileState({
+        status: 'success',
+        message: `Reconciled against live sources${reconciliation.syncStatus.newFilingsDetected > 0
+          ? ` with ${reconciliation.syncStatus.newFilingsDetected} new filing${reconciliation.syncStatus.newFilingsDetected === 1 ? '' : 's'}`
+          : ''}.`,
+      });
+    } catch (error) {
+      setReconcileState({
+        status: 'error',
+        message: error instanceof Error ? error.message : 'Failed to reconcile against live sources.',
       });
     }
   };
@@ -879,6 +920,24 @@ export function DividendViabilityDashboard() {
                     <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-sm text-slate-700">
                       Annual periods analyzed: {formatInteger(annualPeriodsAnalyzed)}
                     </div>
+                  </div>
+                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={reconcileLive}
+                      disabled={reconcileState.status === 'loading'}
+                      className="rounded-2xl"
+                    >
+                      <RefreshCw className={`h-4 w-4 ${reconcileState.status === 'loading' ? 'animate-spin' : ''}`} />
+                      Reconcile live
+                    </Button>
+                    {reconcileState.status === 'success' && (
+                      <span className="text-sm font-medium text-emerald-700">{reconcileState.message}</span>
+                    )}
+                    {reconcileState.status === 'error' && (
+                      <span className="text-sm font-medium text-rose-700">{reconcileState.message}</span>
+                    )}
                   </div>
                 </div>
 

@@ -655,6 +655,36 @@ export interface DividendSyncState {
   warnings: string[];
 }
 
+export interface DividendReconciliation {
+  company: DividendCompanySummary;
+  syncStatus: DividendSyncState;
+  overview: DividendOverview;
+  history: DividendHistory;
+  alerts: DividendAlerts;
+  events: DividendEvents;
+  reconciledAt: string;
+  warnings: string[];
+}
+
+export type DividendAnalysisSnapshotSource = 'COMPUTED' | 'LIVE_RECONCILED';
+
+export interface DividendAnalysisSnapshot {
+  id: string;
+  cik: string;
+  ticker?: string | null;
+  companyName?: string | null;
+  overview?: DividendOverview | null;
+  history?: DividendHistory | null;
+  alerts?: DividendAlerts | null;
+  events?: DividendEvents | null;
+  source: DividendAnalysisSnapshotSource;
+  factsVersion?: number | null;
+  lastComputedAt?: string | null;
+  lastReconciledAt?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
 export type DividendQualityStatus = 'PASS' | 'WARN' | 'FAIL';
 export type DividendQualityIssueSeverity = 'LOW' | 'MEDIUM' | 'HIGH';
 

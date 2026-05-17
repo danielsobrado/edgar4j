@@ -8,6 +8,8 @@
 - `main` is merged and synced with `origin/main`.
 - Backend Maven tests passed before the latest readiness work.
 - Frontend production build and Vitest suite passed before the latest readiness work.
+- Dividend dashboard overview, history, alerts, and events now persist into a durable analysis snapshot in both Mongo-backed and file-backed resource modes.
+- Dividend analysis can be reconciled against live SEC sources through `POST /api/dividend/{tickerOrCik}/reconcile`, and persisted snapshots can be retrieved through `GET /api/dividend/{tickerOrCik}/snapshot`.
 - Docker Compose now exposes explicit `high` and `low` deployment profiles:
   - `docker compose --profile high up --build`
   - `docker compose --profile low up --build`
@@ -46,6 +48,8 @@ For authenticated staging:
 - [x] Backend liveness/readiness endpoints are public through security config.
 - [x] Frontend nginx exposes `/health`.
 - [x] Smoke-test script checks backend probes, frontend health, frontend shell, and dividend API reachability.
+- [x] Dividend dashboard analysis surfaces persist a latest snapshot.
+- [x] Dividend dashboard supports explicit live-source reconciliation.
 - [ ] Run smoke test against the target staging infrastructure.
 - [ ] Confirm production `SEC_USER_AGENT` uses a monitored contact, not the default placeholder.
 - [ ] Confirm production secrets are supplied through the hosting platform, not committed config.

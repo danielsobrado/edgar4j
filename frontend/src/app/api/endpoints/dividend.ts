@@ -2,6 +2,7 @@ import { apiClient } from '../client';
 import {
   DividendAlerts,
   DividendAlertResolutionRequest,
+  DividendAnalysisSnapshot,
   DividendComparison,
   DividendEvents,
   DividendFilingEvidence,
@@ -9,6 +10,7 @@ import {
   DividendMetricDefinition,
   DividendOverview,
   DividendQuality,
+  DividendReconciliation,
   DividendScreen,
   DividendScreenRequest,
   DividendSyncState,
@@ -109,6 +111,22 @@ export const dividendApi = {
         refreshMarketData: options.refreshMarketData ?? true,
       },
     });
+  },
+
+  reconcileCompany: (tickerOrCik: string, options: DividendSyncOptions = {}): Promise<DividendReconciliation> => {
+    return apiClient.post<DividendReconciliation>(
+      `/dividend/${encodeURIComponent(tickerOrCik)}/reconcile`,
+      undefined,
+      {
+        params: {
+          refreshMarketData: options.refreshMarketData ?? true,
+        },
+      },
+    );
+  },
+
+  getSnapshot: (tickerOrCik: string): Promise<DividendAnalysisSnapshot> => {
+    return apiClient.get<DividendAnalysisSnapshot>(`/dividend/${encodeURIComponent(tickerOrCik)}/snapshot`);
   },
 
   getSyncStatus: (tickerOrCik: string): Promise<DividendSyncState> => {
