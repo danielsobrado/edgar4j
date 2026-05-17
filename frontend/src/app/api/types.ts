@@ -366,6 +366,7 @@ export interface MarketPriceHistory {
 // Dividend Analysis Types
 export type DividendRating = 'SAFE' | 'STABLE' | 'WATCH' | 'AT_RISK';
 export type DividendAlertSeverity = 'LOW' | 'MEDIUM' | 'HIGH';
+export type DividendAlertResolutionStatus = 'RESOLVED' | 'SNOOZED';
 export type DividendMetricConfidence = 'HIGH' | 'MEDIUM' | 'LOW_MEDIUM' | 'LOW';
 export type DividendHistoryTrendDirection = 'UP' | 'FLAT' | 'DOWN' | 'VOLATILE' | 'INSUFFICIENT_DATA';
 export type DividendEventType = 'DECLARATION' | 'SPECIAL' | 'INCREASE' | 'DECREASE' | 'SUSPENSION' | 'REINSTATEMENT' | 'POLICY_CHANGE';
@@ -415,6 +416,11 @@ export interface DividendAlertEvent extends DividendAlert {
   filingDate?: string | null;
   accessionNumber?: string | null;
   active: boolean;
+  resolutionStatus?: DividendAlertResolutionStatus | null;
+  resolutionNote?: string | null;
+  resolvedBy?: string | null;
+  resolvedAt?: string | null;
+  snoozedUntil?: string | null;
 }
 
 export interface DividendCoverage {
@@ -512,6 +518,15 @@ export interface DividendAlerts {
   activeAlerts: DividendAlert[];
   historicalAlerts: DividendAlertEvent[];
   warnings: string[];
+}
+
+export interface DividendAlertResolutionRequest {
+  periodEnd?: string | null;
+  accessionNumber?: string | null;
+  note?: string | null;
+  resolvedBy?: string | null;
+  status?: DividendAlertResolutionStatus;
+  snoozedUntil?: string | null;
 }
 
 export interface DividendEvent {

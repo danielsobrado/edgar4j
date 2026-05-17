@@ -1,7 +1,10 @@
 package org.jds.edgar4j.dto.response;
 
 import java.time.LocalDate;
+import java.time.Instant;
 import java.util.List;
+
+import org.jds.edgar4j.model.DividendAlertResolution;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -33,5 +36,10 @@ public class DividendAlertsResponse {
         private LocalDate filingDate;
         private String accessionNumber;
         private boolean active;
+        private DividendAlertResolution.ResolutionStatus resolutionStatus;
+        private String resolutionNote;
+        private String resolvedBy;
+        private Instant resolvedAt;
+        private Instant snoozedUntil;
     }
 }

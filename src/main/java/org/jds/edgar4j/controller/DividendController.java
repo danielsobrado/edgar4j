@@ -3,6 +3,7 @@ package org.jds.edgar4j.controller;
 import java.util.List;
 import java.time.LocalDate;
 
+import org.jds.edgar4j.dto.request.DividendAlertResolutionRequest;
 import org.jds.edgar4j.dto.request.DividendScreenRequest;
 import org.jds.edgar4j.dto.response.ApiResponse;
 import org.jds.edgar4j.dto.response.DividendAlertsResponse;
@@ -174,6 +175,34 @@ public class DividendController {
             @RequestParam(defaultValue = "true") boolean active) {
         log.info("GET /api/dividend/{}/alerts active={}", tickerOrCik, active);
         return ResponseEntity.ok(ApiResponse.success(dividendAnalysisService.getAlerts(tickerOrCik, active)));
+    }
+
+    @Operation(summary = "Resolve or snooze a dividend alert",
+               description = "Persists operator review state so the same alert does not re-fire for the same company and period.")
+    @PostMapping("/{tickerOrCik}/alerts/{alertId}/resolve")
+    public ResponseEntity<ApiResponse<DividendAlertsResponse>> resolveAlert(
+            @Parameter(description = "Ticker symbol or SEC CIK", example = "AAPL")
+            @PathVariable String tickerOrCik,
+            @Parameter(description = "Dividend alert id", example = "fcf-payout")
+            @PathVariable String alertId,
+            @RequestBody(required = false) DividendAlertResolutionRequest request) {
+        log.info("POST /api/dividend/{}/alerts/{}/resolve", tickerOrCik, alertId);
+        return ResponseEntity.ok(ApiResponse.success(
+                dividendAnalysisService.resolveAlert(tickerOrCik, alertId, request)));
+    }
+
+    @Operation(summary = "Reopen a resolved dividend alert",
+               description = "Removes persisted alert resolution state for the current or supplied alert period.")
+    @DeleteMapping("/{tickerOrCik}/alerts/{alertId}/resolve")
+    public ResponseEntity<ApiResponse<DividendAlertsResponse>> reopenAlert(
+            @Parameter(description = "Ticker symbol or SEC CIK", example = "AAPL")
+            @PathVariable String tickerOrCik,
+            @Parameter(description = "Dividend alert id", example = "fcf-payout")
+            @PathVariable String alertId,
+            @RequestBody(required = false) DividendAlertResolutionRequest request) {
+        log.info("DELETE /api/dividend/{}/alerts/{}/resolve", tickerOrCik, alertId);
+        return ResponseEntity.ok(ApiResponse.success(
+                dividendAnalysisService.reopenAlert(tickerOrCik, alertId, request)));
     }
 
     @Operation(summary = "Get dividend event timeline",

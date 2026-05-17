@@ -34,10 +34,12 @@ import org.jds.edgar4j.integration.model.SecCompanyFactsResponse;
 import org.jds.edgar4j.model.CompanyMarketData;
 import org.jds.edgar4j.model.Filling;
 import org.jds.edgar4j.model.FormType;
+import org.jds.edgar4j.port.DividendAlertResolutionDataPort;
 import org.jds.edgar4j.port.FillingDataPort;
 import org.jds.edgar4j.port.NormalizedXbrlFactDataPort;
 import org.jds.edgar4j.service.CompanyMarketDataService;
 import org.jds.edgar4j.service.CompanyService;
+import org.jds.edgar4j.service.dividend.DividendAlertResolutionService;
 import org.jds.edgar4j.service.dividend.DividendAlertsService;
 import org.jds.edgar4j.service.dividend.DividendEventExtractor;
 import org.jds.edgar4j.service.dividend.DividendEvidenceService;
@@ -88,6 +90,9 @@ class DividendAnalysisServiceImplTest {
     @Mock
     private NormalizedXbrlFactDataPort normalizedXbrlFactDataPort;
 
+    @Mock
+    private DividendAlertResolutionDataPort dividendAlertResolutionDataPort;
+
     private DividendAnalysisServiceImpl dividendAnalysisService;
     private DividendEvidenceService dividendEvidenceService;
     private DividendScreeningService dividendScreeningService;
@@ -120,6 +125,7 @@ class DividendAnalysisServiceImplTest {
                 dividendMetricsService,
                 new DividendAlertsService());
         DividendMetricCatalogService dividendMetricCatalogService = new DividendMetricCatalogService();
+        DividendAlertsService dividendAlertsService = new DividendAlertsService();
         DividendCompanyContextService dividendCompanyContextService = new DividendCompanyContextService(
                 companyService,
                 dividendFilingAnalysisService);
@@ -136,7 +142,9 @@ class DividendAnalysisServiceImplTest {
                 dividendMetricCatalogService,
                 dividendPeerAnalysisService,
                 dividendScreeningService,
-                dividendEvidenceService);
+                dividendEvidenceService,
+                new DividendAlertResolutionService(dividendAlertResolutionDataPort),
+                dividendAlertsService);
     }
 
     @Test

@@ -5,11 +5,13 @@ import {
   ArrowRight,
   Building2,
   CalendarDays,
+  CheckCircle2,
   ExternalLink,
   FileText,
   Landmark,
   LineChart,
   RefreshCw,
+  RotateCcw,
   Search,
   Wallet,
 } from 'lucide-react';
@@ -132,6 +134,12 @@ type ScreenState =
   | { status: 'error'; message: string }
   | { status: 'success'; request: DividendScreenRequest; result: DividendScreen };
 
+type AlertActionState =
+  | { status: 'idle' }
+  | { status: 'loading'; alertId: string }
+  | { status: 'error'; message: string }
+  | { status: 'success'; message: string };
+
 async function resolveDividendQuery(identifier: string): Promise<string> {
   const trimmed = identifier.trim();
   if (!trimmed) {
@@ -197,6 +205,7 @@ export function DividendViabilityDashboard() {
   const [screenSort, setScreenSort] = React.useState('score');
   const [screenDirection, setScreenDirection] = React.useState<'ASC' | 'DESC'>('DESC');
   const [screenRatings, setScreenRatings] = React.useState<DividendRating[]>(['SAFE', 'STABLE']);
+  const [alertActionState, setAlertActionState] = React.useState<AlertActionState>({ status: 'idle' });
   const [state, setState] = React.useState<DashboardState>(
     searchParams.get('company') ? { status: 'loading', query: searchParams.get('company') ?? '' } : { status: 'idle' },
   );
@@ -219,6 +228,7 @@ export function DividendViabilityDashboard() {
     let cancelled = false;
     setEvidenceState({ status: 'idle' });
     setComparisonState({ status: 'idle' });
+    setAlertActionState({ status: 'idle' });
     setCompareInput('');
 
     async function run() {
@@ -269,6 +279,7 @@ export function DividendViabilityDashboard() {
   const annualPeriodsAnalyzed = historyRows.length > 0 ? historyRows.length : (overview?.trend.length ?? 0);
   const activeAlerts = alerts?.activeAlerts ?? overview?.alerts ?? [];
   const historicalAlerts = alerts?.historicalAlerts ?? [];
+  const activeAlertEvents = historicalAlerts.filter((event) => event.active);
   const dividendEvents = eventsResponse?.events ?? [];
   const evidenceResult = evidenceState.status === 'success' ? evidenceState.result : null;
   const comparisonResult = comparisonState.status === 'success' ? comparisonState.result : null;
@@ -318,6 +329,63 @@ export function DividendViabilityDashboard() {
         status: 'error',
         accession: accessionNumber,
         message: error instanceof Error ? error.message : 'Failed to load filing evidence.',
+      });
+    }
+  };
+
+  const updateAlertsInState = (updatedAlerts: DividendAlerts) => {
+    setState((current) => {
+      if (current.status !== 'success') {
+        return current;
+      }
+      return {
+        ...current,
+        result: {
+          ...current.result,
+          alerts: updatedAlerts,
+        },
+      };
+    });
+  };
+
+  const resolveAlert = async (alertId: string) => {
+    if (!company) {
+      return;
+    }
+    const event = activeAlertEvents.find((candidate) => candidate.id === alertId);
+    setAlertActionState({ status: 'loading', alertId });
+    try {
+      const updatedAlerts = await dividendApi.resolveAlert(company.ticker || company.cik, alertId, {
+        periodEnd: event?.periodEnd ?? null,
+        accessionNumber: event?.accessionNumber ?? null,
+        status: 'RESOLVED',
+      });
+      updateAlertsInState(updatedAlerts);
+      setAlertActionState({ status: 'success', message: 'Alert resolved.' });
+    } catch (error) {
+      setAlertActionState({
+        status: 'error',
+        message: error instanceof Error ? error.message : 'Failed to resolve alert.',
+      });
+    }
+  };
+
+  const reopenAlert = async (alertId: string, periodEnd?: string | null, accessionNumber?: string | null) => {
+    if (!company) {
+      return;
+    }
+    setAlertActionState({ status: 'loading', alertId });
+    try {
+      const updatedAlerts = await dividendApi.reopenAlert(company.ticker || company.cik, alertId, {
+        periodEnd: periodEnd ?? null,
+        accessionNumber: accessionNumber ?? null,
+      });
+      updateAlertsInState(updatedAlerts);
+      setAlertActionState({ status: 'success', message: 'Alert reopened.' });
+    } catch (error) {
+      setAlertActionState({
+        status: 'error',
+        message: error instanceof Error ? error.message : 'Failed to reopen alert.',
       });
     }
   };
@@ -1102,14 +1170,39 @@ export function DividendViabilityDashboard() {
                 </div>
               </div>
               <div className="mt-5 space-y-3">
+                {alertActionState.status === 'error' && (
+                  <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                    {alertActionState.message}
+                  </div>
+                )}
+                {alertActionState.status === 'success' && (
+                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                    {alertActionState.message}
+                  </div>
+                )}
                 {activeAlerts.length === 0 ? (
                   <div className="rounded-3xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm text-emerald-800">
                     No active alerts were raised by the current dividend viability rules.
                   </div>
                 ) : activeAlerts.map((alert) => (
                   <div key={alert.id} className={`rounded-3xl border px-4 py-4 ${severityClasses(alert.severity)}`}>
-                    <p className="text-sm font-semibold">{alert.title}</p>
-                    <p className="mt-1 text-sm leading-6">{alert.description}</p>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold">{alert.title}</p>
+                        <p className="mt-1 text-sm leading-6">{alert.description}</p>
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="shrink-0 rounded-xl bg-white/80"
+                        disabled={alertActionState.status === 'loading'}
+                        onClick={() => void resolveAlert(alert.id)}
+                      >
+                        <CheckCircle2 className="h-4 w-4" />
+                        Resolve
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1139,6 +1232,13 @@ export function DividendViabilityDashboard() {
                             {event.periodEnd ? `Period ${formatDate(event.periodEnd)}` : 'Historical event'}
                             {event.filingDate ? ` · filed ${formatDate(event.filingDate)}` : ''}
                           </p>
+                          {event.resolutionStatus && (
+                            <p className="mt-2 text-xs text-slate-500">
+                              {event.resolutionStatus.toLowerCase()}
+                              {event.resolvedAt ? ` on ${formatDate(event.resolvedAt)}` : ''}
+                              {event.resolvedBy ? ` by ${event.resolvedBy}` : ''}
+                            </p>
+                          )}
                         </div>
                         <div className="flex flex-col items-end gap-2">
                           <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${severityClasses(event.severity)}`}>
@@ -1147,6 +1247,19 @@ export function DividendViabilityDashboard() {
                           <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${event.active ? 'bg-rose-100 text-rose-700' : 'bg-slate-200 text-slate-700'}`}>
                             {event.active ? 'Active' : 'Resolved'}
                           </span>
+                          {event.resolutionStatus && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 rounded-xl px-2 text-xs"
+                              disabled={alertActionState.status === 'loading'}
+                              onClick={() => void reopenAlert(event.id, event.periodEnd, event.accessionNumber)}
+                            >
+                              <RotateCcw className="h-3.5 w-3.5" />
+                              Reopen
+                            </Button>
+                          )}
                         </div>
                       </div>
                     </div>

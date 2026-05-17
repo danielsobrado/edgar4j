@@ -3,6 +3,7 @@ package org.jds.edgar4j.service;
 import java.util.List;
 import java.time.LocalDate;
 
+import org.jds.edgar4j.dto.request.DividendAlertResolutionRequest;
 import org.jds.edgar4j.dto.response.DividendAlertsResponse;
 import org.jds.edgar4j.dto.response.DividendComparisonResponse;
 import org.jds.edgar4j.dto.response.DividendEvidenceResponse;
@@ -20,6 +21,16 @@ public interface DividendAnalysisService {
     DividendHistoryResponse getHistory(String tickerOrCik, List<String> metrics, String period, int years);
 
     DividendAlertsResponse getAlerts(String tickerOrCik, boolean activeOnly);
+
+    DividendAlertsResponse resolveAlert(
+            String tickerOrCik,
+            String alertId,
+            DividendAlertResolutionRequest request);
+
+    DividendAlertsResponse reopenAlert(
+            String tickerOrCik,
+            String alertId,
+            DividendAlertResolutionRequest request);
 
     DividendEventsResponse getEvents(String tickerOrCik, LocalDate since);
 

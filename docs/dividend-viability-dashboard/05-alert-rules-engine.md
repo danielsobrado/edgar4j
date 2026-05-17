@@ -14,7 +14,7 @@ Implemented local coverage:
 
 Remaining implementation/operational validation:
 
-- Persistent alert resolution remains future work; alert events are currently computed from current and historical metric rows.
+- Persistent alert resolution is implemented through durable `DividendAlertResolution` records. Resolved or currently snoozed alerts are suppressed for the same company, alert id, period, and accession.
 - Live AT&T 2022 validation and 10-company manual rating calibration remain operational benchmark tasks.
 
 ## Alert Data Model
@@ -178,7 +178,7 @@ public ViabilityRating computeViabilityRating(String cik) {
 - [ ] AT&T (T) triggers `dividend_cut` alert for 2022
 - [x] A company with FCF < 0 and dividends > 0 triggers a debt-funded dividend alert
 - [x] REIT sector overrides apply correctly for FCF payout and net-debt-to-EBITDA thresholds
-- [ ] Resolved alerts don't re-fire for the same period
+- [x] Resolved alerts don't re-fire for the same period
 - [x] Composite viability rating maps healthy and stressed local profiles correctly
 - [ ] Composite viability rating matches manual assessment for 10 test companies
 

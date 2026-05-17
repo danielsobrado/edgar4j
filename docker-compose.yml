@@ -1,20 +1,25 @@
 services:
-  edgar4j:
+  backend:
     build:
       context: .
-    image: edgar4j:latest
+      dockerfile: docker/Dockerfile.backend
+    image: edgar4j-backend:latest
     ports:
-      - "8080:8080"
+      - "${BACKEND_PORT:-8080}:8080"
     environment:
-      EDGAR4J_RESOURCE_MODE: ${EDGAR4J_RESOURCE_MODE:-high}
+      SPRING_PROFILES_ACTIVE: docker
+      EDGAR4J_RESOURCE_MODE: high
       SEC_USER_AGENT: ${SEC_USER_AGENT:-Edgar4J/1.0 (ops@example.com)}
       SPRING_CLOUD_CONFIG_ENABLED: "false"
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/edgar4j
-      SPRING_DATASOURCE_USERNAME: edgar4j
-      SPRING_DATASOURCE_PASSWORD: edgar4j
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-edgar4j}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-edgar4j}
       SPRING_MONGODB_URI: mongodb://mongodb:27017/edgar
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      EDGAR4J_SECURITY_ENABLED: ${EDGAR4J_SECURITY_ENABLED:-false}
+      EDGAR4J_SECURITY_USERNAME: ${EDGAR4J_SECURITY_USERNAME:-}
+      EDGAR4J_SECURITY_PASSWORD: ${EDGAR4J_SECURITY_PASSWORD:-}
     volumes:
       - edgar4j-data:/app/data
     depends_on:
@@ -25,15 +30,69 @@ services:
       redis:
         condition: service_started
     profiles:
-      - low
       - high
+
+  backend-low:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    image: edgar4j-backend:latest
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      EDGAR4J_RESOURCE_MODE: low
+      SEC_USER_AGENT: ${SEC_USER_AGENT:-Edgar4J/1.0 (ops@example.com)}
+      SPRING_CLOUD_CONFIG_ENABLED: "false"
+      EDGAR4J_SECURITY_ENABLED: ${EDGAR4J_SECURITY_ENABLED:-false}
+      EDGAR4J_SECURITY_USERNAME: ${EDGAR4J_SECURITY_USERNAME:-}
+      EDGAR4J_SECURITY_PASSWORD: ${EDGAR4J_SECURITY_PASSWORD:-}
+    volumes:
+      - edgar4j-data:/app/data
+    networks:
+      default:
+        aliases:
+          - backend
+    profiles:
+      - low
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+      args:
+        VITE_API_URL: ${PUBLIC_API_URL:-http://localhost:${FRONTEND_PORT:-3000}}
+    image: edgar4j-frontend:latest
+    ports:
+      - "${FRONTEND_PORT:-3000}:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+    profiles:
+      - high
+
+  frontend-low:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+      args:
+        VITE_API_URL: ${PUBLIC_API_URL:-http://localhost:${FRONTEND_PORT:-3000}}
+    image: edgar4j-frontend:latest
+    ports:
+      - "${FRONTEND_PORT:-3000}:8080"
+    depends_on:
+      backend-low:
+        condition: service_healthy
+    profiles:
+      - low
 
   mongodb:
     image: mongo:7
     ports:
-      - "27017:27017"
+      - "${MONGODB_PORT:-27017}:27017"
     volumes:
       - mongo-data:/data/db
+      - ./docker/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 10s
@@ -45,15 +104,15 @@ services:
   postgres:
     image: postgres:16
     environment:
-      POSTGRES_DB: edgar4j
-      POSTGRES_USER: edgar4j
-      POSTGRES_PASSWORD: edgar4j
+      POSTGRES_DB: ${POSTGRES_DB:-edgar4j}
+      POSTGRES_USER: ${POSTGRES_USER:-edgar4j}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-edgar4j}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pg-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U edgar4j"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-edgar4j}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -63,9 +122,14 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     profiles:
       - high
 

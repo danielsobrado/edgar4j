@@ -35,6 +35,24 @@ curl -i http://<backend-host>/api/settings
 curl -u "$EDGAR4J_SECURITY_USERNAME:$EDGAR4J_SECURITY_PASSWORD" http://<backend-host>/api/settings
 ```
 
+PowerShell automation:
+
+```powershell
+.\scripts\smoke-test.ps1 `
+  -BackendBaseUrl http://localhost:8080 `
+  -FrontendBaseUrl http://localhost:3000
+```
+
+For authenticated staging:
+
+```powershell
+.\scripts\smoke-test.ps1 `
+  -BackendBaseUrl https://api.example.com `
+  -FrontendBaseUrl https://app.example.com `
+  -Username $env:EDGAR4J_SECURITY_USERNAME `
+  -Password $env:EDGAR4J_SECURITY_PASSWORD
+```
+
 ## 3. Backend API Smoke
 
 - `GET /api/settings` succeeds with auth when security is enabled.

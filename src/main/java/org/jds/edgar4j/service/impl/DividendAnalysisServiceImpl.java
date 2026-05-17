@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import org.jds.edgar4j.dto.request.DividendAlertResolutionRequest;
 import org.jds.edgar4j.dto.request.DividendScreenRequest;
 import org.jds.edgar4j.dto.response.CompanyResponse;
 import org.jds.edgar4j.dto.response.DividendAlertsResponse;
@@ -25,6 +26,8 @@ import org.jds.edgar4j.model.Filling;
 import org.jds.edgar4j.service.CompanyMarketDataService;
 import org.jds.edgar4j.service.CompanyService;
 import org.jds.edgar4j.service.DividendAnalysisService;
+import org.jds.edgar4j.service.dividend.DividendAlertResolutionService;
+import org.jds.edgar4j.service.dividend.DividendAlertsService;
 import org.jds.edgar4j.service.dividend.DividendEvidenceService;
 import org.jds.edgar4j.service.dividend.DividendScreeningService;
 import org.jds.edgar4j.service.impl.DividendFilingAnalysisService.AnalyzedFilingData;
@@ -60,10 +63,12 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
     private final DividendPeerAnalysisService dividendPeerAnalysisService;
     private final DividendScreeningService dividendScreeningService;
     private final DividendEvidenceService dividendEvidenceService;
+    private final DividendAlertResolutionService dividendAlertResolutionService;
+    private final DividendAlertsService dividendAlertsService;
 
     @Override
     public DividendOverviewResponse getOverview(String tickerOrCik) {
-        DividendAnalysisContext context = analyze(tickerOrCik);
+        DividendAnalysisContext context = analyze(tickerOrCik, true);
         return buildOverview(context);
     }
 
@@ -75,7 +80,7 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
 
         String normalizedPeriod = dividendMetricCatalogService.normalizeHistoryPeriod(period);
         List<String> requestedMetrics = dividendMetricCatalogService.normalizeHistoryMetrics(metrics);
-        DividendAnalysisContext context = analyze(tickerOrCik);
+        DividendAnalysisContext context = analyze(tickerOrCik, true);
         List<HistoryRowData> rows = dividendHistoryAnalysisService.limitHistoryRows(context.historyRows(), years);
 
         List<DividendHistoryResponse.MetricSeries> series = requestedMetrics.stream()
@@ -99,22 +104,55 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
 
     @Override
     public DividendAlertsResponse getAlerts(String tickerOrCik, boolean activeOnly) {
-        DividendAnalysisContext context = analyze(tickerOrCik);
+        DividendAnalysisContext context = analyze(tickerOrCik, true);
         List<DividendAlertsResponse.AlertEvent> historicalAlerts = dividendHistoryAnalysisService.buildHistoricalAlerts(
                 context.historyRows(),
                 context.alerts(),
                 context.latestBalance(),
                 context.latestAnnual(),
                 context.companySummary().getLastFilingDate(),
-                activeOnly);
+                false);
+        List<DividendAlertsResponse.AlertEvent> decoratedHistoricalAlerts =
+                dividendAlertResolutionService.applyResolutionState(
+                        context.companySummary().getCik(),
+                        historicalAlerts,
+                        activeOnly);
 
         return DividendAlertsResponse.builder()
                 .company(context.companySummary())
                 .activeOnly(activeOnly)
                 .activeAlerts(context.alerts())
-                .historicalAlerts(historicalAlerts)
+                .historicalAlerts(decoratedHistoricalAlerts)
                 .warnings(context.warnings())
                 .build();
+    }
+
+    @Override
+    public DividendAlertsResponse resolveAlert(
+            String tickerOrCik,
+            String alertId,
+            DividendAlertResolutionRequest request) {
+        DividendAnalysisContext context = analyze(tickerOrCik, false);
+        DividendAlertsResponse.AlertEvent event = resolveTargetAlertEvent(context, alertId, request)
+                .orElseThrow(() -> new ResourceNotFoundException("Dividend alert event", "alertId", alertId));
+        dividendAlertResolutionService.resolve(
+                context.companySummary().getCik(),
+                context.companySummary().getTicker(),
+                event,
+                request != null ? request : DividendAlertResolutionRequest.builder().build());
+        return getAlerts(tickerOrCik, false);
+    }
+
+    @Override
+    public DividendAlertsResponse reopenAlert(
+            String tickerOrCik,
+            String alertId,
+            DividendAlertResolutionRequest request) {
+        DividendAnalysisContext context = analyze(tickerOrCik, false);
+        DividendAlertsResponse.AlertEvent event = resolveTargetAlertEvent(context, alertId, request)
+                .orElseThrow(() -> new ResourceNotFoundException("Dividend alert event", "alertId", alertId));
+        dividendAlertResolutionService.reopen(context.companySummary().getCik(), event);
+        return getAlerts(tickerOrCik, false);
     }
 
     @Override
@@ -179,7 +217,7 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
 
         for (String identifier : identifiers) {
             try {
-                DividendAnalysisContext context = analyze(identifier);
+                DividendAnalysisContext context = analyze(identifier, true);
                 rows.add(dividendPeerAnalysisService.buildComparisonRow(context, requestedMetrics));
             } catch (RuntimeException e) {
                 warnings.add("Could not analyze " + identifier + ": " + e.getMessage());
@@ -225,7 +263,7 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
 
         for (String identifier : identifiers) {
             try {
-                DividendAnalysisContext context = analyze(identifier);
+                DividendAnalysisContext context = analyze(identifier, true);
                 DividendScreeningService.ScreeningCandidate screeningCandidate =
                         dividendPeerAnalysisService.toScreeningCandidate(context);
                 if (dividendScreeningService.matchesScreenFilters(
@@ -267,7 +305,7 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
                 .build();
     }
 
-    private DividendAnalysisContext analyze(String tickerOrCik) {
+    private DividendAnalysisContext analyze(String tickerOrCik, boolean applyAlertResolutions) {
         CompanyResponse company = dividendCompanyContextService.resolveCompany(tickerOrCik)
                 .orElseThrow(() -> new ResourceNotFoundException("Company", "tickerOrCik", tickerOrCik));
 
@@ -316,12 +354,33 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
         DividendOverviewResponse.CompanySummary companySummary = buildCompanySummary(company, ticker, filings);
         DividendOverviewResponse.Evidence evidence = buildEvidence(latestAnnual, latestCurrentReport);
         List<HistoryRowData> historyRows = dividendHistoryAnalysisService.buildHistoryRows(annualAnalyses, trend);
+        List<DividendOverviewResponse.Alert> activeAlerts = computed.alerts();
+        int score = computed.score();
+        DividendOverviewResponse.DividendRating rating = computed.rating();
+
+        if (applyAlertResolutions) {
+            List<DividendAlertsResponse.AlertEvent> rawActiveEvents = dividendHistoryAnalysisService.buildHistoricalAlerts(
+                    historyRows,
+                    computed.alerts(),
+                    latestBalance,
+                    latestAnnual,
+                    companySummary.getLastFilingDate(),
+                    true);
+            activeAlerts = dividendAlertResolutionService.filterActiveAlerts(
+                    companySummary.getCik(),
+                    computed.alerts(),
+                    rawActiveEvents);
+            if (activeAlerts.size() != computed.alerts().size()) {
+                score = dividendAlertsService.buildScore(computed.snapshot(), activeAlerts);
+                rating = dividendAlertsService.toRating(score);
+            }
+        }
 
         return new DividendAnalysisContext(
                 companySummary,
                 computed.snapshot(),
                 computed.confidence(),
-                computed.alerts(),
+                activeAlerts,
                 computed.coverage(),
                 computed.balance(),
                 trend,
@@ -331,8 +390,35 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
                 latestAnnual,
                 latestBalance,
                 historyRows,
-                computed.score(),
-                computed.rating());
+                score,
+                rating);
+    }
+
+    private Optional<DividendAlertsResponse.AlertEvent> resolveTargetAlertEvent(
+            DividendAnalysisContext context,
+            String alertId,
+            DividendAlertResolutionRequest request) {
+        List<DividendAlertsResponse.AlertEvent> events = dividendHistoryAnalysisService.buildHistoricalAlerts(
+                context.historyRows(),
+                context.alerts(),
+                context.latestBalance(),
+                context.latestAnnual(),
+                context.companySummary().getLastFilingDate(),
+                false);
+        LocalDate requestedPeriodEnd = request != null ? request.getPeriodEnd() : null;
+        String requestedAccession = request != null ? request.getAccessionNumber() : null;
+
+        return events.stream()
+                .filter(event -> event.getId().equals(alertId))
+                .filter(event -> requestedPeriodEnd == null || requestedPeriodEnd.equals(event.getPeriodEnd()))
+                .filter(event -> requestedAccession == null || requestedAccession.equals(event.getAccessionNumber()))
+                .sorted(Comparator
+                        .comparing(DividendAlertsResponse.AlertEvent::isActive, Comparator.reverseOrder())
+                        .thenComparing(DividendAlertsResponse.AlertEvent::getPeriodEnd,
+                                Comparator.nullsLast(Comparator.reverseOrder()))
+                        .thenComparing(DividendAlertsResponse.AlertEvent::getFilingDate,
+                                Comparator.nullsLast(Comparator.reverseOrder())))
+                .findFirst();
     }
 
     private DividendOverviewResponse buildOverview(DividendAnalysisContext context) {

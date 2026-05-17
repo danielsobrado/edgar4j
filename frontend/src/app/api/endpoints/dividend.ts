@@ -1,6 +1,7 @@
 import { apiClient } from '../client';
 import {
   DividendAlerts,
+  DividendAlertResolutionRequest,
   DividendComparison,
   DividendEvents,
   DividendFilingEvidence,
@@ -60,6 +61,28 @@ export const dividendApi = {
         active: options.active ?? false,
       },
     });
+  },
+
+  resolveAlert: (
+    tickerOrCik: string,
+    alertId: string,
+    request: DividendAlertResolutionRequest = {},
+  ): Promise<DividendAlerts> => {
+    return apiClient.post<DividendAlerts>(
+      `/dividend/${encodeURIComponent(tickerOrCik)}/alerts/${encodeURIComponent(alertId)}/resolve`,
+      request,
+    );
+  },
+
+  reopenAlert: (
+    tickerOrCik: string,
+    alertId: string,
+    request: DividendAlertResolutionRequest = {},
+  ): Promise<DividendAlerts> => {
+    return apiClient.delete<DividendAlerts>(
+      `/dividend/${encodeURIComponent(tickerOrCik)}/alerts/${encodeURIComponent(alertId)}/resolve`,
+      { data: request },
+    );
   },
 
   getEvents: (tickerOrCik: string, options: DividendEventsOptions = {}): Promise<DividendEvents> => {
