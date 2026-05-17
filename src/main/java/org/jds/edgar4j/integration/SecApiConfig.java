@@ -66,6 +66,22 @@ public class SecApiConfig {
         return String.format("%s/api/xbrl/companyfacts/CIK%s.json", baseDataSecUrl, formatCik(cik));
     }
 
+    public String getCompanyConceptUrl(String cik, String taxonomy, String tag) {
+        return UriComponentsBuilder.fromUriString(baseDataSecUrl)
+                .pathSegment("api", "xbrl", "companyconcept", "CIK" + formatCik(cik), taxonomy, tag + ".json")
+                .build()
+                .encode()
+                .toUriString();
+    }
+
+    public String getFrameUrl(String taxonomy, String tag, String unit, String period) {
+        return UriComponentsBuilder.fromUriString(baseDataSecUrl)
+                .pathSegment("api", "xbrl", "frames", taxonomy, tag, unit, period + ".json")
+                .build()
+                .encode()
+                .toUriString();
+    }
+
     public String getForm4Url(String cik, String accessionNumber, String primaryDocument) {
         String cleanedAccession = accessionNumber.replace("-", "");
         return String.format("%s/%s/%s/%s",

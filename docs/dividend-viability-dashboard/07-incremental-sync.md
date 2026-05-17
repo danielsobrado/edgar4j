@@ -4,6 +4,18 @@
 
 Build scheduled jobs that keep the dividend dashboard data current by detecting new/changed filings on SEC/EDGAR and re-ingesting only what changed. All operations must be idempotent and respect the SEC's 10 rps fair-access policy.
 
+## Current Implementation Status
+
+Implemented in code:
+- single-company dividend sync refreshes submissions, ingests normalized companyfacts, warms overview analysis, and records sync state
+- new 8-K / 8-K/A accessions trigger dividend event warm-up
+- failed syncs persist `ERROR` status, retry count, error message, and exponential backoff timestamp
+- scheduled tracked-company sync uses stored dividend sync states, falls back to the S&P 500 list when no universe is stored, and continues after one tracked company fails
+- `/api/dividend/{tickerOrCik}/track` and `DELETE /api/dividend/{tickerOrCik}/track` add/remove companies from the tracked universe without deleting historical facts
+
+Remaining operational validation:
+- run tracked sync under live SEC credentials to confirm fair-access behavior across the intended production universe
+
 ## Design Principles
 
 - **Detect changes, don't re-download everything** — use EDGAR daily index files or submissions diff to find new filings
@@ -381,13 +393,13 @@ public class DividendUniverseService {
 
 ## Validation Checklist
 
-- [ ] New 10-K filing triggers fact re-ingestion and metric recomputation
-- [ ] New 8-K filing triggers event extraction
-- [ ] Amendment (10-K/A) correctly overrides original period data
-- [ ] Failed sync for one CIK doesn't block others
-- [ ] Exponential backoff works (1h → 4h → 12h → 24h cap)
+- [x] New 10-K filing triggers fact re-ingestion and metric recomputation warm-up
+- [x] New 8-K filing triggers event extraction warm-up
+- [x] Amendment (10-K/A) correctly overrides original period data through current-best fact selection
+- [x] Failed sync for one CIK doesn't block others
+- [x] Exponential backoff works (1h → 4h → 12h → 24h cap)
 - [ ] SEC rate limit never exceeded even with parallel sync
 - [ ] Sync state persists across application restarts
-- [ ] Universe add/remove works correctly
+- [x] Universe add/remove works correctly
 
 ## Estimated Effort: 4-5 days

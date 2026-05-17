@@ -28,6 +28,8 @@ export interface DividendViabilitySnapshot {
   currentRatio: number | null;
   fcfMargin: number | null;
   dividendYield: number | null;
+  shareholderYield: number | null;
+  buybackYield: number | null;
 }
 
 export interface DividendCoverageMetrics {
@@ -286,6 +288,8 @@ function clamp(value: number, minimum: number, maximum: number): number {
 function buildAlerts(input: {
   trend: AnnualTrendPoint[];
   fcfPayoutRatio: number | null;
+  freeCashFlow: number | null;
+  dividendsPaid: number | null;
   currentRatio: number | null;
   netDebtToEbitda: number | null;
   interestCoverage: number | null;
@@ -305,6 +309,15 @@ function buildAlerts(input: {
       severity: 'high',
       title: 'Dividend cut detected',
       description: 'The latest annual dividend-per-share value is below the prior year.',
+    });
+  }
+
+  if (input.freeCashFlow != null && input.freeCashFlow < 0 && input.dividendsPaid != null && input.dividendsPaid > 0) {
+    alerts.push({
+      id: 'dividend-funded-by-debt',
+      severity: 'high',
+      title: 'Dividend is not covered by free cash flow',
+      description: 'The company paid dividends while annual free cash flow was negative.',
     });
   }
 
@@ -511,6 +524,33 @@ export function buildDividendViabilityOverview(
   const dividendYield = referencePrice != null && referencePrice > 0 && dpsLatest != null
     ? dpsLatest / referencePrice
     : null;
+  const shareRepurchases = latestAnnual
+    ? magnitude(getMetricNumber(
+      latestAnnual.analysis,
+      ['ShareRepurchases'],
+      ['PaymentsForRepurchaseOfCommonStock', 'StockRepurchasedAndRetiredDuringPeriodValue'],
+    ))
+    : null;
+  const shareIssuance = latestAnnual
+    ? magnitude(getMetricNumber(
+      latestAnnual.analysis,
+      ['ShareIssuance'],
+      ['ProceedsFromIssuanceOfCommonStock', 'StockIssuedDuringPeriodValue'],
+    ))
+    : null;
+  const netBuybacks = shareRepurchases != null || shareIssuance != null
+    ? (shareRepurchases ?? 0) - (shareIssuance ?? 0)
+    : null;
+  const sharesOutstanding = getSharesOutstanding(latestAnnual);
+  const impliedMarketCap = referencePrice != null && referencePrice > 0 && sharesOutstanding != null
+    ? referencePrice * sharesOutstanding
+    : null;
+  const shareholderYield = impliedMarketCap != null && impliedMarketCap > 0 && dividendsPaid != null
+    ? safeDivide(dividendsPaid + (netBuybacks ?? 0), impliedMarketCap)
+    : null;
+  const buybackYield = impliedMarketCap != null && impliedMarketCap > 0 && netBuybacks != null
+    ? safeDivide(netBuybacks, impliedMarketCap)
+    : null;
 
   const snapshot: DividendViabilitySnapshot = {
     dpsLatest,
@@ -523,11 +563,15 @@ export function buildDividendViabilityOverview(
     currentRatio,
     fcfMargin,
     dividendYield,
+    shareholderYield,
+    buybackYield,
   };
 
   const alerts = buildAlerts({
     trend,
     fcfPayoutRatio,
+    freeCashFlow,
+    dividendsPaid,
     currentRatio,
     netDebtToEbitda,
     interestCoverage,

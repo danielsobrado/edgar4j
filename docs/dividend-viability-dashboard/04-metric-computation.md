@@ -4,6 +4,20 @@
 
 Compute all 65+ dividend viability metrics from the normalized fact store (Phase 2) and dividend events (Phase 3). Store results in a `metric_values` table for fast dashboard queries. Leverage the existing `MultiPeriodAnalyzer` for CAGR, trend detection, and volatility scoring.
 
+## Current Implementation Status
+
+Implemented local coverage:
+
+- Annual dividend overview and history metrics are computed from normalized companyfacts/XBRL fallback data.
+- CAGR helpers reject non-positive base or terminal values and round finite positive results.
+- Payout ratios are not defined when denominator metrics are zero or negative.
+- Metric catalog exposes the implemented overview/history metrics and rejects unsupported history periods.
+
+Remaining implementation/operational validation:
+
+- TTM metric computation is not exposed yet; the history API currently supports FY only.
+- Full 52+ metric registry, dependency graph, and live benchmark validation are still future expansion areas.
+
 ## Design: Centralized Formula Registry
 
 All metric formulas are defined in a single registry — preventing "ratio drift" where different parts of the code compute the same metric differently.
@@ -299,9 +313,9 @@ public class MetricComputationService {
 - [ ] Apple (AAPL) metrics match known values (DPS ~$0.96, FCF payout ~15%)
 - [ ] Johnson & Johnson (JNJ) shows 60+ uninterrupted years
 - [ ] AT&T (T) shows dividend cut in 2022 correctly detected
-- [ ] CAGR computation handles negative base values gracefully
+- [x] CAGR computation handles negative base values gracefully
 - [ ] TTM computation correctly sums 4 quarters
 - [ ] Metric dependency ordering prevents circular references
-- [ ] Proxy metrics (EBITDA, ROIC) clearly labeled
+- [x] Proxy metrics (EBITDA) clearly labeled in metric definitions and overview balance data
 
 ## Estimated Effort: 5-6 days

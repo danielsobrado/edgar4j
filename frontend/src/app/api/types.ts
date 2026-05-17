@@ -399,6 +399,8 @@ export interface DividendSnapshot {
   currentRatio: number | null;
   fcfMargin: number | null;
   dividendYield: number | null;
+  shareholderYield: number | null;
+  buybackYield: number | null;
 }
 
 export interface DividendAlert {
@@ -611,6 +613,60 @@ export interface DividendFilingEvidence {
   highlights: DividendEvidenceHighlight[];
   cleanedText?: string | null;
   truncated: boolean;
+  warnings: string[];
+}
+
+export type DividendSyncStatus = 'IDLE' | 'IN_PROGRESS' | 'ERROR';
+
+export interface DividendSyncState {
+  company: DividendCompanySummary;
+  status: DividendSyncStatus;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  lastFactsSync?: string | null;
+  lastEventsSync?: string | null;
+  lastSuccessfulSync?: string | null;
+  lastMarketDataSync?: string | null;
+  lastAnalysisWarmup?: string | null;
+  lastAccession?: string | null;
+  retryCount: number;
+  errorMessage?: string | null;
+  nextRetryAt?: string | null;
+  factsVersion: number;
+  newFilingsDetected: number;
+  refreshedSubmissions: boolean;
+  refreshedMarketData: boolean;
+  analysisWarmupSucceeded: boolean;
+  warnings: string[];
+}
+
+export type DividendQualityStatus = 'PASS' | 'WARN' | 'FAIL';
+export type DividendQualityIssueSeverity = 'LOW' | 'MEDIUM' | 'HIGH';
+
+export interface DividendQualityIssue {
+  severity: DividendQualityIssueSeverity;
+  code: string;
+  message: string;
+  metricId?: string | null;
+  periodEnd?: string | null;
+}
+
+export interface DividendBenchmarkCheck {
+  metricId: string;
+  label: string;
+  expectedValue: number | null;
+  actualValue: number | null;
+  tolerance: number | null;
+  passed: boolean;
+}
+
+export interface DividendQuality {
+  company: DividendCompanySummary;
+  overallStatus: DividendQualityStatus;
+  benchmarkAvailable: boolean;
+  benchmarkFiscalYear?: number | null;
+  issues: DividendQualityIssue[];
+  benchmarks: DividendBenchmarkCheck[];
   warnings: string[];
 }
 

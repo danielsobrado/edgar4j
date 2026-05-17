@@ -22,7 +22,9 @@ import org.springframework.test.web.reactive.server.WebTestClient;
  * Uses WebTestClient and embedded MongoDB.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")`r`n@SuppressWarnings("removal")`r`nclass Form6KControllerTest {
+@ActiveProfiles("test")
+@SuppressWarnings("removal")
+class Form6KControllerTest {
 
     private WebTestClient webTestClient;
 

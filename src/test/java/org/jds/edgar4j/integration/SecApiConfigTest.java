@@ -55,4 +55,26 @@ class SecApiConfigTest {
                 "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json",
                 config.getCompanyFactsUrl("320193"));
     }
+
+    @Test
+    @DisplayName("companyconcept URLs should zero-pad CIK and encode path segments")
+    void companyConceptUrlShouldUsePaddedCikAndEncodedPathSegments() {
+        SecApiConfig config = new SecApiConfig();
+        ReflectionTestUtils.setField(config, "baseDataSecUrl", "https://data.sec.gov");
+
+        assertEquals(
+                "https://data.sec.gov/api/xbrl/companyconcept/CIK0000320193/us-gaap/CommonStockDividendsPerShareDeclared.json",
+                config.getCompanyConceptUrl("320193", "us-gaap", "CommonStockDividendsPerShareDeclared"));
+    }
+
+    @Test
+    @DisplayName("frame URLs should encode unit path segments")
+    void frameUrlShouldEncodeUnitPathSegments() {
+        SecApiConfig config = new SecApiConfig();
+        ReflectionTestUtils.setField(config, "baseDataSecUrl", "https://data.sec.gov");
+
+        assertEquals(
+                "https://data.sec.gov/api/xbrl/frames/us-gaap/CommonStockDividendsPerShareDeclared/USD%2Fshares/CY2023Q4I.json",
+                config.getFrameUrl("us-gaap", "CommonStockDividendsPerShareDeclared", "USD/shares", "CY2023Q4I"));
+    }
 }

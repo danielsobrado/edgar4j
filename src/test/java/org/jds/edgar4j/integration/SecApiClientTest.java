@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -104,6 +106,161 @@ class SecApiClientTest {
         Optional<String> response = client.fetchDailyMasterIndex(LocalDate.of(2026, 3, 14));
 
         assertTrue(response.isEmpty());
+    }
+
+    @Test
+    @DisplayName("fetchCompanyConcept should request and cache the SEC companyconcept endpoint")
+    void fetchCompanyConceptShouldRequestCompanyConceptEndpoint() throws IOException {
+        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext(
+                "/api/xbrl/companyconcept/CIK0000320193/us-gaap/CommonStockDividendsPerShareDeclared.json",
+                exchange -> writeResponse(exchange, 200, "{\"concept\":\"dps\"}"));
+        server.start();
+
+        SecApiConfig config = new SecApiConfig();
+        ReflectionTestUtils.setField(config, "baseDataSecUrl", "http://127.0.0.1:" + server.getAddress().getPort());
+
+        when(settingsService.getUserAgent()).thenReturn("My Company sec-ops@mycompany.com");
+        when(downloadedResourceStore.readText(anyString(), anyString(), any(Charset.class)))
+                .thenReturn(Optional.empty());
+        when(downloadedResourceStore.writeText(anyString(), anyString(), anyString(), any(Charset.class)))
+                .thenReturn(Path.of("cache.txt"));
+
+        SecApiClient client = new SecApiClient(
+                config,
+                new SecRateLimiter(1000),
+                settingsService,
+                downloadedResourceStore);
+
+        String response = client.fetchCompanyConcept(
+                "320193",
+                "us-gaap",
+                "CommonStockDividendsPerShareDeclared");
+
+        assertEquals("{\"concept\":\"dps\"}", response);
+    }
+
+    @Test
+    @DisplayName("fetchCompanyFacts should return cached companyfacts without an HTTP request")
+    void fetchCompanyFactsShouldReturnCachedCompanyFacts() {
+        SecApiConfig config = new SecApiConfig();
+        ReflectionTestUtils.setField(config, "baseDataSecUrl", "http://127.0.0.1:9");
+
+        when(downloadedResourceStore.readText(anyString(), anyString(), any(Charset.class)))
+                .thenReturn(Optional.of("{\"cached\":true}"));
+
+        SecApiClient client = new SecApiClient(
+                config,
+                new SecRateLimiter(1000),
+                settingsService,
+                downloadedResourceStore);
+
+        String response = client.fetchCompanyFacts("320193");
+
+        assertEquals("{\"cached\":true}", response);
+        verify(settingsService, never()).getUserAgent();
+    }
+
+    @Test
+    @DisplayName("fetchCompanyFactsOptional should return empty for SEC 404 responses")
+    void fetchCompanyFactsOptionalShouldReturnEmptyForNotFoundResponses() throws IOException {
+        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext(
+                "/api/xbrl/companyfacts/CIK9999999999.json",
+                exchange -> writeResponse(exchange, 404, "Not Found"));
+        server.start();
+
+        SecApiConfig config = new SecApiConfig();
+        ReflectionTestUtils.setField(config, "baseDataSecUrl", "http://127.0.0.1:" + server.getAddress().getPort());
+
+        when(settingsService.getUserAgent()).thenReturn("My Company sec-ops@mycompany.com");
+        when(downloadedResourceStore.readText(anyString(), anyString(), any(Charset.class)))
+                .thenReturn(Optional.empty());
+
+        SecApiClient client = new SecApiClient(
+                config,
+                new SecRateLimiter(1000),
+                settingsService,
+                downloadedResourceStore);
+
+        Optional<String> response = client.fetchCompanyFactsOptional("9999999999");
+
+        assertTrue(response.isEmpty());
+    }
+
+    @Test
+    @DisplayName("async companyfacts, companyconcept, and frame variants should request SEC endpoints")
+    void asyncVariantsShouldRequestSecEndpoints() throws IOException {
+        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext(
+                "/api/xbrl/companyfacts/CIK0000320193.json",
+                exchange -> writeResponse(exchange, 200, "{\"facts\":true}"));
+        server.createContext(
+                "/api/xbrl/companyconcept/CIK0000320193/us-gaap/CommonStockDividendsPerShareDeclared.json",
+                exchange -> writeResponse(exchange, 200, "{\"concept\":true}"));
+        server.createContext(
+                "/api/xbrl/frames/us-gaap/CommonStockDividendsPerShareDeclared/USD-per-shares/CY2023Q4I.json",
+                exchange -> writeResponse(exchange, 200, "{\"frame\":true}"));
+        server.start();
+
+        SecApiConfig config = new SecApiConfig();
+        ReflectionTestUtils.setField(config, "baseDataSecUrl", "http://127.0.0.1:" + server.getAddress().getPort());
+
+        when(settingsService.getUserAgent()).thenReturn("My Company sec-ops@mycompany.com");
+        when(downloadedResourceStore.readText(anyString(), anyString(), any(Charset.class)))
+                .thenReturn(Optional.empty());
+        when(downloadedResourceStore.writeText(anyString(), anyString(), anyString(), any(Charset.class)))
+                .thenReturn(Path.of("cache.txt"));
+
+        SecApiClient client = new SecApiClient(
+                config,
+                new SecRateLimiter(1000),
+                settingsService,
+                downloadedResourceStore);
+
+        assertEquals("{\"facts\":true}", client.fetchCompanyFactsAsync("320193").join());
+        assertEquals("{\"concept\":true}", client.fetchCompanyConceptAsync(
+                "320193",
+                "us-gaap",
+                "CommonStockDividendsPerShareDeclared").join());
+        assertEquals("{\"frame\":true}", client.fetchFrameAsync(
+                "us-gaap",
+                "CommonStockDividendsPerShareDeclared",
+                "USD-per-shares",
+                "CY2023Q4I").join());
+    }
+
+    @Test
+    @DisplayName("fetchFrame should request and cache the SEC frames endpoint")
+    void fetchFrameShouldRequestFramesEndpoint() throws IOException {
+        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext(
+                "/api/xbrl/frames/us-gaap/CommonStockDividendsPerShareDeclared/USD-per-shares/CY2023Q4I.json",
+                exchange -> writeResponse(exchange, 200, "{\"frame\":\"CY2023Q4I\"}"));
+        server.start();
+
+        SecApiConfig config = new SecApiConfig();
+        ReflectionTestUtils.setField(config, "baseDataSecUrl", "http://127.0.0.1:" + server.getAddress().getPort());
+
+        when(settingsService.getUserAgent()).thenReturn("My Company sec-ops@mycompany.com");
+        when(downloadedResourceStore.readText(anyString(), anyString(), any(Charset.class)))
+                .thenReturn(Optional.empty());
+        when(downloadedResourceStore.writeText(anyString(), anyString(), anyString(), any(Charset.class)))
+                .thenReturn(Path.of("cache.txt"));
+
+        SecApiClient client = new SecApiClient(
+                config,
+                new SecRateLimiter(1000),
+                settingsService,
+                downloadedResourceStore);
+
+        String response = client.fetchFrame(
+                "us-gaap",
+                "CommonStockDividendsPerShareDeclared",
+                "USD-per-shares",
+                "CY2023Q4I");
+
+        assertEquals("{\"frame\":\"CY2023Q4I\"}", response);
     }
 
     private void writeResponse(HttpExchange exchange, int statusCode, String body) throws IOException {

@@ -179,6 +179,42 @@ class DividendControllerTest {
     }
 
     @Test
+    @DisplayName("trackCompany should wrap the service response in ApiResponse.success")
+    void trackCompanyShouldReturnApiResponse() {
+        DividendSyncStatusResponse syncStatus = DividendSyncStatusResponse.builder()
+                .status(org.jds.edgar4j.model.DividendSyncState.SyncStatus.IDLE)
+                .build();
+
+        when(dividendSyncService.trackCompany("AAPL", false, true)).thenReturn(syncStatus);
+
+        ResponseEntity<ApiResponse<DividendSyncStatusResponse>> response =
+                dividendController.trackCompany("AAPL", false, true);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals(true, response.getBody().isSuccess());
+        assertSame(syncStatus, response.getBody().getData());
+    }
+
+    @Test
+    @DisplayName("untrackCompany should wrap the service response in ApiResponse.success")
+    void untrackCompanyShouldReturnApiResponse() {
+        DividendSyncStatusResponse syncStatus = DividendSyncStatusResponse.builder()
+                .status(org.jds.edgar4j.model.DividendSyncState.SyncStatus.IDLE)
+                .build();
+
+        when(dividendSyncService.untrackCompany("AAPL")).thenReturn(syncStatus);
+
+        ResponseEntity<ApiResponse<DividendSyncStatusResponse>> response =
+                dividendController.untrackCompany("AAPL");
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals(true, response.getBody().isSuccess());
+        assertSame(syncStatus, response.getBody().getData());
+    }
+
+    @Test
     @DisplayName("getQuality should wrap the service response in ApiResponse.success")
     void getQualityShouldReturnApiResponse() {
         DividendQualityResponse quality = DividendQualityResponse.builder()

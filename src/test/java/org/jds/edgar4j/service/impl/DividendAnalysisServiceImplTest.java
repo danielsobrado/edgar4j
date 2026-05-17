@@ -35,6 +35,7 @@ import org.jds.edgar4j.model.CompanyMarketData;
 import org.jds.edgar4j.model.Filling;
 import org.jds.edgar4j.model.FormType;
 import org.jds.edgar4j.port.FillingDataPort;
+import org.jds.edgar4j.port.NormalizedXbrlFactDataPort;
 import org.jds.edgar4j.service.CompanyMarketDataService;
 import org.jds.edgar4j.service.CompanyService;
 import org.jds.edgar4j.service.dividend.DividendAlertsService;
@@ -84,6 +85,9 @@ class DividendAnalysisServiceImplTest {
     @Mock
     private UrlAllowlistValidator urlAllowlistValidator;
 
+    @Mock
+    private NormalizedXbrlFactDataPort normalizedXbrlFactDataPort;
+
     private DividendAnalysisServiceImpl dividendAnalysisService;
     private DividendEvidenceService dividendEvidenceService;
     private DividendScreeningService dividendScreeningService;
@@ -105,7 +109,8 @@ class DividendAnalysisServiceImplTest {
                 secApiConfig,
                 xbrlService,
                 urlAllowlistValidator,
-                dividendMetricsService);
+                dividendMetricsService,
+                normalizedXbrlFactDataPort);
         DividendHistoryAnalysisService dividendHistoryAnalysisService = new DividendHistoryAnalysisService(
                 dividendMetricsService,
                 new DividendAlertsService(),
@@ -167,6 +172,7 @@ class DividendAnalysisServiceImplTest {
         when(companyMarketDataService.getStoredMarketData("ACME")).thenReturn(Optional.of(CompanyMarketData.builder()
                 .ticker("ACME")
                 .currentPrice(42d)
+                .marketCap(50_000_000_000d)
                 .lastUpdated(Instant.parse("2026-03-14T00:00:00Z"))
                 .build()));
 
@@ -180,6 +186,8 @@ class DividendAnalysisServiceImplTest {
                 "OperatingIncome", 9_000_000_000d,
                 "DepreciationAmortization", 1_000_000_000d,
                 "InterestExpense", 500_000_000d,
+                "ShareRepurchases", 10_000_000_000d,
+                "ShareIssuance", 1_000_000_000d,
                 "DividendsPerShare", 1.26d)));
         when(xbrlService.getKeyFinancials(annualInstance)).thenReturn(bigDecimalMap(Map.of(
                 "EarningsPerShareDiluted", 5.50d)));
@@ -217,6 +225,8 @@ class DividendAnalysisServiceImplTest {
         assertEquals(1.500000d, response.getSnapshot().getCurrentRatio(), 0.000001d);
         assertEquals(0.200000d, response.getSnapshot().getFcfMargin(), 0.000001d);
         assertEquals(0.030000d, response.getSnapshot().getDividendYield(), 0.000001d);
+        assertEquals(0.240000d, response.getSnapshot().getShareholderYield(), 0.000001d);
+        assertEquals(0.180000d, response.getSnapshot().getBuybackYield(), 0.000001d);
         assertEquals(42d, response.getReferencePrice(), 0.000001d);
         assertEquals(DividendOverviewResponse.MetricConfidence.HIGH, response.getConfidence().get("dpsLatest"));
         assertEquals("10-K", response.getEvidence().getLatestAnnualReport().getFormType());

@@ -23,7 +23,6 @@ import org.springframework.data.redis.serializer.GenericJacksonJsonRedisSerializ
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
-import tools.jackson.databind.ObjectMapper;
 
 import lombok.RequiredArgsConstructor;
 
@@ -42,7 +41,6 @@ public class HighResourceCacheConfig {
     private static final Duration SP500_CACHE_TTL = Duration.ofHours(1);
 
     private final MarketDataProviderProperties marketDataProviderProperties;
-    private final ObjectMapper objectMapper;
 
     @Bean
     @ConditionalOnProperty(prefix = "spring.cache", name = "type", havingValue = "redis", matchIfMissing = true)
@@ -117,7 +115,7 @@ public class HighResourceCacheConfig {
     }
 
     private RedisCacheConfiguration baseConfiguration(Duration ttl) {
-        GenericJacksonJsonRedisSerializer serializer = new GenericJacksonJsonRedisSerializer(objectMapper.copy());
+        GenericJacksonJsonRedisSerializer serializer = GenericJacksonJsonRedisSerializer.builder().build();
         RedisSerializationContext.SerializationPair<Object> valueSerializer = RedisSerializationContext.SerializationPair
                 .fromSerializer(serializer);
 

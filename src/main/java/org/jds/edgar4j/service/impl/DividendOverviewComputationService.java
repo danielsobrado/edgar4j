@@ -32,7 +32,9 @@ public class DividendOverviewComputationService {
             AnalyzedFilingData latestBalance,
             List<DividendOverviewResponse.TrendPoint> trend,
             List<DividendFactPoint> dividendFacts,
-            Double referencePrice) {
+            Double referencePrice,
+            Double marketCap,
+            String sector) {
         Double revenue = dividendFilingAnalysisService.getMetric(latestAnnual,
                 List.of("Revenue"),
                 List.of("Revenues", "RevenueFromContractWithCustomerExcludingAssessedTax"));
@@ -45,6 +47,12 @@ public class DividendOverviewComputationService {
         Double dividendsPaid = dividendMetricsService.magnitude(dividendFilingAnalysisService.getMetric(latestAnnual,
                 List.of("DividendsPaid", "PaymentsOfDividendsCommonStock"),
                 List.of("PaymentsOfDividendsCommonStock", "DividendsCommonStockCash", "PaymentsOfOrdinaryDividends")));
+        Double shareRepurchases = dividendMetricsService.magnitude(dividendFilingAnalysisService.getMetric(latestAnnual,
+                List.of("ShareRepurchases"),
+                List.of("PaymentsForRepurchaseOfCommonStock", "StockRepurchasedAndRetiredDuringPeriodValue")));
+        Double shareIssuance = dividendMetricsService.magnitude(dividendFilingAnalysisService.getMetric(latestAnnual,
+                List.of("ShareIssuance"),
+                List.of("ProceedsFromIssuanceOfCommonStock", "StockIssuedDuringPeriodValue")));
         Double freeCashFlow = operatingCashFlow != null && capitalExpenditures != null
                 ? operatingCashFlow - capitalExpenditures
                 : null;
@@ -95,6 +103,32 @@ public class DividendOverviewComputationService {
         Double dividendYield = referencePrice != null && referencePrice > 0d && dpsLatest != null
                 ? dpsLatest / referencePrice
                 : null;
+        Double resolvedMarketCap = firstNonNull(
+                marketCap,
+                referencePrice != null && referencePrice > 0d && latestAnnual != null
+                        && latestAnnual.secMetadata() != null
+                        && latestAnnual.secMetadata().getSharesOutstanding() != null
+                                ? referencePrice * latestAnnual.secMetadata().getSharesOutstanding().doubleValue()
+                                : null);
+        Double netBuybacks = shareRepurchases != null || shareIssuance != null
+                ? dividendMetricsService.defaultIfNull(shareRepurchases) - dividendMetricsService.defaultIfNull(shareIssuance)
+                : null;
+        Double buybackYield = resolvedMarketCap != null && resolvedMarketCap > 0d && netBuybacks != null
+                ? dividendMetricsService.safeDivide(netBuybacks, resolvedMarketCap)
+                : null;
+        Double shareholderYield = resolvedMarketCap != null && resolvedMarketCap > 0d && dividendsPaid != null
+                ? dividendMetricsService.safeDivide(dividendsPaid + dividendMetricsService.defaultIfNull(netBuybacks), resolvedMarketCap)
+                : null;
+
+        DividendOverviewResponse.Coverage coverage = DividendOverviewResponse.Coverage.builder()
+                .revenue(revenue)
+                .operatingCashFlow(operatingCashFlow)
+                .capitalExpenditures(capitalExpenditures)
+                .freeCashFlow(freeCashFlow)
+                .dividendsPaid(dividendsPaid)
+                .cashCoverage(cashCoverage)
+                .retainedCash(retainedCash)
+                .build();
 
         DividendOverviewResponse.Snapshot snapshot = DividendOverviewResponse.Snapshot.builder()
                 .dpsLatest(dpsLatest)
@@ -107,21 +141,14 @@ public class DividendOverviewComputationService {
                 .currentRatio(currentRatio)
                 .fcfMargin(fcfMargin)
                 .dividendYield(dividendYield)
+                .shareholderYield(shareholderYield)
+                .buybackYield(buybackYield)
                 .build();
 
-        List<DividendOverviewResponse.Alert> alerts = dividendAlertsService.buildAlerts(trend, snapshot);
+        List<DividendOverviewResponse.Alert> alerts = dividendAlertsService.buildAlerts(trend, snapshot, coverage, sector);
         int score = dividendAlertsService.buildScore(snapshot, alerts);
         DividendOverviewResponse.DividendRating rating = dividendAlertsService.toRating(score);
 
-        DividendOverviewResponse.Coverage coverage = DividendOverviewResponse.Coverage.builder()
-                .revenue(revenue)
-                .operatingCashFlow(operatingCashFlow)
-                .capitalExpenditures(capitalExpenditures)
-                .freeCashFlow(freeCashFlow)
-                .dividendsPaid(dividendsPaid)
-                .cashCoverage(cashCoverage)
-                .retainedCash(retainedCash)
-                .build();
         DividendOverviewResponse.Balance balance = DividendOverviewResponse.Balance.builder()
                 .cash(cash)
                 .grossDebt(grossDebt)
@@ -191,6 +218,12 @@ public class DividendOverviewComputationService {
         confidence.put("dividendYield", referencePrice != null && snapshot.getDividendYield() != null
                 ? DividendOverviewResponse.MetricConfidence.MEDIUM
                 : DividendOverviewResponse.MetricConfidence.LOW);
+        confidence.put("shareholderYield", snapshot.getShareholderYield() != null
+                ? DividendOverviewResponse.MetricConfidence.LOW_MEDIUM
+                : DividendOverviewResponse.MetricConfidence.LOW);
+        confidence.put("buybackYield", snapshot.getBuybackYield() != null
+                ? DividendOverviewResponse.MetricConfidence.LOW_MEDIUM
+                : DividendOverviewResponse.MetricConfidence.LOW);
 
         return confidence;
     }
@@ -233,6 +266,19 @@ public class DividendOverviewComputationService {
         }
 
         return warnings;
+    }
+
+    @SafeVarargs
+    private final <T> T firstNonNull(T... values) {
+        if (values == null) {
+            return null;
+        }
+        for (T value : values) {
+            if (value != null) {
+                return value;
+            }
+        }
+        return null;
     }
 
     public record OverviewComputation(

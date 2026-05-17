@@ -9,16 +9,20 @@ Extend `SecApiClient` to support the three XBRL-specific SEC endpoints that prov
 `SecApiClient` already supports:
 - `fetchSubmissions(cik)` — company metadata and filing history
 - `fetchCompanyTickers()` — CIK/ticker mapping
+- `fetchCompanyFacts(cik)` - all XBRL facts for a company
+- `fetchCompanyConcept(cik, taxonomy, tag)` - single XBRL concept time series
+- `fetchFrame(taxonomy, tag, unit, period)` - cross-sectional XBRL frame data
+- Optional companyfacts/companyconcept/frame fetchers that return `Optional.empty()` for SEC 404 responses
 - `fetchForm4(cik, accession, document)` — individual filing documents
 - `fetchEftsSearch(...)` — full-text filing search
-- Rate limiting via `SecRateLimiter` (10 rps)
+- Rate limiting via `SecRateLimiter` (10 rps by default, configurable)
 - Persistent disk caching via `DownloadedResourceStore`
 - Gzip/deflate decompression
 - Async variants with `CompletableFuture`
 
-The `bulkCompanyFactsFileUrl` is configured in `application.yml` but not yet used.
+The `bulkCompanyFactsFileUrl` is configured in `application.yml` and used by bulk download flows.
 
-## New Endpoints to Add
+## SEC XBRL Endpoints
 
 ### 1.1 Company Facts Endpoint
 
@@ -240,9 +244,9 @@ private String normalizeCik(String cik) {
 - [ ] `fetchCompanyFacts("320193")` returns Apple's complete fact set
 - [ ] `fetchCompanyConcept("320193", "us-gaap", "CommonStockDividendsPerShareDeclared")` returns DPS history
 - [ ] `fetchFrame("us-gaap", "CommonStockDividendsPerShareDeclared", "USD-per-shares", "CY2023Q4I")` returns cross-sectional data
-- [ ] Rate limiter prevents exceeding 10 rps across all endpoint types
-- [ ] Disk cache works for all three endpoints
-- [ ] 404 for non-existent CIK returns graceful empty response
-- [ ] Async variants work correctly
+- [x] Rate limiter prevents exceeding configured requests per second across endpoint types
+- [x] Disk cache works for all three endpoints
+- [x] 404 for non-existent CIK can return graceful empty response through optional fetchers
+- [x] Async variants work correctly
 
 ## Estimated Effort: 3-4 days

@@ -4,6 +4,18 @@
 
 Expose all dividend viability metrics, alerts, and filing evidence through a clean REST API. Design the response structure to directly support the dashboard wireframe.
 
+## Current Implementation Status
+
+Implemented local coverage:
+
+- Controller endpoints exist for overview, history, alerts, events, evidence, compare, screen, metric definitions, sync, track/untrack, and quality.
+- Service-level tests cover overview, history, compare, screen, alerts, events, evidence, and metric definitions using deterministic fixtures.
+- Springdoc OpenAPI UI is included and dividend endpoints are annotated with `@Operation`/`@Tag` metadata.
+
+Remaining operational validation:
+
+- Live AAPL/MSFT/JNJ endpoint checks and cached response-time benchmarks require a running application with seeded or live SEC data.
+
 ## API Endpoints
 
 ### Base Path: `/api/dividend`
@@ -18,6 +30,11 @@ Expose all dividend viability metrics, alerts, and filing evidence through a cle
 | GET | `/compare` | Peer comparison across companies |
 | POST | `/screen` | Screen companies by dividend criteria |
 | GET | `/metrics` | Self-documenting metric definitions |
+| POST | `/{tickerOrCik}/sync` | Run immediate dividend sync |
+| GET | `/{tickerOrCik}/sync` | Read stored dividend sync status |
+| POST | `/{tickerOrCik}/track` | Add company to tracked dividend universe |
+| DELETE | `/{tickerOrCik}/track` | Remove company from tracked dividend universe |
+| GET | `/{tickerOrCik}/quality` | Data quality and benchmark checks |
 
 ### 6.1 Company Overview Response
 
@@ -179,8 +196,9 @@ public class DividendController {
 - [ ] `/api/dividend/AAPL` returns complete overview
 - [ ] `/api/dividend/AAPL/history` returns 15 years of annual metrics
 - [ ] `/api/dividend/compare?tickers=AAPL,MSFT,JNJ` works
-- [ ] `/api/dividend/screen` filters correctly
-- [ ] Swagger UI shows all endpoints
+- [x] `/api/dividend/screen` filters correctly
+- [x] Sync, tracking, and quality endpoints are exposed by the controller
+- [x] Swagger/OpenAPI metadata is present for all dividend controller endpoints
 - [ ] Response times < 200ms for single company (cached)
 
 ## Estimated Effort: 5-6 days

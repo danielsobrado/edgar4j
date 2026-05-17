@@ -22,7 +22,9 @@ import org.jds.edgar4j.integration.SecApiConfig;
 import org.jds.edgar4j.integration.SecResponseParser;
 import org.jds.edgar4j.integration.model.SecCompanyFactsResponse;
 import org.jds.edgar4j.model.Filling;
+import org.jds.edgar4j.model.NormalizedXbrlFact;
 import org.jds.edgar4j.port.FillingDataPort;
+import org.jds.edgar4j.port.NormalizedXbrlFactDataPort;
 import org.jds.edgar4j.service.dividend.DividendMetricsService;
 import org.jds.edgar4j.validation.UrlAllowlistValidator;
 import org.jds.edgar4j.xbrl.XbrlService;
@@ -55,6 +57,9 @@ public class DividendFilingAnalysisService {
             "CommonStockDividendsPerShareCashPaid",
             "CommonStockDividendsPerShareDeclaredAndPaid",
             "DividendsPerShare");
+    private static final List<StoredConceptPriority> STORED_DPS_STANDARD_KEYS = List.of(
+            new StoredConceptPriority("DividendsPerShare", 0),
+            new StoredConceptPriority("DividendsPerShareCashPaid", 1));
 
     private final FillingDataPort fillingRepository;
     private final SecApiClient secApiClient;
@@ -63,6 +68,7 @@ public class DividendFilingAnalysisService {
     private final XbrlService xbrlService;
     private final UrlAllowlistValidator urlAllowlistValidator;
     private final DividendMetricsService dividendMetricsService;
+    private final NormalizedXbrlFactDataPort normalizedXbrlFactDataPort;
 
     public List<Filling> loadRecentFilings(String cik) {
         LinkedHashMap<String, Filling> merged = new LinkedHashMap<>();
@@ -119,6 +125,11 @@ public class DividendFilingAnalysisService {
     }
 
     public List<DividendFactPoint> loadDividendFactSeries(String cik) {
+        List<DividendFactPoint> storedSeries = loadStoredDividendFactSeries(cik);
+        if (!storedSeries.isEmpty()) {
+            return storedSeries;
+        }
+
         try {
             SecCompanyFactsResponse companyFacts = secResponseParser.parseCompanyFactsResponse(secApiClient.fetchCompanyFacts(cik));
             return extractAnnualDividendSeries(companyFacts);
@@ -340,6 +351,50 @@ public class DividendFilingAnalysisService {
         return series.values();
     }
 
+    private List<DividendFactPoint> loadStoredDividendFactSeries(String cik) {
+        String normalizedCik = blankToNull(cik);
+        if (normalizedCik == null) {
+            return List.of();
+        }
+
+        TreeAccumulator<DividendFactPoint> series = new TreeAccumulator<>();
+        try {
+            for (StoredConceptPriority priority : STORED_DPS_STANDARD_KEYS) {
+                List<NormalizedXbrlFact> facts =
+                        normalizedXbrlFactDataPort.findByCikAndStandardConceptAndCurrentBestTrueOrderByPeriodEndDesc(
+                                normalizedCik,
+                                priority.standardConcept());
+                if (facts == null) {
+                    continue;
+                }
+
+                for (NormalizedXbrlFact fact : facts) {
+                    if (!isAnnualNormalizedDividendFact(fact)) {
+                        continue;
+                    }
+
+                    Double value = toDouble(fact.getValue());
+                    if (fact.getPeriodEnd() == null || value == null) {
+                        continue;
+                    }
+
+                    DividendFactPoint candidate = new DividendFactPoint(
+                            fact.getPeriodEnd(),
+                            fact.getFiledDate(),
+                            blankToNull(fact.getAccession()),
+                            dividendMetricsService.magnitude(value),
+                            priority.priority());
+                    series.put(fact.getPeriodEnd(), candidate, this::isBetterFactCandidate);
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Could not load normalized dividend facts for {}", normalizedCik, e);
+            return List.of();
+        }
+
+        return series.values();
+    }
+
     private SecCompanyFactsResponse.ConceptFacts getConceptFacts(
             SecCompanyFactsResponse companyFacts,
             String taxonomy,
@@ -365,6 +420,26 @@ public class DividendFilingAnalysisService {
 
         LocalDate start = parseDate(entry.getStart());
         LocalDate end = parseDate(entry.getEnd());
+        return start != null && end != null && ChronoUnit.DAYS.between(start, end) >= 300;
+    }
+
+    private boolean isAnnualNormalizedDividendFact(NormalizedXbrlFact fact) {
+        if (fact == null || fact.getValue() == null) {
+            return false;
+        }
+
+        String form = normalizeFormType(fact.getForm());
+        if (!ANNUAL_FORMS.contains(form)) {
+            return false;
+        }
+
+        String fiscalPeriod = blankToNull(fact.getFiscalPeriod());
+        if (fiscalPeriod != null) {
+            return "FY".equalsIgnoreCase(fiscalPeriod);
+        }
+
+        LocalDate start = fact.getPeriodStart();
+        LocalDate end = fact.getPeriodEnd();
         return start != null && end != null && ChronoUnit.DAYS.between(start, end) >= 300;
     }
 
@@ -486,6 +561,9 @@ public class DividendFilingAnalysisService {
     }
 
     private record TagPriority(String taxonomy, String tag, int priority) {
+    }
+
+    private record StoredConceptPriority(String standardConcept, int priority) {
     }
 
     private static final class TrendAccumulator {

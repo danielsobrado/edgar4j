@@ -5,12 +5,14 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.StreamSupport;
 
 import org.jds.edgar4j.dto.response.CompanyResponse;
 import org.jds.edgar4j.dto.response.DividendOverviewResponse;
@@ -26,6 +28,7 @@ import org.jds.edgar4j.service.DividendAnalysisService;
 import org.jds.edgar4j.service.DividendSyncService;
 import org.jds.edgar4j.service.DownloadSubmissionsService;
 import org.jds.edgar4j.service.Sp500Service;
+import org.jds.edgar4j.service.xbrl.CompanyFactsIngestionService;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -48,6 +51,7 @@ public class DividendSyncServiceImpl implements DividendSyncService {
     private final CompanyMarketDataService companyMarketDataService;
     private final DividendAnalysisService dividendAnalysisService;
     private final Sp500Service sp500Service;
+    private final CompanyFactsIngestionService companyFactsIngestionService;
 
     @Override
     public DividendSyncStatusResponse syncCompany(String tickerOrCik, boolean refreshMarketData) {
@@ -71,6 +75,7 @@ public class DividendSyncServiceImpl implements DividendSyncService {
 
         try {
             downloadSubmissionsService.downloadSubmissions(cik);
+            CompanyFactsIngestionService.IngestionResult factIngestion = companyFactsIngestionService.ingest(cik);
 
             List<Filling> recentFilings = loadRecentFilings(cik);
             List<String> newAccessions = detectNewAccessions(recentFilings, state.getLastAccession());
@@ -83,7 +88,8 @@ public class DividendSyncServiceImpl implements DividendSyncService {
             state.setLastFactsSync(now);
             state.setLastAccession(latestAccession);
             state.setLastNewFilingsDetected(newAccessions.size());
-            state.setFactsVersion(newAccessions.isEmpty() ? state.getFactsVersion() : state.getFactsVersion() + 1);
+            boolean factsChanged = factIngestion.inserted() > 0 || !newAccessions.isEmpty();
+            state.setFactsVersion(factsChanged ? state.getFactsVersion() + 1 : state.getFactsVersion());
 
             if (refreshMarketData && ticker != null) {
                 companyMarketDataService.fetchAndSaveQuote(ticker);
@@ -167,15 +173,98 @@ public class DividendSyncServiceImpl implements DividendSyncService {
     }
 
     @Override
+    public DividendSyncStatusResponse trackCompany(String tickerOrCik, boolean syncNow, boolean refreshMarketData) {
+        if (syncNow) {
+            return syncCompany(tickerOrCik, refreshMarketData);
+        }
+
+        CompanyResponse company = resolveCompany(tickerOrCik);
+        String cik = normalizeCik(company.getCik())
+                .orElseThrow(() -> new IllegalArgumentException("Company CIK is unavailable"));
+        String ticker = normalizeTicker(company.getTicker())
+                .orElseGet(() -> companyService.getTickerByCik(cik).orElse(null));
+        Instant now = Instant.now();
+
+        DividendSyncState state = dividendSyncStateRepository.findByCik(cik)
+                .orElseGet(() -> newState(cik, ticker, company.getName(), now));
+        updateStateIdentity(state, cik, ticker, company.getName(), now);
+        state.setSyncStatus(DividendSyncState.SyncStatus.IDLE);
+        state.setUpdatedAt(now);
+        dividendSyncStateRepository.save(state);
+
+        return toStatusResponse(
+                state,
+                buildCompanySummary(company, ticker, null),
+                false,
+                false,
+                state.getLastAnalysisWarmup() != null,
+                List.of());
+    }
+
+    @Override
+    public DividendSyncStatusResponse untrackCompany(String tickerOrCik) {
+        CompanyResponse company = resolveCompany(tickerOrCik);
+        String cik = normalizeCik(company.getCik())
+                .orElseThrow(() -> new IllegalArgumentException("Company CIK is unavailable"));
+        String ticker = normalizeTicker(company.getTicker())
+                .orElseGet(() -> companyService.getTickerByCik(cik).orElse(null));
+
+        Optional<DividendSyncState> existingState = dividendSyncStateRepository.findByCik(cik);
+        List<String> warnings = new ArrayList<>();
+        DividendSyncState responseState = existingState.orElseGet(() -> {
+            warnings.add("Company was not tracked.");
+            return newState(cik, ticker, company.getName(), Instant.now());
+        });
+
+        existingState.ifPresent(state -> dividendSyncStateRepository.deleteById(
+                state.getId() != null ? state.getId() : cik));
+
+        return toStatusResponse(
+                responseState,
+                buildCompanySummary(company, ticker, null),
+                false,
+                false,
+                responseState.getLastAnalysisWarmup() != null,
+                warnings);
+    }
+
+    @Override
     public List<DividendSyncStatusResponse> syncTrackedCompanies(int maxCompanies, boolean refreshMarketData) {
-        Set<String> tickers = new LinkedHashSet<>(sp500Service.getAllTickers());
-        return tickers.stream()
+        Set<String> identifiers = resolveTrackedSyncIdentifiers();
+        return identifiers.stream()
                 .filter(Objects::nonNull)
-                .filter(ticker -> !ticker.isBlank())
+                .filter(identifier -> !identifier.isBlank())
                 .sorted(String.CASE_INSENSITIVE_ORDER)
                 .limit(maxCompanies > 0 ? maxCompanies : Long.MAX_VALUE)
-                .map(ticker -> syncCompany(ticker, refreshMarketData))
+                .map(identifier -> syncTrackedCompanySafely(identifier, refreshMarketData))
+                .flatMap(Optional::stream)
                 .toList();
+    }
+
+    private Set<String> resolveTrackedSyncIdentifiers() {
+        Set<String> trackedIdentifiers = StreamSupport.stream(dividendSyncStateRepository.findAll().spliterator(), false)
+                .sorted(Comparator.comparing(
+                        state -> firstNonBlank(state.getTicker(), state.getCik()),
+                        Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
+                .map(state -> firstNonBlank(state.getTicker(), state.getCik()))
+                .filter(Objects::nonNull)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        if (!trackedIdentifiers.isEmpty()) {
+            return trackedIdentifiers;
+        }
+
+        return new LinkedHashSet<>(sp500Service.getAllTickers());
+    }
+
+    private Optional<DividendSyncStatusResponse> syncTrackedCompanySafely(
+            String tickerOrCik,
+            boolean refreshMarketData) {
+        try {
+            return Optional.of(syncCompany(tickerOrCik, refreshMarketData));
+        } catch (RuntimeException e) {
+            log.warn("Skipping dividend sync for tracked company {}: {}", tickerOrCik, e.getMessage());
+            return Optional.empty();
+        }
     }
 
     private CompanyResponse resolveCompany(String tickerOrCik) {

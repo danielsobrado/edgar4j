@@ -62,6 +62,38 @@ public class SecApiClient {
         return executeRequest(config.getCompanyFactsUrl(cik));
     }
 
+    public Optional<String> fetchCompanyFactsOptional(String cik) {
+        return executeRequestOptional(config.getCompanyFactsUrl(cik));
+    }
+
+    public CompletableFuture<String> fetchCompanyFactsAsync(String cik) {
+        return executeRequestAsync(config.getCompanyFactsUrl(cik));
+    }
+
+    public String fetchCompanyConcept(String cik, String taxonomy, String tag) {
+        return executeRequest(config.getCompanyConceptUrl(cik, taxonomy, tag));
+    }
+
+    public Optional<String> fetchCompanyConceptOptional(String cik, String taxonomy, String tag) {
+        return executeRequestOptional(config.getCompanyConceptUrl(cik, taxonomy, tag));
+    }
+
+    public CompletableFuture<String> fetchCompanyConceptAsync(String cik, String taxonomy, String tag) {
+        return executeRequestAsync(config.getCompanyConceptUrl(cik, taxonomy, tag));
+    }
+
+    public String fetchFrame(String taxonomy, String tag, String unit, String period) {
+        return executeRequest(config.getFrameUrl(taxonomy, tag, unit, period));
+    }
+
+    public Optional<String> fetchFrameOptional(String taxonomy, String tag, String unit, String period) {
+        return executeRequestOptional(config.getFrameUrl(taxonomy, tag, unit, period));
+    }
+
+    public CompletableFuture<String> fetchFrameAsync(String taxonomy, String tag, String unit, String period) {
+        return executeRequestAsync(config.getFrameUrl(taxonomy, tag, unit, period));
+    }
+
     public byte[] fetchBulkSubmissionsArchive() {
         return executeBinaryRequest(config.getBulkSubmissionsFileUrl());
     }

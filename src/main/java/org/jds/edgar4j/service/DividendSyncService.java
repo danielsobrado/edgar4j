@@ -10,5 +10,9 @@ public interface DividendSyncService {
 
     DividendSyncStatusResponse getSyncStatus(String tickerOrCik);
 
+    DividendSyncStatusResponse trackCompany(String tickerOrCik, boolean syncNow, boolean refreshMarketData);
+
+    DividendSyncStatusResponse untrackCompany(String tickerOrCik);
+
     List<DividendSyncStatusResponse> syncTrackedCompanies(int maxCompanies, boolean refreshMarketData);
 }

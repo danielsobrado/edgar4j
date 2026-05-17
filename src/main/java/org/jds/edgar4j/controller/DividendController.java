@@ -18,6 +18,7 @@ import org.jds.edgar4j.dto.response.DividendSyncStatusResponse;
 import org.jds.edgar4j.service.DividendAnalysisService;
 import org.jds.edgar4j.service.DividendQualityService;
 import org.jds.edgar4j.service.DividendSyncService;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -96,6 +97,32 @@ public class DividendController {
             @PathVariable String tickerOrCik) {
         log.info("GET /api/dividend/{}/sync", tickerOrCik);
         return ResponseEntity.ok(ApiResponse.success(dividendSyncService.getSyncStatus(tickerOrCik)));
+    }
+
+    @Operation(summary = "Add a company to the dividend tracked universe",
+               description = "Creates dividend sync state for a ticker or SEC CIK. Optionally runs the first sync immediately.")
+    @PostMapping("/{tickerOrCik}/track")
+    public ResponseEntity<ApiResponse<DividendSyncStatusResponse>> trackCompany(
+            @Parameter(description = "Ticker symbol or SEC CIK", example = "AAPL")
+            @PathVariable String tickerOrCik,
+            @Parameter(description = "Run sync immediately after adding the company.", example = "false")
+            @RequestParam(defaultValue = "false") boolean syncNow,
+            @Parameter(description = "Refresh market data if syncNow is true.", example = "true")
+            @RequestParam(defaultValue = "true") boolean refreshMarketData) {
+        log.info("POST /api/dividend/{}/track syncNow={} refreshMarketData={}",
+                tickerOrCik, syncNow, refreshMarketData);
+        return ResponseEntity.ok(ApiResponse.success(
+                dividendSyncService.trackCompany(tickerOrCik, syncNow, refreshMarketData)));
+    }
+
+    @Operation(summary = "Remove a company from the dividend tracked universe",
+               description = "Deletes stored dividend sync state for a ticker or SEC CIK without deleting historical filings or facts.")
+    @DeleteMapping("/{tickerOrCik}/track")
+    public ResponseEntity<ApiResponse<DividendSyncStatusResponse>> untrackCompany(
+            @Parameter(description = "Ticker symbol or SEC CIK", example = "AAPL")
+            @PathVariable String tickerOrCik) {
+        log.info("DELETE /api/dividend/{}/track", tickerOrCik);
+        return ResponseEntity.ok(ApiResponse.success(dividendSyncService.untrackCompany(tickerOrCik)));
     }
 
     @Operation(summary = "Get dividend data quality and benchmark status",

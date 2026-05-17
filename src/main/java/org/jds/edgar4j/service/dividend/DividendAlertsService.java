@@ -2,6 +2,7 @@ package org.jds.edgar4j.service.dividend;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 import org.jds.edgar4j.dto.response.DividendOverviewResponse;
 import org.springframework.stereotype.Service;
@@ -9,12 +10,37 @@ import org.springframework.stereotype.Service;
 @Service
 public class DividendAlertsService {
 
+    private static final double DEFAULT_FCF_PAYOUT_WARNING_THRESHOLD = 0.85d;
+    private static final double DEFAULT_FCF_PAYOUT_HIGH_THRESHOLD = 1.00d;
+    private static final double REIT_FCF_PAYOUT_WARNING_THRESHOLD = 1.20d;
+    private static final double REIT_FCF_PAYOUT_HIGH_THRESHOLD = 1.50d;
+    private static final double DEFAULT_NET_DEBT_WARNING_THRESHOLD = 3.50d;
+    private static final double DEFAULT_NET_DEBT_HIGH_THRESHOLD = 5.00d;
+    private static final double REIT_NET_DEBT_WARNING_THRESHOLD = 6.00d;
+    private static final double REIT_NET_DEBT_HIGH_THRESHOLD = 7.50d;
+
     public List<DividendOverviewResponse.Alert> buildAlerts(
             List<DividendOverviewResponse.TrendPoint> trend,
             DividendOverviewResponse.Snapshot snapshot) {
+        return buildAlerts(trend, snapshot, null);
+    }
+
+    public List<DividendOverviewResponse.Alert> buildAlerts(
+            List<DividendOverviewResponse.TrendPoint> trend,
+            DividendOverviewResponse.Snapshot snapshot,
+            DividendOverviewResponse.Coverage coverage) {
+        return buildAlerts(trend, snapshot, coverage, null);
+    }
+
+    public List<DividendOverviewResponse.Alert> buildAlerts(
+            List<DividendOverviewResponse.TrendPoint> trend,
+            DividendOverviewResponse.Snapshot snapshot,
+            DividendOverviewResponse.Coverage coverage,
+            String sector) {
         List<DividendOverviewResponse.Alert> alerts = new ArrayList<>();
         DividendOverviewResponse.TrendPoint latest = trend.isEmpty() ? null : trend.get(trend.size() - 1);
         DividendOverviewResponse.TrendPoint previous = trend.size() > 1 ? trend.get(trend.size() - 2) : null;
+        AlertThresholds thresholds = AlertThresholds.forSector(sector);
 
         if (latest != null
                 && previous != null
@@ -27,9 +53,20 @@ public class DividendAlertsService {
                     "The latest annual dividend-per-share value is below the prior year."));
         }
 
-        if (snapshot.getFcfPayoutRatio() != null && snapshot.getFcfPayoutRatio() > 0.85d) {
+        if (coverage != null
+                && coverage.getFreeCashFlow() != null
+                && coverage.getDividendsPaid() != null
+                && coverage.getFreeCashFlow() < 0d
+                && coverage.getDividendsPaid() > 0d) {
+            alerts.add(alert("dividend-funded-by-debt", DividendOverviewResponse.AlertSeverity.HIGH,
+                    "Dividend is not covered by free cash flow",
+                    "The company paid dividends while annual free cash flow was negative."));
+        }
+
+        if (snapshot.getFcfPayoutRatio() != null
+                && snapshot.getFcfPayoutRatio() > thresholds.fcfPayoutWarningThreshold()) {
             alerts.add(alert("fcf-payout",
-                    snapshot.getFcfPayoutRatio() > 1d
+                    snapshot.getFcfPayoutRatio() > thresholds.fcfPayoutHighThreshold()
                             ? DividendOverviewResponse.AlertSeverity.HIGH
                             : DividendOverviewResponse.AlertSeverity.MEDIUM,
                     "Elevated cash payout ratio",
@@ -45,9 +82,10 @@ public class DividendAlertsService {
                     "Current liabilities exceed or nearly exceed current assets."));
         }
 
-        if (snapshot.getNetDebtToEbitda() != null && snapshot.getNetDebtToEbitda() > 3.5d) {
+        if (snapshot.getNetDebtToEbitda() != null
+                && snapshot.getNetDebtToEbitda() > thresholds.netDebtWarningThreshold()) {
             alerts.add(alert("net-debt-to-ebitda",
-                    snapshot.getNetDebtToEbitda() > 5d
+                    snapshot.getNetDebtToEbitda() > thresholds.netDebtHighThreshold()
                             ? DividendOverviewResponse.AlertSeverity.HIGH
                             : DividendOverviewResponse.AlertSeverity.MEDIUM,
                     "Leverage is running hot",
@@ -176,5 +214,36 @@ public class DividendAlertsService {
                 .title(title)
                 .description(description)
                 .build();
+    }
+
+    private record AlertThresholds(
+            double fcfPayoutWarningThreshold,
+            double fcfPayoutHighThreshold,
+            double netDebtWarningThreshold,
+            double netDebtHighThreshold) {
+
+        private static AlertThresholds forSector(String sector) {
+            if (isReitSector(sector)) {
+                return new AlertThresholds(
+                        REIT_FCF_PAYOUT_WARNING_THRESHOLD,
+                        REIT_FCF_PAYOUT_HIGH_THRESHOLD,
+                        REIT_NET_DEBT_WARNING_THRESHOLD,
+                        REIT_NET_DEBT_HIGH_THRESHOLD);
+            }
+            return new AlertThresholds(
+                    DEFAULT_FCF_PAYOUT_WARNING_THRESHOLD,
+                    DEFAULT_FCF_PAYOUT_HIGH_THRESHOLD,
+                    DEFAULT_NET_DEBT_WARNING_THRESHOLD,
+                    DEFAULT_NET_DEBT_HIGH_THRESHOLD);
+        }
+
+        private static boolean isReitSector(String sector) {
+            if (sector == null || sector.isBlank()) {
+                return false;
+            }
+            String normalized = sector.toLowerCase(Locale.ROOT);
+            return normalized.contains("reit")
+                    || normalized.contains("real estate investment trust");
+        }
     }
 }

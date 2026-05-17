@@ -318,6 +318,18 @@ public class DividendHistoryAnalysisService {
                     current));
         }
 
+        if (current.freeCashFlow() != null
+                && current.dividendsPaid() != null
+                && current.freeCashFlow() < 0d
+                && current.dividendsPaid() > 0d) {
+            events.add(toAlertEventData(dividendAlertsService.alert(
+                    "dividend-funded-by-debt",
+                    DividendOverviewResponse.AlertSeverity.HIGH,
+                    "Dividend is not covered by free cash flow",
+                    "The company paid dividends while annual free cash flow was negative."),
+                    current));
+        }
+
         if (current.fcfPayoutRatio() != null && current.fcfPayoutRatio() > 0.85d) {
             events.add(toAlertEventData(dividendAlertsService.alert(
                     "fcf-payout",

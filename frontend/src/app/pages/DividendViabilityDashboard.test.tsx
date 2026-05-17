@@ -84,6 +84,8 @@ describe('DividendViabilityDashboard', () => {
         currentRatio: 1.07,
         fcfMargin: 0.27,
         dividendYield: 0.018,
+        shareholderYield: 0.035,
+        buybackYield: 0.017,
       },
       confidence: {
         dpsLatest: 'HIGH',

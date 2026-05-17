@@ -4,6 +4,21 @@
 
 Parse SEC filing text (8-K Item 8.01, Exhibit 99.1 press releases, and 10-K equity notes) to extract dividend declarations, suspensions, policy changes, and special dividends — events that are frequently described in narrative text rather than in a single neat XBRL tag.
 
+## Current Implementation Status
+
+Implemented local coverage:
+
+- Declaration extraction from representative Item 8.01 text, including per-share amount, declaration date, record date, and payable date.
+- Special dividend extraction from representative current-report text.
+- Suspension-language extraction without creating a false declaration event.
+- Policy-language extraction from annual filing text.
+- False-positive guard for general dividend-yield discussion.
+- Inline XBRL/HTML cleaning without corrupting visible text.
+
+Remaining operational validation:
+
+- Live recent AAPL 8-K extraction and comparison against known dividend history.
+
 ## Why Text Extraction Is Necessary
 
 XBRL gives you the **numbers** (DPS declared, dividends paid), but the **events** live in filing text:
@@ -213,11 +228,11 @@ public class FilingTextCleaner {
 
 - [ ] Apple (AAPL) dividend declarations extracted from recent 8-K filings
 - [ ] Per-share amounts match known dividend history
-- [ ] Record date and payable date correctly parsed
-- [ ] Special dividends correctly flagged (e.g., Costco historical specials)
-- [ ] Suspension events detected (test with a company that suspended during COVID)
-- [ ] Policy language extracted from 10-K risk factors
-- [ ] No false positives from unrelated uses of "dividend"
-- [ ] HTML cleaning handles inline XBRL markup without corrupting text
+- [x] Record date and payable date correctly parsed
+- [x] Special dividends correctly flagged
+- [x] Suspension events detected
+- [x] Policy language extracted from 10-K risk factors
+- [x] No false positives from unrelated uses of "dividend"
+- [x] HTML cleaning handles inline XBRL markup without corrupting text
 
 ## Estimated Effort: 5-6 days

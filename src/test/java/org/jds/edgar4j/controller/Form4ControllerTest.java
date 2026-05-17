@@ -24,7 +24,9 @@ import static org.hamcrest.Matchers.*;
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class)`r`n@SuppressWarnings("removal")`r`nclass Form4ControllerTest {
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@SuppressWarnings("removal")
+class Form4ControllerTest {
 
     private WebTestClient webTestClient;
 

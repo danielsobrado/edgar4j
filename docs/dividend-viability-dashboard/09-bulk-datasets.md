@@ -4,6 +4,21 @@
 
 Ingest the SEC's "Financial Statement and Notes" bulk datasets for broader coverage of dimensioned facts, custom tags, and note-level disclosures. This is optional but highly valuable at scale — the bulk datasets cover cases that the real-time XBRL APIs miss.
 
+## Current Implementation Status
+
+Implemented local coverage:
+
+- NUM table parser handles tab-separated rows, blank optional fields, dates, numeric values, dimensions, and `iprx`.
+- Custom dividend-like tags are detected from TAG table rows via the custom/version metadata.
+- Dividend dimensions are classified as consolidated, common, preferred, special, other, or unknown.
+- `iprx` de-duplication selects the preferred priority-1 fact for identical accession/tag/period/unit/dimension keys.
+- Normalized fact records now carry source/tag-version/custom-tag/quarter-count/inline-priority metadata for API/BULK merging.
+
+Remaining implementation/operational validation:
+
+- Full quarterly/monthly notes ZIP download and extraction is not wired to normalized fact ingestion yet.
+- API + BULK merge/current-best recomputation is prepared at the model level but not fully ingested from SEC notes files.
+
 ## When to Use Bulk Datasets vs Company Facts API
 
 | Scenario | Company Facts API | Bulk Datasets |
@@ -262,10 +277,10 @@ public class BulkDatasetSyncJob {
 ## Validation Checklist
 
 - [ ] Quarterly bulk dataset downloads and extracts correctly
-- [ ] NUM parser handles tab-separated format with edge cases
-- [ ] Custom tags detected via version field
-- [ ] Dimensional facts correctly classified (common vs preferred dividends)
-- [ ] iprx de-duplication selects priority 1 facts
+- [x] NUM parser handles tab-separated format with edge cases
+- [x] Custom tags detected via version field
+- [x] Dimensional facts correctly classified (common vs preferred dividends)
+- [x] iprx de-duplication selects priority 1 facts
 - [ ] Bulk-ingested facts merge correctly with API-ingested facts
 - [ ] Current-best selection handles mixed API + BULK sources
 - [ ] Monthly job runs without blocking daily sync jobs

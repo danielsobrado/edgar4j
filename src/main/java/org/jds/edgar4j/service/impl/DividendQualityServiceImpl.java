@@ -58,6 +58,8 @@ public class DividendQualityServiceImpl implements DividendQualityService {
                 : rows.get(rows.size() - 1);
 
         checkAnnualHistoryDepth(history, issues);
+        checkAnnualHistoryGaps(rows, issues);
+        checkImpossibleMetricValues(rows, issues);
         checkSnapshotDpsConsistency(overview, latestRow, issues);
         checkFcfPayoutConsistency(latestRow, issues);
         checkEarningsPayoutConsistency(latestRow, issues);
@@ -92,6 +94,109 @@ public class DividendQualityServiceImpl implements DividendQualityService {
                     "Less than three annual history rows are available for validation.",
                     null,
                     null));
+        }
+    }
+
+    private void checkAnnualHistoryGaps(
+            List<DividendHistoryResponse.HistoryRow> rows,
+            List<DividendQualityResponse.QualityIssue> issues) {
+        List<LocalDate> periodEnds = rows.stream()
+                .filter(Objects::nonNull)
+                .map(DividendHistoryResponse.HistoryRow::getPeriodEnd)
+                .filter(Objects::nonNull)
+                .sorted()
+                .toList();
+
+        for (int index = 1; index < periodEnds.size(); index++) {
+            LocalDate previous = periodEnds.get(index - 1);
+            LocalDate current = periodEnds.get(index);
+            if (current.getYear() - previous.getYear() > 1) {
+                issues.add(issue(
+                        DividendQualityResponse.IssueSeverity.MEDIUM,
+                        "annual_history_gap",
+                        String.format(Locale.ROOT,
+                                "Annual history has a gap between fiscal years %d and %d.",
+                                previous.getYear(),
+                                current.getYear()),
+                        null,
+                        current));
+            }
+        }
+    }
+
+    private void checkImpossibleMetricValues(
+            List<DividendHistoryResponse.HistoryRow> rows,
+            List<DividendQualityResponse.QualityIssue> issues) {
+        for (DividendHistoryResponse.HistoryRow row : rows) {
+            if (row == null || row.getMetrics() == null) {
+                continue;
+            }
+
+            Map<String, Double> metrics = row.getMetrics();
+            LocalDate periodEnd = row.getPeriodEnd();
+            Double dps = metrics.get("dps_declared");
+            Double eps = metrics.get("eps_diluted");
+            Double earningsPayout = metrics.get("earnings_payout");
+            Double freeCashFlow = metrics.get("free_cash_flow");
+            Double dividendsPaid = metrics.get("dividends_paid");
+            Double fcfPayout = metrics.get("fcf_payout");
+
+            if (dps != null && dps < 0d) {
+                issues.add(issue(
+                        DividendQualityResponse.IssueSeverity.HIGH,
+                        "negative_dps",
+                        "Dividend per share is negative, which is not a valid cash dividend history value.",
+                        "dps_declared",
+                        periodEnd));
+            }
+            if (dividendsPaid != null && dividendsPaid < 0d) {
+                issues.add(issue(
+                        DividendQualityResponse.IssueSeverity.MEDIUM,
+                        "negative_dividends_paid",
+                        "Dividends paid is negative after normalization.",
+                        "dividends_paid",
+                        periodEnd));
+            }
+            if (freeCashFlow != null && freeCashFlow <= 0d && dividendsPaid != null && dividendsPaid > 0d) {
+                issues.add(issue(
+                        DividendQualityResponse.IssueSeverity.HIGH,
+                        "dividends_without_positive_fcf",
+                        "Dividends were paid while free cash flow was zero or negative.",
+                        "free_cash_flow",
+                        periodEnd));
+            }
+            if (freeCashFlow != null && freeCashFlow <= 0d && fcfPayout != null) {
+                issues.add(issue(
+                        DividendQualityResponse.IssueSeverity.MEDIUM,
+                        "fcf_payout_with_nonpositive_fcf",
+                        "FCF payout ratio is defined even though free cash flow is zero or negative.",
+                        "fcf_payout",
+                        periodEnd));
+            }
+            if (eps != null && eps <= 0d && earningsPayout != null) {
+                issues.add(issue(
+                        DividendQualityResponse.IssueSeverity.MEDIUM,
+                        "earnings_payout_with_nonpositive_eps",
+                        "Earnings payout ratio is defined even though diluted EPS is zero or negative.",
+                        "earnings_payout",
+                        periodEnd));
+            }
+            if (fcfPayout != null && (fcfPayout < 0d || fcfPayout > 2d)) {
+                issues.add(issue(
+                        fcfPayout < 0d ? DividendQualityResponse.IssueSeverity.HIGH : DividendQualityResponse.IssueSeverity.MEDIUM,
+                        "fcf_payout_out_of_bounds",
+                        "FCF payout ratio is outside expected bounds for dividend analysis.",
+                        "fcf_payout",
+                        periodEnd));
+            }
+            if (earningsPayout != null && (earningsPayout < 0d || earningsPayout > 2d)) {
+                issues.add(issue(
+                        earningsPayout < 0d ? DividendQualityResponse.IssueSeverity.HIGH : DividendQualityResponse.IssueSeverity.MEDIUM,
+                        "earnings_payout_out_of_bounds",
+                        "Earnings payout ratio is outside expected bounds for dividend analysis.",
+                        "earnings_payout",
+                        periodEnd));
+            }
         }
     }
 

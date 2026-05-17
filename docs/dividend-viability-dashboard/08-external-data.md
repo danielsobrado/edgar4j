@@ -4,6 +4,19 @@
 
 Integrate external data sources that EDGAR cannot provide: equity prices (for dividend yield), U.S. Treasury yield curve (for risk-free comparison), and corporate bond spreads (for credit context). These are **overlay metrics** — the EDGAR fundamentals remain the source of truth.
 
+## Current Implementation Status
+
+Implemented local coverage:
+
+- Dividend yield is computed as latest DPS divided by stored current price.
+- Shareholder yield is computed as dividends paid plus net buybacks divided by stored market cap.
+- Buyback yield is computed as net buybacks divided by stored market cap.
+- The overview degrades gracefully when stored market price data is unavailable; EDGAR-derived metrics still return.
+
+Remaining implementation/operational validation:
+
+- Treasury yield curve ingestion, FRED corporate yields, and historical yield-comparison chart data remain future work.
+
 ## What EDGAR Cannot Provide
 
 | Data | Why EDGAR Lacks It | External Source |
@@ -278,12 +291,12 @@ public Map<LocalDate, YieldComparison> getHistoricalYieldComparison(
 
 ## Validation Checklist
 
-- [ ] Dividend yield computed correctly: DPS / price
-- [ ] Shareholder yield includes buybacks
+- [x] Dividend yield computed correctly: DPS / price
+- [x] Shareholder yield includes buybacks
 - [ ] Treasury 10Y yield fetched and cached
 - [ ] FRED corporate yields work (when API key configured)
 - [ ] Yield comparison correctly identifies spread over risk-free
-- [ ] Graceful degradation when external sources unavailable (EDGAR metrics still work)
+- [x] Graceful degradation when external sources unavailable (EDGAR metrics still work)
 - [ ] Historical yield comparison chart data correct
 
 ## Estimated Effort: 3-4 days

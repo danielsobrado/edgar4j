@@ -291,10 +291,15 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
         List<DividendFactPoint> dividendFacts = dividendFilingAnalysisService.loadDividendFactSeries(cik);
         List<DividendOverviewResponse.TrendPoint> trend = dividendFilingAnalysisService.buildTrend(dividendFacts, annualAnalyses);
 
-        Double referencePrice = Optional.ofNullable(ticker)
-                .flatMap(companyMarketDataService::getStoredMarketData)
+        Optional<CompanyMarketData> marketData = Optional.ofNullable(ticker)
+                .flatMap(companyMarketDataService::getStoredMarketData);
+        Double referencePrice = marketData
                 .map(CompanyMarketData::getCurrentPrice)
                 .filter(price -> price != null && price > 0d)
+                .orElse(null);
+        Double marketCap = marketData
+                .map(CompanyMarketData::getMarketCap)
+                .filter(value -> value != null && value > 0d)
                 .orElse(null);
         DividendOverviewComputationService.OverviewComputation computed = dividendOverviewComputationService.computeOverview(
                 annualCandidates,
@@ -305,7 +310,9 @@ public class DividendAnalysisServiceImpl implements DividendAnalysisService {
                 latestBalance,
                 trend,
                 dividendFacts,
-                referencePrice);
+                referencePrice,
+                marketCap,
+                company.getSicDescription());
         DividendOverviewResponse.CompanySummary companySummary = buildCompanySummary(company, ticker, filings);
         DividendOverviewResponse.Evidence evidence = buildEvidence(latestAnnual, latestCurrentReport);
         List<HistoryRowData> historyRows = dividendHistoryAnalysisService.buildHistoryRows(annualAnalyses, trend);

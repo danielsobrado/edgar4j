@@ -192,6 +192,10 @@ public class DividendMetricCatalogService {
                 "overview", "Free cash flow divided by revenue."));
         definitions.put("dividend_yield", metric("dividend_yield", "Dividend Yield", "percent", "percent",
                 "overview", "Estimated dividend yield using stored market price."));
+        definitions.put("shareholder_yield", metric("shareholder_yield", "Shareholder Yield", "percent", "percent",
+                "overview", "Dividends paid plus net buybacks divided by market capitalization."));
+        definitions.put("buyback_yield", metric("buyback_yield", "Buyback Yield", "percent", "percent",
+                "overview", "Net common share repurchases divided by market capitalization."));
         definitions.put("score", metric("score", "Viability Score", "score", "score",
                 "overview", "Composite dividend viability score on a 0-100 scale."));
         definitions.put("active_alerts", metric("active_alerts", "Active Alerts", "count", "count",

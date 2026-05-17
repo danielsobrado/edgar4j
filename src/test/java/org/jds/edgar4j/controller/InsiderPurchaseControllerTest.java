@@ -26,7 +26,9 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")`r`n@SuppressWarnings("removal")`r`nclass InsiderPurchaseControllerTest {
+@ActiveProfiles("test")
+@SuppressWarnings("removal")
+class InsiderPurchaseControllerTest {
 
     @LocalServerPort
     private int port;

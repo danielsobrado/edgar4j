@@ -13,6 +13,23 @@ Create a persistent data model and ingestion pipeline that transforms raw SEC Co
 
 ## Data Model
 
+## Current Implementation Status
+
+Implemented in code:
+- `NormalizedXbrlFact` Mongo/file-backed document model for normalized SEC companyfacts entries
+- `NormalizedXbrlFactDataPort` plus high-resource Mongo and low-resource file adapters
+- `CompanyFactsIngestionService` for idempotent flattening of SEC companyfacts responses
+- deterministic current-best selection per `(cik, taxonomy, tag, unit, period, dimensions)`
+- dimensional fact metadata is preserved when SEC fact entries expose segment/member/axis fields, and the dimension hash participates in the natural key
+- extended dividend, coverage, leverage, liquidity, and share-count concept mappings in `ConceptStandardizer`
+- dividend sync now invokes normalized companyfacts ingestion
+- dividend analysis reads current-best dividend-per-share facts from the normalized fact store before falling back to SEC companyfacts
+- bulk companyfacts ingestion deduplicates CIKs, caps the batch size, records per-CIK failures, and uses the shared SEC rate-limited client
+- SEC unit strings are normalized during ingestion, including dividend-per-share units
+
+Remaining operational validation:
+- run a real large-universe ingestion dry run with a production SEC user agent and monitored contact email to confirm throughput against live SEC fair-access behavior
+
 ### 2.1 Core Tables / Documents
 
 ```
@@ -306,13 +323,15 @@ public static String detectPeriodKind(CompanyFactsResponse.FactEntry entry) {
 
 ## Validation Checklist
 
-- [ ] Ingesting Apple (CIK 320193) populates `DividendsPerShare` facts from 2012+
-- [ ] Re-ingesting the same CIK produces zero duplicate rows
-- [ ] `is_current_best` correctly selects latest filing for each period
-- [ ] Amendment forms (10-K/A) override originals
-- [ ] Annual vs quarterly facts are correctly classified
-- [ ] Unit normalization handles "USD", "USD/shares", "USD-per-shares" consistently
-- [ ] Standard concept mapping covers all 30+ dividend-relevant tags
-- [ ] Ingestion of 1000+ companies completes without hitting rate limits
+- [x] Re-ingesting the same CIK produces zero duplicate rows
+- [x] `is_current_best` correctly selects latest filing for each period
+- [x] Amendment forms (10-K/A) override originals
+- [x] Annual vs quarterly facts are correctly classified for dashboard dividend-series reads
+- [x] Dimensional facts are stored as separate natural keys when segment/member/axis metadata is present
+- [x] Standard concept mapping covers the dividend-relevant tags used by the dashboard
+- [x] Unit normalization handles "USD", "USD/shares", "USD-per-shares" consistently
+- [x] Bulk ingestion deduplicates CIKs, caps batch size, and continues after per-CIK failures
+- [ ] Ingesting Apple (CIK 320193) against live SEC data populates `DividendsPerShare` facts from 2012+
+- [ ] Ingestion of 1000+ companies completes without hitting live SEC fair-access limits
 
 ## Estimated Effort: 5-6 days

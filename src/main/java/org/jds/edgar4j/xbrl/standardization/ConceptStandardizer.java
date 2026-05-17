@@ -161,7 +161,6 @@ public class ConceptStandardizer {
                 .category(ConceptCategory.SHARES)
                 .alternateNames(Arrays.asList(
                         "CommonStockDividendsPerShareDeclared",
-                        "CommonStockDividendsPerShareCashPaid",
                         "CommonStockDividendsPerShareDeclaredAndPaid",
                         "DividendsPerShare"
                 ))
@@ -179,6 +178,49 @@ public class ConceptStandardizer {
                 ))
                 .signConvention(SignConvention.POSITIVE)
                 .description("Cash dividends paid")
+                .build());
+
+        STANDARD_MAPPINGS.put("DividendsPerShareCashPaid", ConceptMapping.builder()
+                .standardConcept("DividendsPerShareCashPaid")
+                .category(ConceptCategory.SHARES)
+                .alternateNames(Arrays.asList(
+                        "CommonStockDividendsPerShareCashPaid"
+                ))
+                .signConvention(SignConvention.POSITIVE)
+                .description("Common stock dividends per share cash paid")
+                .build());
+
+        STANDARD_MAPPINGS.put("DividendsPayable", ConceptMapping.builder()
+                .standardConcept("DividendsPayable")
+                .category(ConceptCategory.BALANCE_SHEET)
+                .alternateNames(Arrays.asList(
+                        "DividendsPayableCurrent",
+                        "DividendsPayableCurrentAndNoncurrent",
+                        "DistributionPayable"
+                ))
+                .signConvention(SignConvention.POSITIVE)
+                .description("Dividends payable")
+                .build());
+
+        STANDARD_MAPPINGS.put("PreferredDividendsPaid", ConceptMapping.builder()
+                .standardConcept("PreferredDividendsPaid")
+                .category(ConceptCategory.CASH_FLOW)
+                .alternateNames(Arrays.asList(
+                        "PaymentsOfDividendsPreferredStockAndPreferenceStock",
+                        "PreferredStockDividendsAndOtherAdjustments"
+                ))
+                .signConvention(SignConvention.POSITIVE)
+                .description("Preferred stock dividends paid")
+                .build());
+
+        STANDARD_MAPPINGS.put("TotalDividendsPaid", ConceptMapping.builder()
+                .standardConcept("TotalDividendsPaid")
+                .category(ConceptCategory.CASH_FLOW)
+                .alternateNames(Arrays.asList(
+                        "PaymentsOfDividends"
+                ))
+                .signConvention(SignConvention.POSITIVE)
+                .description("Total dividends paid")
                 .build());
 
         // BALANCE SHEET - ASSETS
@@ -252,6 +294,65 @@ public class ConceptStandardizer {
                 .description("Long-term debt")
                 .build());
 
+        STANDARD_MAPPINGS.put("ShortTermDebt", ConceptMapping.builder()
+                .standardConcept("ShortTermDebt")
+                .category(ConceptCategory.BALANCE_SHEET)
+                .alternateNames(Arrays.asList(
+                        "DebtCurrent",
+                        "ShortTermBorrowings",
+                        "ShortTermDebt"
+                ))
+                .signConvention(SignConvention.POSITIVE)
+                .description("Short-term debt")
+                .build());
+
+        STANDARD_MAPPINGS.put("InterestExpense", ConceptMapping.builder()
+                .standardConcept("InterestExpense")
+                .category(ConceptCategory.INCOME_STATEMENT)
+                .alternateNames(Arrays.asList(
+                        "InterestExpense",
+                        "InterestExpenseDebt",
+                        "InterestPaid"
+                ))
+                .signConvention(SignConvention.POSITIVE)
+                .description("Interest expense")
+                .build());
+
+        STANDARD_MAPPINGS.put("IncomeTaxExpense", ConceptMapping.builder()
+                .standardConcept("IncomeTaxExpense")
+                .category(ConceptCategory.INCOME_STATEMENT)
+                .alternateNames(Arrays.asList(
+                        "IncomeTaxExpenseBenefit"
+                ))
+                .signConvention(SignConvention.POSITIVE_INCOME)
+                .description("Income tax expense or benefit")
+                .build());
+
+        STANDARD_MAPPINGS.put("IncomeBeforeTaxes", ConceptMapping.builder()
+                .standardConcept("IncomeBeforeTaxes")
+                .category(ConceptCategory.INCOME_STATEMENT)
+                .alternateNames(Arrays.asList(
+                        "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest",
+                        "IncomeLossFromContinuingOperationsBeforeIncomeTaxes",
+                        "IncomeLossFromContinuingOperationsBeforeIncomeTaxExpenseBenefit",
+                        "IncomeBeforeIncomeTaxes"
+                ))
+                .signConvention(SignConvention.POSITIVE_INCOME)
+                .description("Income before income taxes")
+                .build());
+
+        STANDARD_MAPPINGS.put("DepreciationAmortization", ConceptMapping.builder()
+                .standardConcept("DepreciationAmortization")
+                .category(ConceptCategory.CASH_FLOW)
+                .alternateNames(Arrays.asList(
+                        "DepreciationDepletionAndAmortization",
+                        "DepreciationAndAmortization",
+                        "Depreciation"
+                ))
+                .signConvention(SignConvention.POSITIVE)
+                .description("Depreciation and amortization")
+                .build());
+
         // EQUITY
         STANDARD_MAPPINGS.put("TotalEquity", ConceptMapping.builder()
                 .standardConcept("TotalEquity")
@@ -323,6 +424,51 @@ public class ConceptStandardizer {
                 .description("Capital expenditures")
                 .build());
 
+        STANDARD_MAPPINGS.put("ShareRepurchases", ConceptMapping.builder()
+                .standardConcept("ShareRepurchases")
+                .category(ConceptCategory.CASH_FLOW)
+                .alternateNames(Arrays.asList(
+                        "PaymentsForRepurchaseOfCommonStock",
+                        "StockRepurchasedAndRetiredDuringPeriodValue"
+                ))
+                .signConvention(SignConvention.POSITIVE)
+                .description("Common share repurchases")
+                .build());
+
+        STANDARD_MAPPINGS.put("ShareIssuance", ConceptMapping.builder()
+                .standardConcept("ShareIssuance")
+                .category(ConceptCategory.CASH_FLOW)
+                .alternateNames(Arrays.asList(
+                        "ProceedsFromIssuanceOfCommonStock",
+                        "StockIssuedDuringPeriodValue"
+                ))
+                .signConvention(SignConvention.POSITIVE)
+                .description("Common share issuance")
+                .build());
+
+        STANDARD_MAPPINGS.put("AccountsReceivable", ConceptMapping.builder()
+                .standardConcept("AccountsReceivable")
+                .category(ConceptCategory.BALANCE_SHEET)
+                .alternateNames(Arrays.asList(
+                        "AccountsReceivableNetCurrent",
+                        "ReceivablesNetCurrent"
+                ))
+                .signConvention(SignConvention.POSITIVE)
+                .description("Accounts receivable")
+                .build());
+
+        STANDARD_MAPPINGS.put("ShortTermInvestments", ConceptMapping.builder()
+                .standardConcept("ShortTermInvestments")
+                .category(ConceptCategory.BALANCE_SHEET)
+                .alternateNames(Arrays.asList(
+                        "ShortTermInvestments",
+                        "AvailableForSaleSecuritiesCurrent",
+                        "MarketableSecuritiesCurrent"
+                ))
+                .signConvention(SignConvention.POSITIVE)
+                .description("Short-term investments")
+                .build());
+
         // SHARES
         STANDARD_MAPPINGS.put("SharesOutstanding", ConceptMapping.builder()
                 .standardConcept("SharesOutstanding")
@@ -334,6 +480,26 @@ public class ConceptStandardizer {
                 ))
                 .signConvention(SignConvention.POSITIVE)
                 .description("Shares outstanding")
+                .build());
+
+        STANDARD_MAPPINGS.put("WeightedAvgSharesDiluted", ConceptMapping.builder()
+                .standardConcept("WeightedAvgSharesDiluted")
+                .category(ConceptCategory.SHARES)
+                .alternateNames(Arrays.asList(
+                        "WeightedAverageNumberOfDilutedSharesOutstanding"
+                ))
+                .signConvention(SignConvention.POSITIVE)
+                .description("Weighted average diluted shares outstanding")
+                .build());
+
+        STANDARD_MAPPINGS.put("WeightedAvgSharesBasic", ConceptMapping.builder()
+                .standardConcept("WeightedAvgSharesBasic")
+                .category(ConceptCategory.SHARES)
+                .alternateNames(Arrays.asList(
+                        "WeightedAverageNumberOfSharesOutstandingBasic"
+                ))
+                .signConvention(SignConvention.POSITIVE)
+                .description("Weighted average basic shares outstanding")
                 .build());
     }
 

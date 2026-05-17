@@ -13,6 +13,8 @@ import org.jds.edgar4j.model.FormType;
 import org.jds.edgar4j.model.Submissions;
 import org.jds.edgar4j.model.Ticker;
 import org.jds.edgar4j.integration.model.SecCompanyFactsResponse;
+import org.jds.edgar4j.integration.model.SecCompanyConceptResponse;
+import org.jds.edgar4j.integration.model.SecFrameResponse;
 import org.jds.edgar4j.integration.model.SecSubmissionResponse;
 import org.jds.edgar4j.integration.model.SecTickerExchangeResponse;
 import org.springframework.stereotype.Component;
@@ -48,6 +50,24 @@ public class SecResponseParser {
         } catch (Exception e) {
             log.error("Failed to parse company facts response", e);
             throw new RuntimeException("Failed to parse SEC company facts response", e);
+        }
+    }
+
+    public SecCompanyConceptResponse parseCompanyConceptResponse(String json) {
+        try {
+            return objectMapper.readValue(json, SecCompanyConceptResponse.class);
+        } catch (Exception e) {
+            log.error("Failed to parse company concept response", e);
+            throw new RuntimeException("Failed to parse SEC company concept response", e);
+        }
+    }
+
+    public SecFrameResponse parseFrameResponse(String json) {
+        try {
+            return objectMapper.readValue(json, SecFrameResponse.class);
+        } catch (Exception e) {
+            log.error("Failed to parse frame response", e);
+            throw new RuntimeException("Failed to parse SEC frame response", e);
         }
     }
 

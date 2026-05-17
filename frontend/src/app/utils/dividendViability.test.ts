@@ -85,6 +85,8 @@ function makeAnnualSnapshot(
       DepreciationAmortization: 40,
       InterestExpense: 10,
       SharesOutstanding: 100,
+      ShareRepurchases: 20,
+      ShareIssuance: 4,
     }, periodEnd),
   };
 }
@@ -146,6 +148,8 @@ describe('dividend viability utils', () => {
     expect(overview.snapshot.currentRatio).toBe(2);
     expect(overview.snapshot.interestCoverage).toBe(25);
     expect(overview.snapshot.dividendYield).toBeCloseTo(0.04, 4);
+    expect(overview.snapshot.shareholderYield).toBeCloseTo((160 + 16) / 4_000, 4);
+    expect(overview.snapshot.buybackYield).toBeCloseTo(16 / 4_000, 4);
   });
 
   it('flags cuts and strained coverage when the latest annual dividend weakens', () => {

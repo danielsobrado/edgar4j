@@ -7,8 +7,10 @@ import {
   DividendHistory,
   DividendMetricDefinition,
   DividendOverview,
+  DividendQuality,
   DividendScreen,
   DividendScreenRequest,
+  DividendSyncState,
 } from '../types';
 
 interface DividendHistoryOptions {
@@ -27,6 +29,14 @@ interface DividendEventsOptions {
 
 interface DividendCompareOptions {
   metrics?: string[];
+}
+
+interface DividendSyncOptions {
+  refreshMarketData?: boolean;
+}
+
+interface DividendTrackOptions extends DividendSyncOptions {
+  syncNow?: boolean;
 }
 
 export const dividendApi = {
@@ -64,6 +74,35 @@ export const dividendApi = {
     return apiClient.get<DividendFilingEvidence>(
       `/dividend/${encodeURIComponent(tickerOrCik)}/evidence/${encodeURIComponent(accession)}`,
     );
+  },
+
+  getQuality: (tickerOrCik: string): Promise<DividendQuality> => {
+    return apiClient.get<DividendQuality>(`/dividend/${encodeURIComponent(tickerOrCik)}/quality`);
+  },
+
+  syncCompany: (tickerOrCik: string, options: DividendSyncOptions = {}): Promise<DividendSyncState> => {
+    return apiClient.post<DividendSyncState>(`/dividend/${encodeURIComponent(tickerOrCik)}/sync`, undefined, {
+      params: {
+        refreshMarketData: options.refreshMarketData ?? true,
+      },
+    });
+  },
+
+  getSyncStatus: (tickerOrCik: string): Promise<DividendSyncState> => {
+    return apiClient.get<DividendSyncState>(`/dividend/${encodeURIComponent(tickerOrCik)}/sync`);
+  },
+
+  trackCompany: (tickerOrCik: string, options: DividendTrackOptions = {}): Promise<DividendSyncState> => {
+    return apiClient.post<DividendSyncState>(`/dividend/${encodeURIComponent(tickerOrCik)}/track`, undefined, {
+      params: {
+        syncNow: options.syncNow ?? false,
+        refreshMarketData: options.refreshMarketData ?? true,
+      },
+    });
+  },
+
+  untrackCompany: (tickerOrCik: string): Promise<DividendSyncState> => {
+    return apiClient.delete<DividendSyncState>(`/dividend/${encodeURIComponent(tickerOrCik)}/track`);
   },
 
   compare: (tickersOrCiks: string[], options: DividendCompareOptions = {}): Promise<DividendComparison> => {

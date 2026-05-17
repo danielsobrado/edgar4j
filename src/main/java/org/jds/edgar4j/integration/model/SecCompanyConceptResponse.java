@@ -1,12 +1,10 @@
 package org.jds.edgar4j.integration.model;
 
 import java.math.BigDecimal;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonAnySetter;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -18,22 +16,15 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class SecCompanyFactsResponse {
+public class SecCompanyConceptResponse {
 
     private String cik;
+    private String taxonomy;
+    private String tag;
+    private String label;
+    private String description;
     private String entityName;
-    private Map<String, Map<String, ConceptFacts>> facts;
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public static class ConceptFacts {
-        private String label;
-        private String description;
-        private Map<String, List<FactEntry>> units;
-    }
+    private Map<String, List<FactEntry>> units;
 
     @Data
     @Builder
@@ -50,13 +41,5 @@ public class SecCompanyFactsResponse {
         private String form;
         private String filed;
         private String frame;
-
-        @Builder.Default
-        private Map<String, Object> extensionFields = new LinkedHashMap<>();
-
-        @JsonAnySetter
-        public void setExtensionField(String name, Object value) {
-            extensionFields.put(name, value);
-        }
     }
 }

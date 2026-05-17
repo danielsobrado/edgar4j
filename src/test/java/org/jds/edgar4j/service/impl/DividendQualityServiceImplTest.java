@@ -122,6 +122,102 @@ class DividendQualityServiceImplTest {
         assertTrue(response.getBenchmarks().stream().anyMatch(check -> !check.isPassed()));
     }
 
+    @Test
+    @DisplayName("assess should flag annual history gaps and impossible metric values")
+    void assessShouldFlagHistoryGapsAndImpossibleMetricValues() {
+        when(dividendAnalysisService.getOverview("TEST")).thenReturn(overview(
+                "0000000001",
+                "TEST",
+                LocalDate.now().minusDays(40),
+                0.25d));
+        when(dividendAnalysisService.getHistory("TEST",
+                List.of("dps_declared", "eps_diluted", "earnings_payout", "free_cash_flow", "dividends_paid", "fcf_payout"),
+                "FY",
+                15)).thenReturn(history(
+                LocalDate.of(2021, 12, 31),
+                Map.of(
+                        "dps_declared", 0.30d,
+                        "eps_diluted", 1.00d,
+                        "earnings_payout", 0.30d,
+                        "free_cash_flow", 100.0d,
+                        "dividends_paid", 20.0d,
+                        "fcf_payout", 0.20d),
+                LocalDate.of(2023, 12, 31),
+                Map.of(
+                        "dps_declared", -0.25d,
+                        "eps_diluted", 0.0d,
+                        "earnings_payout", 0.25d,
+                        "free_cash_flow", -10.0d,
+                        "dividends_paid", 5.0d,
+                        "fcf_payout", 2.50d),
+                LocalDate.of(2024, 12, 31),
+                Map.of(
+                        "dps_declared", 0.25d,
+                        "eps_diluted", 1.00d,
+                        "earnings_payout", 0.25d,
+                        "free_cash_flow", 50.0d,
+                        "dividends_paid", 12.5d,
+                        "fcf_payout", 0.25d)));
+
+        DividendQualityResponse response = dividendQualityService.assess("TEST");
+
+        assertEquals(DividendQualityResponse.QualityStatus.FAIL, response.getOverallStatus());
+        assertTrue(hasIssue(response, "annual_history_gap"));
+        assertTrue(hasIssue(response, "negative_dps"));
+        assertTrue(hasIssue(response, "dividends_without_positive_fcf"));
+        assertTrue(hasIssue(response, "fcf_payout_with_nonpositive_fcf"));
+        assertTrue(hasIssue(response, "earnings_payout_with_nonpositive_eps"));
+        assertTrue(hasIssue(response, "fcf_payout_out_of_bounds"));
+    }
+
+    @Test
+    @DisplayName("assess should flag payout ratios defined against zero denominators")
+    void assessShouldFlagPayoutRatiosDefinedAgainstZeroDenominators() {
+        when(dividendAnalysisService.getOverview("ZERO")).thenReturn(overview(
+                "0000000002",
+                "ZERO",
+                LocalDate.now().minusDays(40),
+                0.10d));
+        when(dividendAnalysisService.getHistory("ZERO",
+                List.of("dps_declared", "eps_diluted", "earnings_payout", "free_cash_flow", "dividends_paid", "fcf_payout"),
+                "FY",
+                15)).thenReturn(history(
+                LocalDate.of(2022, 12, 31),
+                Map.of(
+                        "dps_declared", 0.10d,
+                        "eps_diluted", 1.00d,
+                        "earnings_payout", 0.10d,
+                        "free_cash_flow", 5.0d,
+                        "dividends_paid", 0.5d,
+                        "fcf_payout", 0.10d),
+                LocalDate.of(2023, 12, 31),
+                Map.of(
+                        "dps_declared", 0.10d,
+                        "eps_diluted", 0.0d,
+                        "earnings_payout", 0.10d,
+                        "free_cash_flow", 0.0d,
+                        "dividends_paid", 0.0d,
+                        "fcf_payout", 0.10d),
+                LocalDate.of(2024, 12, 31),
+                Map.of(
+                        "dps_declared", 0.10d,
+                        "eps_diluted", 1.00d,
+                        "earnings_payout", 0.10d,
+                        "free_cash_flow", 5.0d,
+                        "dividends_paid", 0.5d,
+                        "fcf_payout", 0.10d)));
+
+        DividendQualityResponse response = dividendQualityService.assess("ZERO");
+
+        assertEquals(DividendQualityResponse.QualityStatus.WARN, response.getOverallStatus());
+        assertTrue(hasIssue(response, "fcf_payout_with_nonpositive_fcf"));
+        assertTrue(hasIssue(response, "earnings_payout_with_nonpositive_eps"));
+    }
+
+    private boolean hasIssue(DividendQualityResponse response, String code) {
+        return response.getIssues().stream().anyMatch(issue -> code.equals(issue.getCode()));
+    }
+
     private DividendOverviewResponse overview(String cik, String ticker, LocalDate lastFilingDate, double dpsLatest) {
         return DividendOverviewResponse.builder()
                 .company(DividendOverviewResponse.CompanySummary.builder()

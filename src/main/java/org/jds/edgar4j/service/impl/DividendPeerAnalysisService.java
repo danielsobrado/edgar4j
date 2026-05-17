@@ -98,6 +98,8 @@ class DividendPeerAnalysisService {
             case "current_ratio" -> context.snapshot().getCurrentRatio();
             case "fcf_margin" -> context.snapshot().getFcfMargin();
             case "dividend_yield" -> context.snapshot().getDividendYield();
+            case "shareholder_yield" -> context.snapshot().getShareholderYield();
+            case "buyback_yield" -> context.snapshot().getBuybackYield();
             case "score" -> Double.valueOf(context.score());
             case "active_alerts" -> Double.valueOf(context.alerts().size());
             default -> {

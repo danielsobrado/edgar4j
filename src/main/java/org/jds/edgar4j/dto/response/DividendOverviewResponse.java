@@ -67,6 +67,8 @@ public class DividendOverviewResponse {
         private Double currentRatio;
         private Double fcfMargin;
         private Double dividendYield;
+        private Double shareholderYield;
+        private Double buybackYield;
     }
 
     @Data

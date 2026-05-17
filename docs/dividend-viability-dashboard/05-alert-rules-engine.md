@@ -4,6 +4,19 @@
 
 Build a configurable, threshold-based alert system that fires warnings when dividend viability indicators deteriorate. Each alert includes triggering metric values and links to supporting filing evidence.
 
+## Current Implementation Status
+
+Implemented local coverage:
+
+- Current overview alerts detect dividend cuts, elevated FCF payout, negative-FCF dividends, current-ratio stress, leverage stress, and weak interest coverage.
+- Historical alert events include dividend cuts, negative-FCF dividends, elevated FCF payout, current-ratio stress, leverage stress, and weak interest coverage.
+- Composite score maps healthy profiles to `SAFE` and stressed profiles to `AT_RISK`.
+
+Remaining implementation/operational validation:
+
+- Persistent alert resolution remains future work; alert events are currently computed from current and historical metric rows.
+- Live AT&T 2022 validation and 10-company manual rating calibration remain operational benchmark tasks.
+
 ## Alert Data Model
 
 ```
@@ -163,9 +176,10 @@ public ViabilityRating computeViabilityRating(String cik) {
 ## Validation Checklist
 
 - [ ] AT&T (T) triggers `dividend_cut` alert for 2022
-- [ ] A company with FCF < 0 and dividends > 0 triggers `dividend_funded_by_debt`
-- [ ] REIT sector overrides apply correctly
+- [x] A company with FCF < 0 and dividends > 0 triggers a debt-funded dividend alert
+- [x] REIT sector overrides apply correctly for FCF payout and net-debt-to-EBITDA thresholds
 - [ ] Resolved alerts don't re-fire for the same period
+- [x] Composite viability rating maps healthy and stressed local profiles correctly
 - [ ] Composite viability rating matches manual assessment for 10 test companies
 
 ## Estimated Effort: 3-4 days

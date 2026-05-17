@@ -17,7 +17,7 @@ The edgar4j codebase provides a **very strong foundation**. This table maps exis
 | `XbrlService` | `xbrl/XbrlService.java` | XBRL parsing, key financials extraction (already extracts dividend concepts), comprehensive analysis |
 | `ConceptStandardizer` | `xbrl/standardization/ConceptStandardizer.java` | Dividend tag mappings already defined (`DividendsPerShare`, `DividendsPaid`), cross-company normalization |
 | `MultiPeriodAnalyzer` | `xbrl/analysis/MultiPeriodAnalyzer.java` | Time series stitching, CAGR, YoY growth, trend detection, anomaly detection, volatility scoring |
-| `SecApiClient` | `integration/SecApiClient.java` | Submissions, tickers, filing fetch, EFTS search, rate limiting, caching |
+| `SecApiClient` | `integration/SecApiClient.java` | Submissions, tickers, filing fetch, EFTS search, XBRL company facts/concepts/frames, rate limiting, caching |
 | `SecRateLimiter` | `integration/SecRateLimiter.java` | 10 rps token bucket (SEC compliant) |
 | `DownloadedResourceStore` | `storage/DownloadedResourceStore.java` | Persistent disk cache for SEC responses |
 | `SecFilingExtractor` | `xbrl/sec/SecFilingExtractor.java` | Filing metadata, form type, period, amendment detection |
@@ -41,7 +41,7 @@ Already mapped and ready to use:
 
 | Component | Why It's Needed | Phase |
 |---|---|---|
-| CompanyFacts API client methods | `companyfacts/CIK####.json` and `companyconcept/` endpoints not yet exposed | 1 |
+| XBRL fact ingestion from SEC API responses | Client methods exist for `companyfacts`, `companyconcept`, and `frames`; normalized persistence/query pipeline still needed | 1-2 |
 | XBRL fact persistence layer | Store normalized facts by company/period/concept for time-series queries | 2 |
 | Dividend event text extractor | Parse 8-K Item 8.01 / Exhibit 99.1 for declarations, suspensions, policy language | 3 |
 | Extended concept mappings | ~30 additional dividend/leverage/coverage tags not yet in ConceptStandardizer | 2 |
@@ -98,7 +98,7 @@ Already mapped and ready to use:
 
 | Phase | Title | Scope | Est. Days | Dependencies |
 |---|---|---|---|---|
-| [Phase 1](01-sec-api-extension.md) | SEC Company Facts API Extension | Add companyfacts/companyconcept endpoints to SecApiClient | 3-4 | None |
+| [Phase 1](01-sec-api-extension.md) | SEC Company Facts API Extension | Add companyfacts/companyconcept/frames endpoints to SecApiClient | 3-4 | None |
 | [Phase 2](02-fact-persistence.md) | XBRL Fact Persistence & Normalization | Data model, repositories, ingestion pipeline for normalized facts | 5-6 | Phase 1 |
 | [Phase 3](03-dividend-event-extraction.md) | Dividend Event Text Extraction | 8-K/10-K parsing for declarations, suspensions, policy language | 5-6 | Phase 1 |
 | [Phase 4](04-metric-computation.md) | Metric Computation Engine | All payout, coverage, leverage, growth, volatility metrics | 5-6 | Phase 2 |
