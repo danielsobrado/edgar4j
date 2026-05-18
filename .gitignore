@@ -65,6 +65,7 @@ frontend/.vite/
 .codex*
 .history/
 .dccache
+scripts/edgar4j.lock
 .m2/
 data/
 data/download-cache/

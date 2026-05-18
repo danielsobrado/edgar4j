@@ -81,51 +81,111 @@ This repo uses the Maven Wrapper. On Windows, `mvnw.cmd` will fall back to the `
 
 Backend builds now target Java 25. Set `JAVA_HOME` to a JDK 25 installation, or use the checked-in `.java-version` file with your version manager.
 
-### Compile and Start with Docker
+## Start the Project
 
 Prerequisites:
 
 - Docker Desktop (or Docker Engine) with Docker Compose v2
 
-From the repository root:
+From the repository root, start the full stack with:
 
-1. Build the backend image (this compiles the Java project inside Docker):
-
-```bash
-docker build -t edgar4j-app-clean .
+```powershell
+.\scripts\start.ps1
 ```
 
-2. Start the full stack:
+On Linux or WSL:
 
 ```bash
-docker compose up -d
+./scripts/start.sh
 ```
 
-3. Verify containers are up:
+This starts Docker Compose with the `high` profile, builds images when needed, and writes a runtime lock file to `scripts/edgar4j.lock`. The lock file prevents starting another copy of the same Compose project by accident and is removed by the stop script.
 
-```bash
-docker compose ps
-```
+Open the application:
 
-4. Open the application:
-
-- Frontend: `http://localhost:5173`
+- Frontend: `http://localhost:3000`
 - Backend API: `http://localhost:8080`
 - Health check: `http://localhost:8080/actuator/health`
 - Readiness check: `http://localhost:8080/actuator/health/readiness`
 - Liveness check: `http://localhost:8080/actuator/health/liveness`
 
+Useful script options:
+
+```powershell
+# Start the lighter backend/frontend-only profile
+.\scripts\start.ps1 -Profile low
+
+# Start without rebuilding images
+.\scripts\start.ps1 -NoBuild
+
+# Use different host ports
+.\scripts\start.ps1 -BackendPort 18080 -FrontendPort 13000
+
+# Refresh a stale lock after containers have already stopped
+.\scripts\start.ps1 -Force
+```
+
+Linux or WSL equivalents:
+
+```bash
+# Start the lighter backend/frontend-only profile
+./scripts/start.sh --profile low
+
+# Start without rebuilding images
+./scripts/start.sh --no-build
+
+# Use different host ports
+./scripts/start.sh --backend-port 18080 --frontend-port 13000
+
+# Refresh a stale lock after containers have already stopped
+./scripts/start.sh --force
+```
+
+Stop the project:
+
+```powershell
+.\scripts\stop.ps1
+```
+
+On Linux or WSL:
+
+```bash
+./scripts/stop.sh
+```
+
+Stop and remove Docker volumes. This deletes local database/cache data:
+
+```powershell
+.\scripts\stop.ps1 -RemoveVolumes
+```
+
+On Linux or WSL:
+
+```bash
+./scripts/stop.sh --remove-volumes
+```
+
+### Docker Compose Commands
+
+If you prefer to call Docker Compose directly:
+
+```bash
+docker compose --profile high up -d --build
+docker compose ps
+docker compose down
+```
+
 Useful Docker commands:
 
 ```bash
 # Follow backend logs
-docker compose logs -f edgar4j-app
+docker compose logs -f backend
 
 # Follow frontend logs
 docker compose logs -f frontend
 
 # Rebuild backend after backend code changes
-docker build -t edgar4j-app-clean . && docker compose up -d --force-recreate edgar4j-app
+docker compose --profile high up -d --build --force-recreate backend
 
 # Stop everything
 docker compose down
