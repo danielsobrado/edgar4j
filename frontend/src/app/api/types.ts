@@ -1212,3 +1212,65 @@ export interface InsiderPurchaseFilter {
   page?: number;
   size?: number;
 }
+
+// ========== Insider Activity Screener Types ==========
+
+export type InsiderActivityPreset =
+  | 'LATEST_PURCHASES'
+  | 'LATEST_SALES'
+  | 'MULTI_INSIDER_BUYS'
+  | 'MULTI_INSIDER_SELLS'
+  | 'MILLION_DOLLAR_BUYS'
+  | 'MILLION_DOLLAR_SELLS';
+
+export type InsiderActivityView = 'AGGREGATE' | 'TRANSACTION';
+export type InsiderActivitySide = 'BUY' | 'SELL';
+export type InsiderActivityExportFormat = 'CSV' | 'JSON';
+
+export interface InsiderActivity {
+  view: InsiderActivityView;
+  side: InsiderActivitySide;
+  ticker: string;
+  companyName: string | null;
+  cik: string | null;
+  latestTransactionDate: string | null;
+  transactionDate: string | null;
+  insiderName: string | null;
+  insiderTitle: string | null;
+  ownerType: string | null;
+  insiderCount: number | null;
+  transactionCount: number | null;
+  totalShares: number | null;
+  transactionShares: number | null;
+  averagePrice: number | null;
+  transactionPrice: number | null;
+  totalValue: number | null;
+  transactionValue: number | null;
+  currentPrice: number | null;
+  percentChange: number | null;
+  marketCap: number | null;
+  marketCapSource: MarketCapSource | null;
+  sp500: boolean;
+  accessionNumber: string | null;
+  transactionCode: string | null;
+  transactionCodes: string[] | null;
+}
+
+export interface InsiderActivityFilter {
+  preset?: InsiderActivityPreset;
+  view?: InsiderActivityView;
+  side?: InsiderActivitySide;
+  transactionCodes?: string[];
+  dateFrom?: string;
+  dateTo?: string;
+  symbol?: string;
+  minPrice?: number;
+  minShares?: number;
+  minTotalAmount?: number;
+  minInsiderCount?: number;
+  insiderTitle?: string;
+  sortBy?: string;
+  sortDir?: 'asc' | 'desc';
+  page?: number;
+  size?: number;
+}

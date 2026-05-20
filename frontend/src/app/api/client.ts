@@ -74,6 +74,13 @@ class ApiClient {
     return response.data;
   }
 
+  async downloadGet(url: string): Promise<Blob> {
+    const response = await this.client.get(url, {
+      responseType: 'blob',
+    });
+    return response.data;
+  }
+
   getBaseUrl(): string {
     return API_BASE_URL;
   }

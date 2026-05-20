@@ -30,7 +30,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const analysisNavItems = React.useMemo(() => ([
     { path: '/analysis/dividend-viability', label: 'Dividend Viability', icon: Landmark },
     { path: '/companies', label: 'Fundamentals', icon: LineChart },
-    { path: '/insider-purchases', label: 'Insider Buys', icon: ShoppingCart },
+    { path: '/insider-activity', label: 'Insider Activity', icon: ShoppingCart },
   ]), []);
 
   const secondaryNavItems = [
@@ -50,8 +50,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
     [formNavItems, location.pathname]
   );
   const isAnalysisActive = React.useMemo(
-    () => analysisNavItems.some(item => isPathActive(item.path)),
-    [analysisNavItems, isPathActive]
+    () => location.pathname === '/insider-purchases' || analysisNavItems.some(item => isPathActive(item.path)),
+    [analysisNavItems, isPathActive, location.pathname]
   );
   const navItems = [...primaryNavItems, ...secondaryNavItems];
   

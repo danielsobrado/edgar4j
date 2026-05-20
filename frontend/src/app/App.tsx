@@ -2,7 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { Dashboard } from './pages/Dashboard';
-import { InsiderPurchasesPage } from './pages/InsiderPurchases';
+import { InsiderActivityPage } from './pages/InsiderActivity';
 import { FilingSearch } from './pages/FilingSearch';
 import { FilingDetail } from './pages/FilingDetail';
 import { Companies } from './pages/Companies';
@@ -29,7 +29,8 @@ export default function App() {
         <Layout>
           <Routes>
             <Route path="/" element={<Dashboard />} />
-            <Route path="/insider-purchases" element={<InsiderPurchasesPage />} />
+            <Route path="/insider-purchases" element={<InsiderActivityPage />} />
+            <Route path="/insider-activity" element={<InsiderActivityPage />} />
             <Route path="/search" element={<FilingSearch />} />
             <Route path="/filing/:id" element={<FilingDetail />} />
             <Route path="/analysis/dividend-viability" element={<DividendViabilityDashboard />} />
