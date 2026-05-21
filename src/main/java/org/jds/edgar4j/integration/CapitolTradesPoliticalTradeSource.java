@@ -7,8 +7,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
+import org.jds.edgar4j.exception.PoliticalTradeSyncException;
 import org.jds.edgar4j.model.PoliticalTrade;
 import org.jsoup.Jsoup;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -46,27 +48,43 @@ public class CapitolTradesPoliticalTradeSource implements PoliticalTradeSource {
         for (int page = 1; page <= maxPages; page++) {
             URI pageUri = buildUri(assetType, page);
             try {
-                String html = Jsoup.connect(pageUri.toString())
-                        .userAgent("edgar4j political-trades-sync")
-                        .referrer("https://www.capitoltrades.com/")
-                        .timeout(TIMEOUT_MILLIS)
-                        .followRedirects(true)
-                        .ignoreHttpErrors(false)
-                        .execute()
-                        .body();
+                String html = fetchPage(pageUri);
                 List<PoliticalTrade> pageTrades = parser.parse(html, pageUri, assetType);
                 if (pageTrades.isEmpty()) {
-                    log.info("No political trades parsed from {}", pageUri);
+                    if (page == 1) {
+                        log.warn("No political trades parsed from first Capitol Trades page {}", pageUri);
+                    } else {
+                        log.info("No political trades parsed from {}", pageUri);
+                    }
                     break;
                 }
+                log.info("Parsed {} political trades from {}", pageTrades.size(), pageUri);
                 trades.addAll(pageTrades);
-                sleepBetweenPages();
+                if (page < maxPages) {
+                    sleepBetweenPages();
+                }
             } catch (IOException ex) {
-                throw new IllegalStateException("Failed to fetch political trades from " + pageUri, ex);
+                throw new PoliticalTradeSyncException(
+                        "Failed to fetch political trades from " + pageUri,
+                        "POLITICAL_TRADE_SOURCE_FETCH_FAILED",
+                        HttpStatus.BAD_GATEWAY,
+                        ex);
             }
         }
 
         return trades;
+    }
+
+    String fetchPage(URI pageUri) throws IOException {
+        return Jsoup.connect(pageUri.toString())
+                .userAgent("edgar4j political-trades-sync")
+                .referrer("https://www.capitoltrades.com/")
+                .timeout(TIMEOUT_MILLIS)
+                .maxBodySize(0)
+                .followRedirects(true)
+                .ignoreHttpErrors(false)
+                .execute()
+                .body();
     }
 
     private URI buildUri(String assetType, int page) {

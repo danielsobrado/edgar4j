@@ -1,16 +1,23 @@
 package org.jds.edgar4j.service.impl;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.List;
 import java.util.Optional;
 
@@ -19,6 +26,7 @@ import org.jds.edgar4j.dto.request.PoliticalTradeSyncRequest;
 import org.jds.edgar4j.dto.response.PaginatedResponse;
 import org.jds.edgar4j.dto.response.PoliticalTradeResponse;
 import org.jds.edgar4j.dto.response.PoliticalTradeSyncResponse;
+import org.jds.edgar4j.exception.PoliticalTradeSyncException;
 import org.jds.edgar4j.integration.PoliticalTradeSource;
 import org.jds.edgar4j.integration.PoliticalTradeSourceRequest;
 import org.jds.edgar4j.model.PoliticalTrade;
@@ -135,6 +143,7 @@ class PoliticalTradeServiceImplTest {
         assertEquals(Instant.parse("2026-05-21T10:00:00Z"), savedCaptor.getValue().getFirstSeenAt());
         assertEquals(1, response.getInsertedRows());
         assertEquals(0, response.getUpdatedRows());
+        assertEquals(0L, response.getDurationMillis());
     }
 
     @Test
@@ -178,6 +187,7 @@ class PoliticalTradeServiceImplTest {
         PoliticalTradeSyncResponse response = service.sync(PoliticalTradeSyncRequest.builder()
                 .assetType("ALL")
                 .maxPages(2)
+                .force(true)
                 .build());
 
         ArgumentCaptor<PoliticalTradeSourceRequest> requestCaptor = ArgumentCaptor.forClass(PoliticalTradeSourceRequest.class);
@@ -188,6 +198,90 @@ class PoliticalTradeServiceImplTest {
                 requestCaptor.getAllValues().stream().map(PoliticalTradeSourceRequest::maxPages).toList());
         assertEquals("all", response.getAssetType());
         assertEquals(10, response.getFetchedPages());
+    }
+
+    @Test
+    void syncRejectsUnsupportedAssetTypesBeforeFetching() {
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> service.sync(PoliticalTradeSyncRequest.builder()
+                .assetType("warrant")
+                .build()));
+
+        assertTrue(ex.getMessage().contains("Unsupported political trade asset type"));
+        verifyNoInteractions(source);
+    }
+
+    @Test
+    void syncRequiresForceForBackfillsOverDefaultLimit() {
+        PoliticalTradeSyncException ex = assertThrows(PoliticalTradeSyncException.class, () -> service.sync(PoliticalTradeSyncRequest.builder()
+                .assetType("stock")
+                .maxPages(26)
+                .build()));
+
+        assertEquals("POLITICAL_TRADE_SYNC_FORCE_REQUIRED", ex.getErrorCode());
+        verifyNoInteractions(source);
+    }
+
+    @Test
+    void syncFailsClosedWhenSourceReturnsNoRowsWithoutForce() {
+        when(source.fetch(any(PoliticalTradeSourceRequest.class))).thenReturn(List.of());
+
+        PoliticalTradeSyncException ex = assertThrows(PoliticalTradeSyncException.class, () -> service.sync(PoliticalTradeSyncRequest.builder()
+                .assetType("stock")
+                .maxPages(1)
+                .build()));
+
+        assertEquals("POLITICAL_TRADE_SYNC_EMPTY_SOURCE", ex.getErrorCode());
+        verify(source).fetch(any(PoliticalTradeSourceRequest.class));
+        verifyNoMoreInteractions(dataPort);
+    }
+
+    @Test
+    void syncAllowsForcedEmptySourceForOperatorBackfills() {
+        when(source.fetch(any(PoliticalTradeSourceRequest.class))).thenReturn(List.of());
+        when(source.sourceName()).thenReturn("CAPITOL_TRADES");
+        when(dataPort.count()).thenReturn(10L);
+
+        PoliticalTradeSyncResponse response = service.sync(PoliticalTradeSyncRequest.builder()
+                .assetType("stock")
+                .maxPages(1)
+                .force(true)
+                .build());
+
+        assertEquals(0, response.getFetchedRows());
+        assertEquals(10L, response.getTotalCachedRows());
+        assertTrue(response.isForced());
+    }
+
+    @Test
+    void syncRejectsConcurrentRuns() throws Exception {
+        PoliticalTrade fetched = trade("20003798315", "Tim Moore", "T", "stock", "BUY", 15_000d, 50_000d, LocalDate.of(2026, 5, 21));
+        fetched.setSourceTradeId("CAPITOL_TRADES:20003798315");
+        CountDownLatch enteredFetch = new CountDownLatch(1);
+        CountDownLatch releaseFetch = new CountDownLatch(1);
+        when(source.fetch(any(PoliticalTradeSourceRequest.class))).thenAnswer(invocation -> {
+            enteredFetch.countDown();
+            assertTrue(releaseFetch.await(5, TimeUnit.SECONDS));
+            return List.of(fetched);
+        });
+        when(source.sourceName()).thenReturn("CAPITOL_TRADES");
+        when(dataPort.findBySourceTradeId("CAPITOL_TRADES:20003798315")).thenReturn(Optional.empty());
+        when(dataPort.existsBySourceTradeId("CAPITOL_TRADES:20003798315")).thenReturn(false);
+
+        CompletableFuture<PoliticalTradeSyncResponse> firstSync = CompletableFuture.supplyAsync(() -> service.sync(PoliticalTradeSyncRequest.builder()
+                .assetType("stock")
+                .maxPages(1)
+                .build()));
+        assertTrue(enteredFetch.await(5, TimeUnit.SECONDS));
+
+        PoliticalTradeSyncException ex = assertThrows(PoliticalTradeSyncException.class, () -> service.sync(PoliticalTradeSyncRequest.builder()
+                .assetType("stock")
+                .maxPages(1)
+                .build()));
+
+        assertEquals("POLITICAL_TRADE_SYNC_IN_PROGRESS", ex.getErrorCode());
+        releaseFetch.countDown();
+        assertEquals(1, firstSync.get(5, TimeUnit.SECONDS).getInsertedRows());
+        assertFalse(firstSync.isCompletedExceptionally());
     }
 
     private PoliticalTrade trade(

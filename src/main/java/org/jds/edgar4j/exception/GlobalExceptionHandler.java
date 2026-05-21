@@ -52,6 +52,18 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error("SEC API Error: " + ex.getMessage(), exchange.getRequest().getPath().value()));
     }
 
+    @ExceptionHandler(PoliticalTradeSyncException.class)
+    public ResponseEntity<ApiResponse<Void>> handlePoliticalTradeSyncException(
+            PoliticalTradeSyncException ex, ServerWebExchange exchange) {
+        if (ex.getStatus().is5xxServerError()) {
+            log.warn("Political trade sync failed [{}]: {}", ex.getErrorCode(), ex.getMessage(), ex);
+        } else {
+            log.warn("Political trade sync rejected [{}]: {}", ex.getErrorCode(), ex.getMessage());
+        }
+        return ResponseEntity.status(ex.getStatus())
+                .body(ApiResponse.error(ex.getMessage(), exchange.getRequest().getPath().value()));
+    }
+
     @ExceptionHandler(Edgar4jException.class)
     public ResponseEntity<ApiResponse<Void>> handleEdgar4jException(
             Edgar4jException ex, ServerWebExchange exchange) {

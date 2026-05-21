@@ -218,6 +218,7 @@ export function PoliticalTradesPage() {
   const [exporting, setExporting] = React.useState<PoliticalTradeExportFormat | null>(null);
   const [syncing, setSyncing] = React.useState(false);
   const [syncResult, setSyncResult] = React.useState<PoliticalTradeSyncResponse | null>(null);
+  const [syncError, setSyncError] = React.useState<string | null>(null);
   const [syncMaxPages, setSyncMaxPages] = React.useState(25);
   const [forceSync, setForceSync] = React.useState(false);
 
@@ -240,6 +241,7 @@ export function PoliticalTradesPage() {
 
   const syncTrades = React.useCallback(async () => {
     setSyncing(true);
+    setSyncError(null);
     try {
       const response = await politicalTradesApi.sync({
         assetType: filter.assetType ?? DEFAULT_FILTER.assetType,
@@ -248,6 +250,8 @@ export function PoliticalTradesPage() {
       });
       setSyncResult(response);
       await refresh();
+    } catch (err) {
+      setSyncError(err instanceof Error ? err.message : 'Political trade sync failed');
     } finally {
       setSyncing(false);
     }
@@ -301,6 +305,10 @@ export function PoliticalTradesPage() {
 
       {error ? (
         <ErrorMessage title="Failed to load political trades" message={error} onRetry={refresh} />
+      ) : null}
+
+      {syncError ? (
+        <ErrorMessage title="Failed to sync political trades" message={syncError} onRetry={() => void syncTrades()} />
       ) : null}
 
       <div className="rounded-lg bg-white p-5 shadow-sm">
@@ -526,7 +534,7 @@ export function PoliticalTradesPage() {
                 onChange={(event) => setForceSync(event.target.checked)}
                 className="h-4 w-4 rounded border-gray-300"
               />
-              Force refresh existing rows
+              Force backfill
             </label>
           </div>
 

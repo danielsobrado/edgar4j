@@ -10,12 +10,14 @@ import java.util.Map;
 import org.jds.edgar4j.dto.request.PoliticalTradeSyncRequest;
 import org.jds.edgar4j.dto.response.PoliticalTradeSyncResponse;
 import org.jds.edgar4j.exception.GlobalExceptionHandler;
+import org.jds.edgar4j.exception.PoliticalTradeSyncException;
 import org.jds.edgar4j.service.PoliticalTradeService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
@@ -112,6 +114,29 @@ class PoliticalTradeControllerWebTest {
                 .jsonPath("$.message").isEqualTo("Bad request");
 
         verifyNoInteractions(politicalTradeService);
+    }
+
+    @Test
+    void syncReturnsConflictWhenAnotherSyncIsRunning() {
+        PoliticalTradeSyncRequest request = PoliticalTradeSyncRequest.builder()
+                .assetType("stock")
+                .maxPages(1)
+                .force(false)
+                .build();
+        when(politicalTradeService.sync(request)).thenThrow(new PoliticalTradeSyncException(
+                "Political trade sync is already running",
+                "POLITICAL_TRADE_SYNC_IN_PROGRESS",
+                HttpStatus.CONFLICT));
+
+        webClient.post()
+                .uri("/api/political-trades/sync?assetType=stock&maxPages=1")
+                .exchange()
+                .expectStatus().isEqualTo(HttpStatus.CONFLICT)
+                .expectBody()
+                .jsonPath("$.success").isEqualTo(false)
+                .jsonPath("$.message").isEqualTo("Political trade sync is already running");
+
+        verify(politicalTradeService).sync(request);
     }
 
     private PoliticalTradeSyncResponse response(String assetType, int requestedPages) {

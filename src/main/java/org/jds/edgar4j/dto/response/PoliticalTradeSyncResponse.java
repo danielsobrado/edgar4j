@@ -24,4 +24,5 @@ public class PoliticalTradeSyncResponse {
     private long totalCachedRows;
     private boolean forced;
     private Instant syncedAt;
+    private long durationMillis;
 }

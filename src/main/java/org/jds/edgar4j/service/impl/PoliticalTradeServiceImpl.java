@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.function.Function;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.jds.edgar4j.config.AppConstants;
 import org.jds.edgar4j.dto.request.PoliticalTradeScreenRequest;
@@ -17,17 +18,22 @@ import org.jds.edgar4j.dto.request.PoliticalTradeSyncRequest;
 import org.jds.edgar4j.dto.response.PaginatedResponse;
 import org.jds.edgar4j.dto.response.PoliticalTradeResponse;
 import org.jds.edgar4j.dto.response.PoliticalTradeSyncResponse;
+import org.jds.edgar4j.exception.PoliticalTradeSyncException;
 import org.jds.edgar4j.integration.PoliticalTradeSource;
 import org.jds.edgar4j.integration.PoliticalTradeSourceRequest;
 import org.jds.edgar4j.model.PoliticalTrade;
 import org.jds.edgar4j.port.PoliticalTradeDataPort;
 import org.jds.edgar4j.service.PoliticalTradeService;
+import org.springframework.http.HttpStatus;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @Service
 public class PoliticalTradeServiceImpl implements PoliticalTradeService {
 
@@ -35,6 +41,7 @@ public class PoliticalTradeServiceImpl implements PoliticalTradeService {
     private static final int DEFAULT_PAGE_SIZE = 50;
     private static final int DEFAULT_SYNC_PAGES = 25;
     private static final int MAX_SYNC_PAGES = 250;
+    private static final int MAX_UNFORCED_SYNC_PAGES = 25;
     private static final int EXPORT_LIMIT = 10_000;
     private static final List<String> ALL_ASSET_SYNC_TYPES = List.of(
             "stock",
@@ -47,6 +54,7 @@ public class PoliticalTradeServiceImpl implements PoliticalTradeService {
     private final PoliticalTradeSource politicalTradeSource;
     private final ObjectMapper objectMapper;
     private final Clock clock;
+    private final AtomicBoolean syncInProgress = new AtomicBoolean(false);
 
     @Autowired
     public PoliticalTradeServiceImpl(
@@ -100,52 +108,88 @@ public class PoliticalTradeServiceImpl implements PoliticalTradeService {
 
     @Override
     public PoliticalTradeSyncResponse sync(PoliticalTradeSyncRequest request) {
-        PoliticalTradeSyncRequest source = request == null ? new PoliticalTradeSyncRequest() : request;
-        String assetType = normalizeAssetType(source.getAssetType(), DEFAULT_ASSET_TYPE);
-        int maxPages = sanitizeSyncPages(source.getMaxPages());
-        Instant syncedAt = Instant.now(clock);
-        List<String> sourceAssetTypes = "ALL".equalsIgnoreCase(assetType)
-                ? ALL_ASSET_SYNC_TYPES
-                : List.of(assetType);
-        List<PoliticalTrade> fetched = sourceAssetTypes.stream()
-                .flatMap(sourceAssetType -> politicalTradeSource.fetch(new PoliticalTradeSourceRequest(sourceAssetType, maxPages)).stream())
-                .toList();
-
-        int inserted = 0;
-        int updated = 0;
-        int skipped = 0;
-        for (PoliticalTrade fetchedTrade : fetched) {
-            if (fetchedTrade.getSourceTradeId() == null) {
-                skipped++;
-                continue;
-            }
-
-            PoliticalTrade tradeToSave = politicalTradeDataPort.findBySourceTradeId(fetchedTrade.getSourceTradeId())
-                    .map(existing -> merge(existing, fetchedTrade, syncedAt))
-                    .orElseGet(() -> prepareNew(fetchedTrade, syncedAt));
-
-            boolean existed = politicalTradeDataPort.existsBySourceTradeId(fetchedTrade.getSourceTradeId());
-            politicalTradeDataPort.save(tradeToSave);
-            if (existed) {
-                updated++;
-            } else {
-                inserted++;
-            }
+        if (!syncInProgress.compareAndSet(false, true)) {
+            throw new PoliticalTradeSyncException(
+                    "Political trade sync is already running",
+                    "POLITICAL_TRADE_SYNC_IN_PROGRESS",
+                    HttpStatus.CONFLICT);
         }
+        try {
+            PoliticalTradeSyncRequest source = request == null ? new PoliticalTradeSyncRequest() : request;
+            String assetType = normalizeAssetType(source.getAssetType(), DEFAULT_ASSET_TYPE);
+            validateSyncAssetType(assetType);
+            int maxPages = sanitizeSyncPages(source.getMaxPages());
+            if (maxPages > MAX_UNFORCED_SYNC_PAGES && !source.isForce()) {
+                throw new PoliticalTradeSyncException(
+                        "Political trade backfills over 25 pages require force=true",
+                        "POLITICAL_TRADE_SYNC_FORCE_REQUIRED",
+                        HttpStatus.BAD_REQUEST);
+            }
+            Instant syncedAt = Instant.now(clock);
+            long startedMillis = clock.millis();
+            List<String> sourceAssetTypes = "ALL".equalsIgnoreCase(assetType)
+                    ? ALL_ASSET_SYNC_TYPES
+                    : List.of(assetType);
+            List<PoliticalTrade> fetched = sourceAssetTypes.stream()
+                    .flatMap(sourceAssetType -> politicalTradeSource.fetch(new PoliticalTradeSourceRequest(sourceAssetType, maxPages)).stream())
+                    .toList();
 
-        return PoliticalTradeSyncResponse.builder()
-                .source(politicalTradeSource.sourceName())
-                .assetType(assetType)
-                .requestedPages(maxPages)
-                .fetchedPages(maxPages * sourceAssetTypes.size())
-                .fetchedRows(fetched.size())
-                .insertedRows(inserted)
-                .updatedRows(updated)
-                .skippedRows(skipped)
-                .totalCachedRows(politicalTradeDataPort.count())
-                .forced(source.isForce())
-                .syncedAt(syncedAt)
-                .build();
+            if (fetched.isEmpty() && !source.isForce()) {
+                throw new PoliticalTradeSyncException(
+                        "Political trade source returned no rows; refusing to mark sync successful without force=true",
+                        "POLITICAL_TRADE_SYNC_EMPTY_SOURCE",
+                        HttpStatus.BAD_GATEWAY);
+            }
+
+            int inserted = 0;
+            int updated = 0;
+            int skipped = 0;
+            for (PoliticalTrade fetchedTrade : fetched) {
+                if (fetchedTrade.getSourceTradeId() == null) {
+                    skipped++;
+                    continue;
+                }
+
+                PoliticalTrade tradeToSave = politicalTradeDataPort.findBySourceTradeId(fetchedTrade.getSourceTradeId())
+                        .map(existing -> merge(existing, fetchedTrade, syncedAt))
+                        .orElseGet(() -> prepareNew(fetchedTrade, syncedAt));
+
+                boolean existed = politicalTradeDataPort.existsBySourceTradeId(fetchedTrade.getSourceTradeId());
+                politicalTradeDataPort.save(tradeToSave);
+                if (existed) {
+                    updated++;
+                } else {
+                    inserted++;
+                }
+            }
+
+            PoliticalTradeSyncResponse response = PoliticalTradeSyncResponse.builder()
+                    .source(politicalTradeSource.sourceName())
+                    .assetType(assetType)
+                    .requestedPages(maxPages)
+                    .fetchedPages(maxPages * sourceAssetTypes.size())
+                    .fetchedRows(fetched.size())
+                    .insertedRows(inserted)
+                    .updatedRows(updated)
+                    .skippedRows(skipped)
+                    .totalCachedRows(politicalTradeDataPort.count())
+                    .forced(source.isForce())
+                    .syncedAt(syncedAt)
+                    .durationMillis(Math.max(0L, clock.millis() - startedMillis))
+                    .build();
+            log.info("Political trade sync completed: source={} assetType={} pages={} fetched={} inserted={} updated={} skipped={} durationMs={}",
+                    response.getSource(),
+                    response.getAssetType(),
+                    response.getFetchedPages(),
+                    response.getFetchedRows(),
+                    response.getInsertedRows(),
+                    response.getUpdatedRows(),
+                    response.getSkippedRows(),
+                    response.getDurationMillis());
+            return response;
+        } finally {
+            syncInProgress.set(false);
+        }
     }
 
     private List<PoliticalTrade> filterAndSort(ResolvedRequest request) {
@@ -265,6 +309,13 @@ public class PoliticalTradeServiceImpl implements PoliticalTradeService {
             return DEFAULT_SYNC_PAGES;
         }
         return Math.min(maxPages, MAX_SYNC_PAGES);
+    }
+
+    private void validateSyncAssetType(String assetType) {
+        if ("ALL".equalsIgnoreCase(assetType) || ALL_ASSET_SYNC_TYPES.contains(assetType)) {
+            return;
+        }
+        throw new IllegalArgumentException("Unsupported political trade asset type: " + assetType);
     }
 
     private String normalizeAssetType(String value, String fallback) {

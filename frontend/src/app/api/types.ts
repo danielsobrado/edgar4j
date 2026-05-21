@@ -1371,4 +1371,5 @@ export interface PoliticalTradeSyncResponse {
   totalCachedRows: number;
   forced: boolean;
   syncedAt: string | null;
+  durationMillis: number;
 }

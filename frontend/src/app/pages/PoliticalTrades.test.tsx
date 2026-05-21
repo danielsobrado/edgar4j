@@ -139,6 +139,7 @@ describe('PoliticalTradesPage', () => {
       totalCachedRows: 1,
       forced: false,
       syncedAt: '2026-05-21T10:00:00Z',
+      durationMillis: 1200,
     });
 
     render(
@@ -159,5 +160,23 @@ describe('PoliticalTradesPage', () => {
       }));
       expect(mockRefresh).toHaveBeenCalled();
     });
+  });
+
+  it('shows sync failures without refreshing stale results', async () => {
+    vi.mocked(politicalTradesApi.sync).mockRejectedValue(new Error('Political trade sync is already running'));
+
+    render(
+      <MemoryRouter initialEntries={['/political-trades?assetType=stock']}>
+        <Routes>
+          <Route path="/political-trades" element={<PoliticalTradesPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sync Latest' }));
+
+    expect(await screen.findByText('Failed to sync political trades')).toBeInTheDocument();
+    expect(screen.getByText('Political trade sync is already running')).toBeInTheDocument();
+    expect(mockRefresh).not.toHaveBeenCalled();
   });
 });
