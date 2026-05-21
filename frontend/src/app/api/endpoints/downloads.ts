@@ -1,5 +1,5 @@
 import { apiClient } from '../client';
-import { DownloadJob, DownloadRequest, DownloadSummary, DownloadType } from '../types';
+import { DownloadJob, DownloadRequest, DownloadSummary, DownloadType, UsaSpendingCsvPage } from '../types';
 
 export const downloadsApi = {
   downloadTickers: (type: DownloadType = 'TICKERS_ALL'): Promise<DownloadJob> => {
@@ -31,6 +31,18 @@ export const downloadsApi = {
     return apiClient.post<DownloadJob>('/downloads/remote-filings', payload);
   },
 
+  downloadUsaSpendingAwards: (request: {
+    dateFrom: string;
+    dateTo: string;
+  }): Promise<DownloadJob> => {
+    const payload: DownloadRequest = {
+      type: 'USA_SPENDING_AWARDS',
+      dateFrom: request.dateFrom,
+      dateTo: request.dateTo,
+    };
+    return apiClient.post<DownloadJob>('/downloads/usaspending/awards', payload);
+  },
+
   downloadBulk: (request: DownloadRequest): Promise<DownloadJob> => {
     return apiClient.post<DownloadJob>('/downloads/bulk', request);
   },
@@ -49,6 +61,10 @@ export const downloadsApi = {
 
   getJobById: (id: string): Promise<DownloadJob> => {
     return apiClient.get<DownloadJob>(`/downloads/jobs/${id}`);
+  },
+
+  getUsaSpendingCsvPage: (id: string, page: number = 0, size: number = 25): Promise<UsaSpendingCsvPage> => {
+    return apiClient.get<UsaSpendingCsvPage>(`/downloads/jobs/${id}/usaspending-csv?page=${page}&size=${size}`);
   },
 
   cancelJob: (id: string): Promise<void> => {

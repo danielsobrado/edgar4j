@@ -6,6 +6,7 @@ import java.util.Optional;
 import org.jds.edgar4j.dto.request.DownloadRequest;
 import org.jds.edgar4j.dto.response.DownloadJobResponse;
 import org.jds.edgar4j.dto.response.DownloadSummaryResponse;
+import org.jds.edgar4j.dto.response.UsaSpendingCsvPageResponse;
 import org.jds.edgar4j.model.DownloadJob;
 
 public interface DownloadJobService {
@@ -13,6 +14,8 @@ public interface DownloadJobService {
     DownloadJobResponse startDownload(DownloadRequest request);
 
     Optional<DownloadJobResponse> getJobById(String jobId);
+
+    Optional<UsaSpendingCsvPageResponse> getUsaSpendingCsvPage(String jobId, int page, int size);
 
     List<DownloadJobResponse> getRecentJobs(int limit);
 

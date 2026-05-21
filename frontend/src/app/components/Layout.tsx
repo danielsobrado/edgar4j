@@ -36,6 +36,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const secondaryNavItems = [
     { path: '/alerts', label: 'Alerts', icon: Bell },
     { path: '/downloads', label: 'Downloads', icon: Download },
+    { path: '/usaspending-downloads', label: 'USAspending', icon: Landmark },
     { path: '/settings', label: 'Settings', icon: Settings }
   ];
 

@@ -9,6 +9,7 @@ import { Companies } from './pages/Companies';
 import { CompanyFundamentals } from './pages/CompanyFundamentals';
 import { DividendViabilityDashboard } from './pages/DividendViabilityDashboard';
 import { Downloads } from './pages/Downloads';
+import { UsaSpendingDownloads } from './pages/UsaSpendingDownloads';
 import { Settings } from './pages/Settings';
 import { Form13FPage } from './pages/Form13F';
 import { Form13DGPage } from './pages/Form13DG';
@@ -47,6 +48,7 @@ export default function App() {
             <Route path="/remote-edgar" element={<RemoteEdgar />} />
             <Route path="/alerts" element={<Alerts />} />
             <Route path="/downloads" element={<Downloads />} />
+            <Route path="/usaspending-downloads" element={<UsaSpendingDownloads />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>
         </Layout>

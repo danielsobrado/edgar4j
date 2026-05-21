@@ -1,5 +1,6 @@
 package org.jds.edgar4j.controller;
 
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Locale;
 
@@ -7,6 +8,7 @@ import org.jds.edgar4j.dto.request.DownloadRequest;
 import org.jds.edgar4j.dto.response.ApiResponse;
 import org.jds.edgar4j.dto.response.DownloadJobResponse;
 import org.jds.edgar4j.dto.response.DownloadSummaryResponse;
+import org.jds.edgar4j.dto.response.UsaSpendingCsvPageResponse;
 import org.jds.edgar4j.service.DownloadJobService;
 import org.jds.edgar4j.util.PaginationUtils;
 import org.springframework.http.HttpStatus;
@@ -93,6 +95,32 @@ public class DownloadController {
         return ResponseEntity.ok(ApiResponse.success(job, "Download job started"));
     }
 
+    @PostMapping("/usaspending/awards")
+    public ResponseEntity<ApiResponse<DownloadJobResponse>> downloadUsaSpendingAwards(@RequestBody @Valid DownloadRequest request) {
+        if (request == null) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("Download request is required"));
+        }
+        log.info("POST /api/downloads/usaspending/awards: dateFrom={}, dateTo={}",
+                request.getDateFrom(), request.getDateTo());
+
+        if (request.getDateFrom() == null || request.getDateTo() == null) {
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("dateFrom and dateTo are required for USAspending award downloads"));
+        }
+        if (request.getDateTo().isBefore(request.getDateFrom())) {
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("dateTo must be on or after dateFrom"));
+        }
+        if (ChronoUnit.DAYS.between(request.getDateFrom(), request.getDateTo()) + 1 > 366) {
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("USAspending award downloads may span at most one year"));
+        }
+
+        request.setType(DownloadRequest.DownloadType.USA_SPENDING_AWARDS);
+        DownloadJobResponse job = downloadJobService.startDownload(request);
+        return ResponseEntity.ok(ApiResponse.success(job, "USAspending award download job started"));
+    }
+
     @PostMapping("/bulk")
     public ResponseEntity<ApiResponse<DownloadJobResponse>> downloadBulk(@RequestBody @Valid DownloadRequest request) {
         if (request == null || request.getType() == null) {
@@ -132,6 +160,18 @@ public class DownloadController {
                 .map(job -> ResponseEntity.ok(ApiResponse.success(job)))
                 .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND)
                         .body(ApiResponse.error("Download job not found")));
+    }
+
+    @GetMapping("/jobs/{id}/usaspending-csv")
+    public ResponseEntity<ApiResponse<UsaSpendingCsvPageResponse>> getUsaSpendingCsvPage(
+            @PathVariable String id,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "25") @Min(1) @Max(100) int size) {
+        log.info("GET /api/downloads/jobs/{}/usaspending-csv?page={}&size={}", id, page, size);
+        return downloadJobService.getUsaSpendingCsvPage(id, page, size)
+                .map(csvPage -> ResponseEntity.ok(ApiResponse.success(csvPage)))
+                .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(ApiResponse.error("Completed USAspending CSV download not found")));
     }
 
     @DeleteMapping("/jobs/{id}")

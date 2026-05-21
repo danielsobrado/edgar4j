@@ -196,6 +196,7 @@ export type DownloadType =
   | 'TICKERS_MF'
   | 'SUBMISSIONS'
   | 'REMOTE_FILINGS_SYNC'
+  | 'USA_SPENDING_AWARDS'
   | 'BULK_SUBMISSIONS'
   | 'BULK_COMPANY_FACTS';
 
@@ -223,11 +224,37 @@ export interface DownloadJob {
   totalFiles: number;
   estimatedSize?: string;
   cik?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  sourceUrl?: string;
+  outputPath?: string;
 }
 
 export interface DownloadSummary {
   tickerRecordsImported: number;
   lastTickerUpdate?: string;
+}
+
+export interface UsaSpendingCsvPage {
+  jobId: string;
+  fileName: string;
+  headers: string[];
+  rows: string[][];
+  rowMatches: UsaSpendingCompanyMatch[][];
+  page: number;
+  size: number;
+  totalRows: number;
+  totalPages: number;
+}
+
+export interface UsaSpendingCompanyMatch {
+  cik: string;
+  ticker?: string;
+  companyName: string;
+  confidence: number;
+  sourceField: string;
+  sourceValue: string;
+  matchMethod: string;
 }
 
 // Settings Types

@@ -13,6 +13,8 @@ import org.jds.edgar4j.service.DownloadBulkDataService;
 import org.jds.edgar4j.service.DownloadSubmissionsService;
 import org.jds.edgar4j.service.DownloadTickersService;
 import org.jds.edgar4j.service.RemoteEdgarService;
+import org.jds.edgar4j.service.UsaSpendingDownloadService;
+import org.jds.edgar4j.service.UsaSpendingDownloadService.UsaSpendingDownloadResult;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -29,6 +31,7 @@ public class DownloadJobExecutor {
     private final DownloadSubmissionsService downloadSubmissionsService;
     private final DownloadBulkDataService downloadBulkDataService;
     private final RemoteEdgarService remoteEdgarService;
+    private final UsaSpendingDownloadService usaSpendingDownloadService;
 
     @Async("downloadExecutor")
     public void executeDownloadAsync(String jobId, DownloadRequest request) {
@@ -41,6 +44,10 @@ public class DownloadJobExecutor {
         }
 
         DownloadJob job = jobOpt.get();
+        if (job.getStatus() == JobStatus.CANCELLED) {
+            log.info("Skipping cancelled download job {}", jobId);
+            return;
+        }
         job.setStatus(JobStatus.IN_PROGRESS);
         downloadJobRepository.save(job);
 
@@ -70,6 +77,13 @@ public class DownloadJobExecutor {
                         return;
                     }
                     break;
+                case USA_SPENDING_AWARDS:
+                    UsaSpendingDownloadResult result = usaSpendingDownloadService.downloadAwardCsvZip(
+                            request.getDateFrom(),
+                            request.getDateTo()
+                    );
+                    markCompleted(jobId, 1, result);
+                    return;
                 case BULK_SUBMISSIONS:
                     filesDownloaded = downloadBulkDataService.downloadBulkSubmissionsArchive();
                     break;
@@ -142,6 +156,21 @@ public class DownloadJobExecutor {
         job.setStatus(JobStatus.COMPLETED);
         job.setProgress(100);
         job.setFilesDownloaded(filesDownloaded);
+        job.setCompletedAt(LocalDateTime.now());
+        downloadJobRepository.save(job);
+    }
+
+    private void markCompleted(String jobId, long filesDownloaded, UsaSpendingDownloadResult result) {
+        DownloadJob job = downloadJobRepository.findById(jobId).orElse(null);
+        if (job == null || job.getStatus() == JobStatus.CANCELLED) {
+            return;
+        }
+        job.setStatus(JobStatus.COMPLETED);
+        job.setProgress(100);
+        job.setFilesDownloaded(filesDownloaded);
+        job.setTotalFiles(result.totalRows());
+        job.setSourceUrl(result.sourceUrl());
+        job.setOutputPath(result.outputPath().toString());
         job.setCompletedAt(LocalDateTime.now());
         downloadJobRepository.save(job);
     }
