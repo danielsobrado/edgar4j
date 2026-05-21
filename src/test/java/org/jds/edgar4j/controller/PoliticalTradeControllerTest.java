@@ -138,7 +138,7 @@ class PoliticalTradeControllerTest {
                 .build();
         when(politicalTradeService.sync(request)).thenReturn(expected);
 
-        ResponseEntity<ApiResponse<PoliticalTradeSyncResponse>> response = controller.sync("stock", 1, false);
+        ResponseEntity<ApiResponse<PoliticalTradeSyncResponse>> response = controller.sync("stock", 1, false).block();
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertTrue(response.getBody().isSuccess());

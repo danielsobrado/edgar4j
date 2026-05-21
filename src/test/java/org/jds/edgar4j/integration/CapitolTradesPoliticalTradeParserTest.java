@@ -54,6 +54,29 @@ class CapitolTradesPoliticalTradeParserTest {
         assertNull(second.getAmountMax());
     }
 
+    @Test
+    void infersAssetTypeFromRowMetadataWhenRequestIsUnfiltered() {
+        List<PoliticalTrade> trades = parser.parse("""
+                <html><body><table><tbody>
+                <tr class="asset-type--crypto" data-asset-type="crypto">
+                  <td><div class="q-cell cell--politician"><h2 class="politician-name"><a>Tim Moore</a></h2></div></td>
+                  <td><div class="q-cell cell--traded-issuer"><h3 class="q-fieldset issuer-name"><a>Bitcoin</a></h3><span class="q-field issuer-ticker">BTC</span></div></td>
+                  <td><div class="text-center"><div>20 May</div><div>2026</div></div></td>
+                  <td><div class="text-center"><div>18 May</div><div>2026</div></div></td>
+                  <td>2 days</td>
+                  <td><span class="q-label">Self</span></td>
+                  <td><span class="q-field tx-type">buy</span></td>
+                  <td><span class="q-field trade-size"><span class="text-size-2">1K-15K</span></span></td>
+                  <td>N/A</td>
+                  <td><a href="/trades/20003798317"></a></td>
+                </tr>
+                </tbody></table></body></html>
+                """, URI.create("https://www.capitoltrades.com/trades"), null);
+
+        assertEquals(1, trades.size());
+        assertEquals("crypto", trades.get(0).getAssetType());
+    }
+
     private String htmlFixture() {
         return """
                 <html><body><table><tbody>

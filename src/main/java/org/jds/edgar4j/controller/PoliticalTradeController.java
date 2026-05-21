@@ -31,6 +31,7 @@ import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 @Slf4j
 @RestController
@@ -151,21 +152,20 @@ public class PoliticalTradeController {
             @RequestBody(required = false) Mono<Map<String, Object>> requestBody) {
         Mono<Map<String, Object>> body = requestBody == null
                 ? Mono.just(Map.of())
-                : requestBody.defaultIfEmpty(Map.of()).onErrorReturn(Map.of());
+                : requestBody.defaultIfEmpty(Map.of());
         return body
                 .map(values -> buildSyncRequest(values, assetType, maxPages, force))
-                .map(politicalTradeService::sync)
-                .map(this::syncResponse);
+                .flatMap(this::syncAsync);
     }
 
     @Operation(summary = "Sync political trades", description = "Fetches public Capitol Trades rows into the local cache.")
     @PostMapping(value = "/sync", consumes = "!application/json")
-    public ResponseEntity<ApiResponse<PoliticalTradeSyncResponse>> sync(
+    public Mono<ResponseEntity<ApiResponse<PoliticalTradeSyncResponse>>> sync(
             @RequestParam(required = false) String assetType,
             @RequestParam(required = false) @Min(1) @Max(250) Integer maxPages,
             @RequestParam(required = false) Boolean force) {
         PoliticalTradeSyncRequest request = buildSyncRequest(Map.of(), assetType, maxPages, force);
-        return syncResponse(politicalTradeService.sync(request));
+        return syncAsync(request);
     }
 
     private PoliticalTradeScreenRequest buildScreenRequest(
@@ -252,5 +252,11 @@ public class PoliticalTradeController {
 
     private ResponseEntity<ApiResponse<PoliticalTradeSyncResponse>> syncResponse(PoliticalTradeSyncResponse response) {
         return ResponseEntity.ok(ApiResponse.success(response, "Political trade sync completed"));
+    }
+
+    private Mono<ResponseEntity<ApiResponse<PoliticalTradeSyncResponse>>> syncAsync(PoliticalTradeSyncRequest request) {
+        return Mono.fromCallable(() -> politicalTradeService.sync(request))
+                .subscribeOn(Schedulers.boundedElastic())
+                .map(this::syncResponse);
     }
 }

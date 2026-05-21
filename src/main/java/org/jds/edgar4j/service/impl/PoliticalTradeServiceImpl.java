@@ -36,6 +36,12 @@ public class PoliticalTradeServiceImpl implements PoliticalTradeService {
     private static final int DEFAULT_SYNC_PAGES = 25;
     private static final int MAX_SYNC_PAGES = 250;
     private static final int EXPORT_LIMIT = 10_000;
+    private static final List<String> ALL_ASSET_SYNC_TYPES = List.of(
+            "stock",
+            "etf",
+            "mutual-fund",
+            "crypto",
+            "corporate-bond");
 
     private final PoliticalTradeDataPort politicalTradeDataPort;
     private final PoliticalTradeSource politicalTradeSource;
@@ -98,7 +104,12 @@ public class PoliticalTradeServiceImpl implements PoliticalTradeService {
         String assetType = normalizeAssetType(source.getAssetType(), DEFAULT_ASSET_TYPE);
         int maxPages = sanitizeSyncPages(source.getMaxPages());
         Instant syncedAt = Instant.now(clock);
-        List<PoliticalTrade> fetched = politicalTradeSource.fetch(new PoliticalTradeSourceRequest(assetType, maxPages));
+        List<String> sourceAssetTypes = "ALL".equalsIgnoreCase(assetType)
+                ? ALL_ASSET_SYNC_TYPES
+                : List.of(assetType);
+        List<PoliticalTrade> fetched = sourceAssetTypes.stream()
+                .flatMap(sourceAssetType -> politicalTradeSource.fetch(new PoliticalTradeSourceRequest(sourceAssetType, maxPages)).stream())
+                .toList();
 
         int inserted = 0;
         int updated = 0;
@@ -126,7 +137,7 @@ public class PoliticalTradeServiceImpl implements PoliticalTradeService {
                 .source(politicalTradeSource.sourceName())
                 .assetType(assetType)
                 .requestedPages(maxPages)
-                .fetchedPages(maxPages)
+                .fetchedPages(maxPages * sourceAssetTypes.size())
                 .fetchedRows(fetched.size())
                 .insertedRows(inserted)
                 .updatedRows(updated)

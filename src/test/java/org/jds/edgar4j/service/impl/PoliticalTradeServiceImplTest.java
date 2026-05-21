@@ -3,6 +3,7 @@ package org.jds.edgar4j.service.impl;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -151,14 +152,14 @@ class PoliticalTradeServiceImplTest {
         when(dataPort.existsBySourceTradeId("CAPITOL_TRADES:20003798315")).thenReturn(true);
 
         PoliticalTradeSyncResponse response = service.sync(PoliticalTradeSyncRequest.builder()
-                .assetType("ALL")
+                .assetType("stock")
                 .maxPages(999)
                 .force(true)
                 .build());
 
         ArgumentCaptor<PoliticalTradeSourceRequest> requestCaptor = ArgumentCaptor.forClass(PoliticalTradeSourceRequest.class);
         verify(source).fetch(requestCaptor.capture());
-        assertEquals("all", requestCaptor.getValue().assetType());
+        assertEquals("stock", requestCaptor.getValue().assetType());
         assertEquals(250, requestCaptor.getValue().maxPages());
 
         ArgumentCaptor<PoliticalTrade> savedCaptor = ArgumentCaptor.forClass(PoliticalTrade.class);
@@ -167,6 +168,26 @@ class PoliticalTradeServiceImplTest {
         assertEquals(Instant.parse("2026-05-20T10:00:00Z"), savedCaptor.getValue().getFirstSeenAt());
         assertEquals(1, response.getUpdatedRows());
         assertEquals(0, response.getInsertedRows());
+    }
+
+    @Test
+    void syncAllAssetTypesFetchesEachSupportedTypeSeparately() {
+        when(source.fetch(any(PoliticalTradeSourceRequest.class))).thenReturn(List.of());
+        when(source.sourceName()).thenReturn("CAPITOL_TRADES");
+
+        PoliticalTradeSyncResponse response = service.sync(PoliticalTradeSyncRequest.builder()
+                .assetType("ALL")
+                .maxPages(2)
+                .build());
+
+        ArgumentCaptor<PoliticalTradeSourceRequest> requestCaptor = ArgumentCaptor.forClass(PoliticalTradeSourceRequest.class);
+        verify(source, times(5)).fetch(requestCaptor.capture());
+        assertEquals(List.of("stock", "etf", "mutual-fund", "crypto", "corporate-bond"),
+                requestCaptor.getAllValues().stream().map(PoliticalTradeSourceRequest::assetType).toList());
+        assertEquals(List.of(2, 2, 2, 2, 2),
+                requestCaptor.getAllValues().stream().map(PoliticalTradeSourceRequest::maxPages).toList());
+        assertEquals("all", response.getAssetType());
+        assertEquals(10, response.getFetchedPages());
     }
 
     private PoliticalTrade trade(

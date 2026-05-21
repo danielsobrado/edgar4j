@@ -98,6 +98,9 @@ class CapitolTradesPoliticalTradeParser {
         List<String> tradedParts = cellParts(cells.get(3));
         String amountLabel = amountLabel(cells.get(7));
 
+        String assetType = Optional.ofNullable(inferAssetType(row))
+                .orElseGet(() -> normalizeAssetType(requestedAssetType));
+
         PoliticalTrade trade = PoliticalTrade.builder()
                 .sourceTradeId(sourceTradeId)
                 .politicianName(politicianName)
@@ -115,7 +118,7 @@ class CapitolTradesPoliticalTradeParser {
                 .amountMin(parseAmountRange(amountLabel).min())
                 .amountMax(parseAmountRange(amountLabel).max())
                 .price(parsePrice(cells.get(8).text()))
-                .assetType(normalizeAssetType(requestedAssetType))
+                .assetType(assetType)
                 .sourceTradeUrl(sourceTradeUrl)
                 .source(SOURCE)
                 .build();
@@ -255,6 +258,34 @@ class CapitolTradesPoliticalTradeParser {
     private String normalizeAssetType(String value) {
         String normalized = blankToNull(value);
         return normalized == null ? "stock" : normalized.toLowerCase(Locale.ROOT);
+    }
+
+    private String inferAssetType(Element row) {
+        String value = blankToNull(row.attr("data-asset-type"));
+        if (value == null) {
+            value = blankToNull(row.attr("data-assetType"));
+        }
+        if (value == null) {
+            value = row.select("[data-asset-type], [data-assetType]").stream()
+                    .map(element -> element.hasAttr("data-asset-type")
+                            ? element.attr("data-asset-type")
+                            : element.attr("data-assetType"))
+                    .map(this::blankToNull)
+                    .filter(Objects::nonNull)
+                    .findFirst()
+                    .orElse(null);
+        }
+        if (value == null) {
+            value = text(row, ".asset-type, .assetType");
+        }
+        if (value == null) {
+            value = row.classNames().stream()
+                    .filter(className -> className.startsWith("asset-type--") || className.startsWith("asset--"))
+                    .map(className -> className.replace("asset-type--", "").replace("asset--", ""))
+                    .findFirst()
+                    .orElse(null);
+        }
+        return value == null ? null : value.trim().toLowerCase(Locale.ROOT).replace(' ', '-');
     }
 
     private String sourceTradeId(String detailHref, Element row) {
