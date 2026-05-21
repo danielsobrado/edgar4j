@@ -97,6 +97,11 @@ public class Form4FileAdapter extends AbstractFileDataPort<Form4> implements For
     }
 
     @Override
+    public List<Form4> findRecentTransactions(LocalDate since) {
+        return findMatching(value -> isRecentTransaction(value, since));
+    }
+
+    @Override
     public boolean existsByAccessionNumber(String accessionNumber) {
         return existsByIndex(INDEX_ACCESSION_NUMBER, accessionNumber);
     }
@@ -122,6 +127,24 @@ public class Form4FileAdapter extends AbstractFileDataPort<Form4> implements For
                 && "A".equalsIgnoreCase(transaction.getAcquiredDisposedCode())
                 && "P".equalsIgnoreCase(transaction.getTransactionCode())
                 && betweenAfter(transaction.getTransactionDate(), since);
+    }
+
+    private boolean isRecentTransaction(Form4 form4, LocalDate since) {
+        if (form4 == null || since == null) {
+            return false;
+        }
+        if (isAcquisitionOrDisposition(form4.getAcquiredDisposedCode())
+                && betweenAfter(form4.getTransactionDate(), since)) {
+            return true;
+        }
+        return form4.getTransactions() != null && form4.getTransactions().stream()
+                .filter(Objects::nonNull)
+                .anyMatch(transaction -> isAcquisitionOrDisposition(transaction.getAcquiredDisposedCode())
+                        && betweenAfter(transaction.getTransactionDate(), since));
+    }
+
+    private boolean isAcquisitionOrDisposition(String acquiredDisposedCode) {
+        return "A".equalsIgnoreCase(acquiredDisposedCode) || "D".equalsIgnoreCase(acquiredDisposedCode);
     }
 
     private boolean betweenAfter(LocalDate value, LocalDate since) {

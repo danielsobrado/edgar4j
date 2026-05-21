@@ -81,6 +81,12 @@ public interface Form4Repository extends MongoRepository<Form4, String> {
             + "] }")
     List<Form4> findRecentAcquisitions(LocalDate since);
 
+    @Query("{ $or: [ "
+            + "{ 'transactionDate': { $gte: ?0 }, 'acquiredDisposedCode': { $in: ['A', 'D'] } }, "
+            + "{ 'transactions': { $elemMatch: { 'transactionDate': { $gte: ?0 }, 'acquiredDisposedCode': { $in: ['A', 'D'] } } } } "
+            + "] }")
+    List<Form4> findRecentTransactions(LocalDate since);
+
     Page<Form4> findByAcquiredDisposedCodeAndTransactionDateGreaterThanEqual(
             String code, LocalDate since, Pageable pageable);
 

@@ -242,7 +242,7 @@ export function Dashboard() {
               <RefreshCw className={`w-4 h-4 text-gray-400 ${topLoading ? 'animate-spin' : ''}`} />
             </button>
             <button
-              onClick={() => navigate('/insider-purchases')}
+              onClick={() => navigate('/insider-activity?preset=LATEST_PURCHASES')}
               className="text-sm text-blue-600 hover:underline"
             >
               View All

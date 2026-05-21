@@ -1,5 +1,6 @@
 package org.jds.edgar4j.model;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import org.springframework.data.annotation.Id;
@@ -30,6 +31,7 @@ public class DownloadJob {
         TICKERS_MF,
         SUBMISSIONS,
         REMOTE_FILINGS_SYNC,
+        USA_SPENDING_AWARDS,
         BULK_SUBMISSIONS,
         BULK_COMPANY_FACTS
     }
@@ -56,4 +58,8 @@ public class DownloadJob {
     private long totalFiles;
     private String cik;
     private String userAgent;
+    private LocalDate dateFrom;
+    private LocalDate dateTo;
+    private String sourceUrl;
+    private String outputPath;
 }

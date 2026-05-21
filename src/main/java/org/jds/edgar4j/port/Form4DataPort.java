@@ -28,5 +28,7 @@ public interface Form4DataPort extends BaseDocumentDataPort<Form4> {
 
     List<Form4> findRecentAcquisitions(LocalDate since);
 
+    List<Form4> findRecentTransactions(LocalDate since);
+
     boolean existsByAccessionNumber(String accessionNumber);
 }

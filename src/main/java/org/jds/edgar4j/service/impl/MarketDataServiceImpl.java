@@ -38,6 +38,7 @@ import org.jds.edgar4j.model.AppSettings;
 import org.jds.edgar4j.port.AppSettingsDataPort;
 import org.jds.edgar4j.service.MarketDataService;
 import org.jds.edgar4j.service.SettingsService;
+import org.jds.edgar4j.util.UsMarketCalendar;
 import org.jds.edgar4j.service.provider.MarketDataProvider;
 import org.jds.edgar4j.service.provider.MarketDataProviderSettingsResolver;
 import org.jds.edgar4j.service.provider.MarketDataProviders;
@@ -414,10 +415,7 @@ public class MarketDataServiceImpl implements MarketDataService {
     }
 
     static boolean isExpectedTradingDay(LocalDate date) {
-        DayOfWeek dayOfWeek = date.getDayOfWeek();
-        return dayOfWeek != SATURDAY
-                && dayOfWeek != SUNDAY
-                && !isUsMarketHoliday(date);
+        return UsMarketCalendar.isExpectedTradingDay(date);
     }
 
     private static boolean isUsMarketHoliday(LocalDate date) {

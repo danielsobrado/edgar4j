@@ -1,5 +1,6 @@
 package org.jds.edgar4j.dto.response;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import lombok.AllArgsConstructor;
@@ -33,4 +34,8 @@ public class DownloadJobResponse {
     private long totalFiles;
     private String estimatedSize;
     private String cik;
+    private LocalDate dateFrom;
+    private LocalDate dateTo;
+    private String sourceUrl;
+    private String outputPath;
 }

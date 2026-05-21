@@ -24,6 +24,7 @@ public class DownloadRequest {
         TICKERS_MF,
         SUBMISSIONS,
         REMOTE_FILINGS_SYNC,
+        USA_SPENDING_AWARDS,
         BULK_SUBMISSIONS,
         BULK_COMPANY_FACTS
     }

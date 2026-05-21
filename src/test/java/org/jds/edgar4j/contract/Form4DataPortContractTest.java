@@ -147,6 +147,33 @@ abstract class Form4DataPortContractTest {
     }
 
     @Test
+    void findRecentTransactions_includesNestedPurchasesAndSales() {
+        Form4 nestedPurchase = TestFixtures.createTestForm4("0001234567-24-710001", "TSLA", LocalDate.of(2024, 1, 1));
+        nestedPurchase.setTransactions(List.of(Form4Transaction.builder()
+                .accessionNumber(nestedPurchase.getAccessionNumber())
+                .transactionCode("P")
+                .transactionDate(LocalDate.of(2024, 2, 1))
+                .acquiredDisposedCode("A")
+                .transactionValue(1000f)
+                .build()));
+
+        Form4 nestedSale = TestFixtures.createTestForm4("0001234567-24-710002", "MSFT", LocalDate.of(2024, 1, 1));
+        nestedSale.setTransactions(List.of(Form4Transaction.builder()
+                .accessionNumber(nestedSale.getAccessionNumber())
+                .transactionCode("S")
+                .transactionDate(LocalDate.of(2024, 2, 2))
+                .acquiredDisposedCode("D")
+                .transactionValue(2000f)
+                .build()));
+
+        port().saveAll(List.of(nestedPurchase, nestedSale));
+
+        List<Form4> transactions = port().findRecentTransactions(LocalDate.of(2024, 1, 15));
+
+        assertEquals(2, transactions.size());
+    }
+
+    @Test
     void existsByAccessionNumber_reflectsPresence() {
         Form4 form4 = TestFixtures.createTestForm4("0001234567-24-800001", "AAPL");
         port().save(form4);

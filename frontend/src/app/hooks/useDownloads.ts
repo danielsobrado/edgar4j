@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { downloadsApi, DownloadJob, DownloadSummary, DownloadType } from '../api';
 
 export function useDownloadJobs(limit: number = 10) {
@@ -59,6 +59,7 @@ export function useDownloadJob(jobId: string | undefined, pollInterval: number =
   const [job, setJob] = useState<DownloadJob | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const statusRef = useRef<DownloadJob['status'] | undefined>(undefined);
 
   const fetchJob = useCallback(async () => {
     if (!jobId) return;
@@ -66,6 +67,7 @@ export function useDownloadJob(jobId: string | undefined, pollInterval: number =
     try {
       const data = await downloadsApi.getJobById(jobId);
       setJob(data);
+      statusRef.current = data.status;
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load job');
@@ -77,6 +79,7 @@ export function useDownloadJob(jobId: string | undefined, pollInterval: number =
   useEffect(() => {
     if (!jobId) {
       setLoading(false);
+      statusRef.current = undefined;
       return;
     }
 
@@ -84,13 +87,13 @@ export function useDownloadJob(jobId: string | undefined, pollInterval: number =
 
     if (pollInterval > 0) {
       const interval = setInterval(() => {
-        if (job && (job.status === 'PENDING' || job.status === 'IN_PROGRESS')) {
+        if (!statusRef.current || statusRef.current === 'PENDING' || statusRef.current === 'IN_PROGRESS') {
           fetchJob();
         }
       }, pollInterval);
       return () => clearInterval(interval);
     }
-  }, [jobId, pollInterval, fetchJob, job]);
+  }, [jobId, pollInterval, fetchJob]);
 
   return { job, loading, error, refresh: fetchJob };
 }
