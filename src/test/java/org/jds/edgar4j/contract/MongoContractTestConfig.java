@@ -3,11 +3,13 @@ package org.jds.edgar4j.contract;
 import org.jds.edgar4j.adapter.mongo.CompanyMongoAdapter;
 import org.jds.edgar4j.adapter.mongo.FillingMongoAdapter;
 import org.jds.edgar4j.adapter.mongo.Form4MongoAdapter;
+import org.jds.edgar4j.adapter.mongo.PoliticalTradeMongoAdapter;
 import org.jds.edgar4j.adapter.mongo.TickerMongoAdapter;
 import org.jds.edgar4j.config.EmbeddedMongoConfig;
 import org.jds.edgar4j.repository.CompanyRepository;
 import org.jds.edgar4j.repository.FillingRepository;
 import org.jds.edgar4j.repository.Form4Repository;
+import org.jds.edgar4j.repository.PoliticalTradeRepository;
 import org.jds.edgar4j.repository.TickerRepository;
 import org.jds.edgar4j.startup.MongoFilingIndexCleanup;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
@@ -43,7 +45,8 @@ import org.springframework.context.annotation.FullyQualifiedAnnotationBeanNameGe
         Form4Repository.class,
         CompanyRepository.class,
         TickerRepository.class,
-        FillingRepository.class
+        FillingRepository.class,
+        PoliticalTradeRepository.class
 }, nameGenerator = FullyQualifiedAnnotationBeanNameGenerator.class)
 @Import({
         EmbeddedMongoConfig.class,
@@ -51,7 +54,8 @@ import org.springframework.context.annotation.FullyQualifiedAnnotationBeanNameGe
         Form4MongoAdapter.class,
         CompanyMongoAdapter.class,
         TickerMongoAdapter.class,
-        FillingMongoAdapter.class
+        FillingMongoAdapter.class,
+        PoliticalTradeMongoAdapter.class
 })
 class MongoContractTestConfig {
 }

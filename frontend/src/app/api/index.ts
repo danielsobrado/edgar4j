@@ -21,6 +21,7 @@ export { remoteEdgarApi } from './endpoints/remoteEdgar';
 export { marketDataApi } from './endpoints/marketData';
 export { insiderPurchasesApi } from './endpoints/insiderPurchases';
 export { insiderActivityApi } from './endpoints/insiderActivity';
+export { politicalTradesApi } from './endpoints/politicalTrades';
 export { dividendApi } from './endpoints/dividend';
 export type {
   XbrlSummary,

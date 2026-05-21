@@ -1301,3 +1301,74 @@ export interface InsiderActivityFilter {
   page?: number;
   size?: number;
 }
+
+// ========== Political Trades Types ==========
+
+export type PoliticalTradeExportFormat = 'CSV' | 'JSON';
+
+export interface PoliticalTrade {
+  id: string | null;
+  sourceTradeId: string | null;
+  politicianName: string | null;
+  party: string | null;
+  chamber: string | null;
+  state: string | null;
+  issuerName: string | null;
+  ticker: string | null;
+  disclosureDate: string | null;
+  tradedDate: string | null;
+  filedAfterDays: number | null;
+  owner: string | null;
+  transactionType: string | null;
+  amountLabel: string | null;
+  amountMin: number | null;
+  amountMax: number | null;
+  price: number | null;
+  assetType: string | null;
+  sourceTradeUrl: string | null;
+  source: string | null;
+  firstSeenAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface PoliticalTradeFilter {
+  politician?: string;
+  ticker?: string;
+  issuer?: string;
+  party?: string;
+  chamber?: string;
+  state?: string;
+  assetType?: string;
+  transactionType?: string;
+  owner?: string;
+  tradedDateFrom?: string;
+  tradedDateTo?: string;
+  disclosureDateFrom?: string;
+  disclosureDateTo?: string;
+  minAmount?: number;
+  maxAmount?: number;
+  sortBy?: string;
+  sortDir?: 'asc' | 'desc';
+  page?: number;
+  size?: number;
+}
+
+export interface PoliticalTradeSyncRequest {
+  assetType?: string;
+  maxPages?: number;
+  force?: boolean;
+}
+
+export interface PoliticalTradeSyncResponse {
+  source: string | null;
+  assetType: string | null;
+  requestedPages: number;
+  fetchedPages: number;
+  fetchedRows: number;
+  insertedRows: number;
+  updatedRows: number;
+  skippedRows: number;
+  totalCachedRows: number;
+  forced: boolean;
+  syncedAt: string | null;
+}

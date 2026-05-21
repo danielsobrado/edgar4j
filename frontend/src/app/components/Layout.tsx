@@ -31,6 +31,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { path: '/analysis/dividend-viability', label: 'Dividend Viability', icon: Landmark },
     { path: '/companies', label: 'Fundamentals', icon: LineChart },
     { path: '/insider-activity', label: 'Insider Activity', icon: ShoppingCart },
+    { path: '/political-trades', label: 'Political Trades', icon: Landmark },
   ]), []);
 
   const secondaryNavItems = [
