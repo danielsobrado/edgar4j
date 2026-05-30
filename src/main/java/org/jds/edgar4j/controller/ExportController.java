@@ -2,6 +2,7 @@ package org.jds.edgar4j.controller;
 
 import org.jds.edgar4j.dto.request.ExportRequest;
 import org.jds.edgar4j.service.ExportService;
+import org.jds.edgar4j.util.ExportFilenames;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -30,7 +31,7 @@ public class ExportController {
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.parseMediaType("text/csv"));
-        headers.setContentDispositionFormData("attachment", "filings-export.csv");
+        headers.setContentDispositionFormData("attachment", ExportFilenames.timestamped("filings-export", "csv"));
         headers.setContentLength(csvData.length);
 
         return ResponseEntity.ok()
@@ -46,7 +47,7 @@ public class ExportController {
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setContentDispositionFormData("attachment", "filings-export.json");
+        headers.setContentDispositionFormData("attachment", ExportFilenames.timestamped("filings-export", "json"));
         headers.setContentLength(jsonData.length);
 
         return ResponseEntity.ok()

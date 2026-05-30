@@ -6,6 +6,7 @@ import { useDownloadJob } from '../hooks';
 import { showError, showSuccess } from '../store/notificationStore';
 import { Pagination } from '../components/common/Pagination';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
+import { toDisplayDate } from '../utils';
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const COLUMN_PAGE_SIZE = 30;
@@ -67,6 +68,45 @@ function getConfidenceClass(confidence: number) {
   return 'bg-amber-100 text-amber-800';
 }
 
+// USAspending award CSVs report dollar figures as plain numbers; format these columns as currency.
+const CURRENCY_COLUMN_PATTERN = /(obligation|obligated|outlay|subsidy|face_value|_amount|value_of_award|options_value)/i;
+
+function isCurrencyColumn(header: string) {
+  return CURRENCY_COLUMN_PATTERN.test(header);
+}
+
+function formatCurrencyCell(value: string) {
+  if (!value || value.trim() === '') {
+    return value;
+  }
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return value;
+  }
+  return numeric.toLocaleString('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function formatMarketCap(value?: number) {
+  if (value == null || !Number.isFinite(value) || value <= 0) {
+    return null;
+  }
+  return value.toLocaleString('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    notation: 'compact',
+    maximumFractionDigits: 2,
+  });
+}
+
+function latestJobUpdateDay(job?: DownloadJob | null) {
+  return toDisplayDate(job?.completedAt ?? job?.startedAt);
+}
+
 export function UsaSpendingDownloads() {
   const fiscalYearRange = React.useMemo(getFiscalYearRange, []);
   const [dateFrom, setDateFrom] = React.useState(fiscalYearRange.start);
@@ -81,6 +121,7 @@ export function UsaSpendingDownloads() {
   const [columnPage, setColumnPage] = React.useState(0);
   const dateFromRef = React.useRef<HTMLInputElement>(null);
   const dateToRef = React.useRef<HTMLInputElement>(null);
+  const rangeInitializedFromLatestJobRef = React.useRef(false);
   const { job, refresh } = useDownloadJob(jobId, 5000);
 
   React.useEffect(() => {
@@ -108,6 +149,21 @@ export function UsaSpendingDownloads() {
       cancelled = true;
     };
   }, [jobId]);
+
+  React.useEffect(() => {
+    if (rangeInitializedFromLatestJobRef.current || job?.type !== 'USA_SPENDING_AWARDS' || job.status !== 'COMPLETED') {
+      return;
+    }
+
+    const latestUpdateDate = job.dateTo ?? job.completedAt?.slice(0, 10) ?? job.startedAt?.slice(0, 10);
+    if (!latestUpdateDate) {
+      return;
+    }
+
+    rangeInitializedFromLatestJobRef.current = true;
+    setDateFrom(latestUpdateDate);
+    setDateTo(toDateInputValue(new Date()));
+  }, [job]);
 
   const fetchCsvPage = React.useCallback(async () => {
     if (!job || job.status !== 'COMPLETED') {
@@ -167,6 +223,7 @@ export function UsaSpendingDownloads() {
   };
 
   const progress = job?.progress ?? 0;
+  const latestUpdateDay = latestJobUpdateDay(job);
   const visibleColumnStart = columnPage * COLUMN_PAGE_SIZE;
   const visibleHeaders = csvPage?.headers
     .map((header, index) => ({ header, index }))
@@ -185,14 +242,17 @@ export function UsaSpendingDownloads() {
             Queue custom award data downloads from USAspending.gov and save the generated CSV ZIP locally.
           </p>
         </div>
-        <button
-          onClick={() => void refresh()}
-          disabled={!jobId}
-          className="inline-flex items-center gap-2 rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <RefreshCw className="w-4 h-4" />
-          Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => void refresh()}
+            disabled={!jobId}
+            className="inline-flex items-center gap-2 rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Refresh
+          </button>
+          <span className="text-xs text-gray-500">Updated {latestUpdateDay}</span>
+        </div>
       </div>
 
       <div className="bg-white rounded-lg shadow-sm p-6">
@@ -310,7 +370,7 @@ export function UsaSpendingDownloads() {
       )}
 
       {job?.status === 'COMPLETED' && (
-        <div className="bg-white rounded-lg shadow-sm p-6">
+        <div className="relative left-1/2 w-screen max-w-[100vw] -translate-x-1/2 bg-white p-6 shadow-sm sm:px-6 lg:px-8">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2>CSV Preview</h2>
@@ -373,13 +433,31 @@ export function UsaSpendingDownloads() {
                           {(() => {
                             const matches = csvPage.rowMatches?.[rowIndex] ?? [];
                             const bestMatch = matches[0];
-                            return bestMatch ? (
+                            if (!bestMatch) {
+                              return (
+                                <>
+                                  <TableCell className="sticky left-0 z-10 min-w-72 bg-white text-gray-500">No candidate</TableCell>
+                                  <TableCell className="text-gray-500">-</TableCell>
+                                  <TableCell className="text-gray-500">-</TableCell>
+                                  <TableCell className="text-gray-500">-</TableCell>
+                                  <TableCell className="text-gray-500">-</TableCell>
+                                </>
+                              );
+                            }
+                            const marketCapLabel = formatMarketCap(bestMatch.marketCap);
+                            const companyTitle = marketCapLabel
+                              ? `${bestMatch.companyName} · Market cap ${marketCapLabel}`
+                              : bestMatch.companyName;
+                            return (
                               <>
                                 <TableCell className="sticky left-0 z-10 min-w-72 max-w-72 bg-white">
                                   <div className="space-y-1">
-                                    <span className="block truncate" title={bestMatch.companyName}>
+                                    <span className="block truncate" title={companyTitle}>
                                       {bestMatch.companyName}
                                     </span>
+                                    {marketCapLabel && (
+                                      <span className="block text-xs text-gray-500">Mkt cap {marketCapLabel}</span>
+                                    )}
                                     {matches.length > 1 && (
                                       <span className="block text-xs text-gray-500">
                                         {matches.length - 1} more candidate{matches.length > 2 ? 's' : ''}
@@ -400,21 +478,15 @@ export function UsaSpendingDownloads() {
                                   </span>
                                 </TableCell>
                               </>
-                            ) : (
-                              <>
-                                <TableCell className="sticky left-0 z-10 min-w-72 bg-white text-gray-500">No candidate</TableCell>
-                                <TableCell className="text-gray-500">-</TableCell>
-                                <TableCell className="text-gray-500">-</TableCell>
-                                <TableCell className="text-gray-500">-</TableCell>
-                                <TableCell className="text-gray-500">-</TableCell>
-                              </>
                             );
                           })()}
                           {visibleHeaders.map(({ header, index }) => {
                             const value = row[index] ?? '';
+                            const currency = isCurrencyColumn(header);
+                            const displayValue = currency ? formatCurrencyCell(value) : value;
                             return (
-                              <TableCell key={`${header}-${index}`} className="max-w-72">
-                                <span className="block truncate" title={value}>{value}</span>
+                              <TableCell key={`${header}-${index}`} className={`max-w-72 ${currency ? 'text-right tabular-nums' : ''}`}>
+                                <span className="block truncate" title={displayValue}>{displayValue}</span>
                               </TableCell>
                             );
                           })}

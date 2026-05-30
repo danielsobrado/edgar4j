@@ -8,6 +8,7 @@ import org.jds.edgar4j.dto.response.ApiResponse;
 import org.jds.edgar4j.dto.response.InsiderActivityResponse;
 import org.jds.edgar4j.dto.response.PaginatedResponse;
 import org.jds.edgar4j.service.InsiderActivityService;
+import org.jds.edgar4j.util.ExportFilenames;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -118,7 +119,8 @@ public class InsiderActivityController {
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType("JSON".equals(normalizedFormat) ? MediaType.APPLICATION_JSON : MediaType.parseMediaType("text/csv"));
-        headers.setContentDispositionFormData("attachment", "insider-activity." + normalizedFormat.toLowerCase());
+        headers.setContentDispositionFormData("attachment",
+                ExportFilenames.timestamped("insider-activity", normalizedFormat.toLowerCase()));
         headers.setContentLength(body.length);
 
         return ResponseEntity.ok().headers(headers).body(body);

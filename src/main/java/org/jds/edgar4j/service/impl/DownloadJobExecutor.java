@@ -98,7 +98,10 @@ public class DownloadJobExecutor {
             }
 
             markCompleted(jobId, filesDownloaded);
-        } catch (Exception e) {
+        } catch (Throwable e) {
+            // Catch Throwable, not just Exception: a fatal error such as
+            // OutOfMemoryError would otherwise leave the job stuck at IN_PROGRESS
+            // forever because the async thread dies without updating status.
             log.error("Download job failed: {}", jobId, e);
             markFailed(jobId, e.getMessage());
         }

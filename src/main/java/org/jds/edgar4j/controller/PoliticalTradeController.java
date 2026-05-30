@@ -1,6 +1,7 @@
 package org.jds.edgar4j.controller;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
 
 import org.jds.edgar4j.dto.request.PoliticalTradeScreenRequest;
@@ -10,6 +11,7 @@ import org.jds.edgar4j.dto.response.PaginatedResponse;
 import org.jds.edgar4j.dto.response.PoliticalTradeResponse;
 import org.jds.edgar4j.dto.response.PoliticalTradeSyncResponse;
 import org.jds.edgar4j.service.PoliticalTradeService;
+import org.jds.edgar4j.util.ExportFilenames;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -137,10 +139,19 @@ public class PoliticalTradeController {
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType("JSON".equals(normalizedFormat) ? MediaType.APPLICATION_JSON : MediaType.parseMediaType("text/csv"));
-        headers.setContentDispositionFormData("attachment", "political-trades." + normalizedFormat.toLowerCase());
+        headers.setContentDispositionFormData("attachment",
+                ExportFilenames.timestamped("political-trades", normalizedFormat.toLowerCase()));
         headers.setContentLength(body.length);
 
         return ResponseEntity.ok().headers(headers).body(body);
+    }
+
+    @Operation(summary = "List cached politicians", description = "Returns distinct politician names from cached political trade rows for filter suggestions.")
+    @GetMapping("/politicians")
+    public ResponseEntity<ApiResponse<List<String>>> politicians(
+            @RequestParam(required = false) String query,
+            @RequestParam(defaultValue = "100") @Min(1) @Max(200) int limit) {
+        return ResponseEntity.ok(ApiResponse.success(politicalTradeService.politicians(query, limit)));
     }
 
     @Operation(summary = "Sync political trades", description = "Fetches public Capitol Trades rows into the local cache.")

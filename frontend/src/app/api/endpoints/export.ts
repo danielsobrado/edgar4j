@@ -1,15 +1,16 @@
 import { apiClient } from '../client';
 import { ExportRequest } from '../types';
+import { timestampedFilename } from '../../utils/formatters';
 
 export const exportApi = {
   exportToCsv: async (request: ExportRequest): Promise<void> => {
     const blob = await apiClient.downloadFile('/export/csv', request);
-    downloadBlob(blob, 'filings-export.csv');
+    downloadBlob(blob, timestampedFilename('filings-export', 'csv'));
   },
 
   exportToJson: async (request: ExportRequest): Promise<void> => {
     const blob = await apiClient.downloadFile('/export/json', request);
-    downloadBlob(blob, 'filings-export.json');
+    downloadBlob(blob, timestampedFilename('filings-export', 'json'));
   },
 };
 

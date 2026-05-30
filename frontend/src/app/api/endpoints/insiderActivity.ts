@@ -1,4 +1,5 @@
 import { apiClient } from '../client';
+import { timestampedFilename } from '../../utils/formatters';
 import {
   InsiderActivity,
   InsiderActivityExportFormat,
@@ -44,7 +45,7 @@ export const insiderActivityApi = {
     const query = new URLSearchParams(buildInsiderActivityQuery(filter, false));
     query.set('format', format);
     const blob = await apiClient.downloadGet(`/insider-activity/export?${query.toString()}`);
-    downloadBlob(blob, `insider-activity.${format.toLowerCase()}`);
+    downloadBlob(blob, timestampedFilename('insider-activity', format.toLowerCase()));
   },
 };
 

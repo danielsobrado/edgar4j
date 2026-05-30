@@ -108,6 +108,21 @@ export function formatSignedShares(
   };
 }
 
+/**
+ * Append the current local date and time to an export filename so downloads are
+ * uniquely named and self-document when they were produced.
+ *
+ * @example timestampedFilename("filings-export", "csv") → "filings-export-20260530-143015.csv"
+ */
+export function timestampedFilename(base: string, extension: string): string {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const stamp =
+    `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}` +
+    `-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  return `${base}-${stamp}.${extension}`;
+}
+
 // ─── Misc helpers ─────────────────────────────────────────────────────────────
 
 /**

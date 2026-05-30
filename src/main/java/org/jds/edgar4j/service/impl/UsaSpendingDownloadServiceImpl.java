@@ -11,6 +11,7 @@ import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
@@ -38,7 +39,9 @@ public class UsaSpendingDownloadServiceImpl implements UsaSpendingDownloadServic
 
     private static final String AWARDS_DOWNLOAD_URL = "https://api.usaspending.gov/api/v2/bulk_download/awards/";
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(60);
-    private static final int MAX_STATUS_ATTEMPTS = 900;
+    private static final Duration STATUS_POLL_INTERVAL = Duration.ofSeconds(5);
+    private static final Duration MAX_DOWNLOAD_WAIT = Duration.ofHours(2);
+    private static final long MAX_STATUS_ATTEMPTS = MAX_DOWNLOAD_WAIT.dividedBy(STATUS_POLL_INTERVAL);
     private static final List<String> PRIME_AWARD_TYPES = List.of(
             "A", "B", "C", "D",
             "IDV_A", "IDV_B", "IDV_B_A", "IDV_B_B", "IDV_B_C", "IDV_D", "IDV_E",
@@ -60,9 +63,8 @@ public class UsaSpendingDownloadServiceImpl implements UsaSpendingDownloadServic
             String fileName = sanitizeFileName(requiredText(finishedDownload, "file_name"));
             long totalRows = finishedDownload.path("total_rows").asLong(-1);
 
-            byte[] bytes = downloadZip(fileUrl);
-            Path outputPath = saveZip(fileName, bytes);
-            log.info("Saved USAspending award CSV ZIP to {} ({} bytes, {} rows)", outputPath, bytes.length, totalRows);
+            Path outputPath = downloadZipToFile(fileUrl, fileName);
+            log.info("Saved USAspending award CSV ZIP to {} ({} bytes, {} rows)", outputPath, Files.size(outputPath), totalRows);
             return new UsaSpendingDownloadResult(outputPath, fileUrl, totalRows);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -146,7 +148,7 @@ public class UsaSpendingDownloadServiceImpl implements UsaSpendingDownloadServic
             return createdDownload;
         }
 
-        for (int attempt = 0; attempt < MAX_STATUS_ATTEMPTS; attempt++) {
+        for (long attempt = 0; attempt < MAX_STATUS_ATTEMPTS; attempt++) {
             JsonNode status = fetchStatus(statusUrl);
             String state = status.path("status").asText("");
             if ("finished".equalsIgnoreCase(state)) {
@@ -156,7 +158,7 @@ public class UsaSpendingDownloadServiceImpl implements UsaSpendingDownloadServic
                 String message = status.path("message").asText("USAspending download generation failed");
                 throw new IllegalStateException(message);
             }
-            Thread.sleep(2_000);
+            Thread.sleep(STATUS_POLL_INTERVAL.toMillis());
         }
 
         throw new IllegalStateException("Timed out waiting for USAspending download generation");
@@ -175,33 +177,41 @@ public class UsaSpendingDownloadServiceImpl implements UsaSpendingDownloadServic
         return objectMapper.readTree(response.body());
     }
 
-    private byte[] downloadZip(String fileUrl) throws Exception {
+    private Path downloadZipToFile(String fileUrl, String fileName) throws Exception {
+        Path outputDirectory = Paths.get(storageProperties.getBulkDownloadsPath(), "usaspending");
+        Files.createDirectories(outputDirectory);
+        Path outputPath = outputDirectory.resolve(fileName);
+        Path tempPath = Files.createTempFile(outputDirectory, fileName, ".part");
+
+        // No request-level timeout here: BodyHandlers.ofInputStream() only times the
+        // headers, and these ZIPs can be hundreds of MB. We stream straight to disk
+        // (instead of readAllBytes) so a multi-GB download cannot exhaust the heap.
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(fileUrl))
-                .timeout(REQUEST_TIMEOUT)
                 .header("Accept", "application/zip, application/octet-stream, */*")
                 .header("User-Agent", "edgar4j USAspending downloader")
                 .GET()
                 .build();
-        HttpResponse<InputStream> response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
-        if (response.statusCode() >= 400) {
-            throw new IllegalStateException("USAspending file download failed with HTTP " + response.statusCode());
-        }
-        try (InputStream inputStream = response.body()) {
-            return inputStream.readAllBytes();
-        }
-    }
 
-    private Path saveZip(String fileName, byte[] bytes) throws Exception {
-        if (bytes == null || bytes.length == 0) {
-            throw new IllegalStateException("USAspending generated an empty ZIP file");
-        }
+        try {
+            HttpResponse<InputStream> response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
+            if (response.statusCode() >= 400) {
+                throw new IllegalStateException("USAspending file download failed with HTTP " + response.statusCode());
+            }
 
-        Path outputDirectory = Paths.get(storageProperties.getBulkDownloadsPath(), "usaspending");
-        Files.createDirectories(outputDirectory);
-        Path outputPath = outputDirectory.resolve(fileName);
-        Files.write(outputPath, bytes);
-        return outputPath;
+            long bytesWritten;
+            try (InputStream inputStream = response.body()) {
+                bytesWritten = Files.copy(inputStream, tempPath, StandardCopyOption.REPLACE_EXISTING);
+            }
+            if (bytesWritten == 0) {
+                throw new IllegalStateException("USAspending generated an empty ZIP file");
+            }
+
+            Files.move(tempPath, outputPath, StandardCopyOption.REPLACE_EXISTING);
+            return outputPath;
+        } finally {
+            Files.deleteIfExists(tempPath);
+        }
     }
 
     private ZipEntry nextCsvEntry(ZipInputStream zipInputStream) throws IOException {

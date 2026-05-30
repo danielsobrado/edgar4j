@@ -167,6 +167,18 @@ function syncSummary(syncResult: PoliticalTradeSyncResponse | null): string | nu
   return `${formatNumber(syncResult.insertedRows)} inserted, ${formatNumber(syncResult.updatedRows)} updated, ${formatNumber(syncResult.fetchedRows)} fetched`;
 }
 
+function latestPoliticalUpdateDay(rows: PoliticalTrade[] | undefined, syncResult: PoliticalTradeSyncResponse | null): string {
+  const candidates = [
+    syncResult?.syncedAt,
+    ...(rows ?? []).map((row) => row.updatedAt),
+  ].filter(Boolean) as string[];
+  const latest = candidates
+    .map((value) => new Date(value))
+    .filter((value) => Number.isFinite(value.getTime()))
+    .sort((a, b) => b.getTime() - a.getTime())[0];
+  return latest ? toDisplayDate(latest.toISOString()) : '-';
+}
+
 function PoliticalTradeRows({ rows }: { rows: PoliticalTrade[] }) {
   return (
     <tbody className="divide-y divide-gray-100">
@@ -221,6 +233,7 @@ export function PoliticalTradesPage() {
   const [syncError, setSyncError] = React.useState<string | null>(null);
   const [syncMaxPages, setSyncMaxPages] = React.useState(25);
   const [forceSync, setForceSync] = React.useState(false);
+  const [politicians, setPoliticians] = React.useState<string[]>([]);
 
   const updateFilter = React.useCallback((patch: Partial<PoliticalTradeFilter>) => {
     setSearchParams(writeFilter({
@@ -250,16 +263,36 @@ export function PoliticalTradesPage() {
       });
       setSyncResult(response);
       await refresh();
+      setPoliticians(await politicalTradesApi.politicians(filter.politician ?? ''));
     } catch (err) {
       setSyncError(err instanceof Error ? err.message : 'Political trade sync failed');
     } finally {
       setSyncing(false);
     }
-  }, [filter.assetType, forceSync, refresh, syncMaxPages]);
+  }, [filter.assetType, filter.politician, forceSync, refresh, syncMaxPages]);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    politicalTradesApi.politicians(filter.politician ?? '')
+      .then((names) => {
+        if (!cancelled) {
+          setPoliticians(names);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPoliticians([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [filter.politician]);
 
   const matchedText = results
     ? `${results.totalElements.toLocaleString()} trade${results.totalElements === 1 ? '' : 's'} matched`
     : 'Cached congressional trade disclosures';
+  const latestUpdateDay = latestPoliticalUpdateDay(results?.content, syncResult);
 
   return (
     <div className="space-y-6">
@@ -293,13 +326,16 @@ export function PoliticalTradesPage() {
             <FileJson className="h-4 w-4" />
             JSON
           </button>
-          <button
-            onClick={refresh}
-            className="inline-flex items-center gap-2 rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={refresh}
+              className="inline-flex items-center gap-2 rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+            <span className="text-xs text-gray-500">Updated {latestUpdateDay}</span>
+          </div>
         </div>
       </div>
 
@@ -322,11 +358,17 @@ export function PoliticalTradesPage() {
             <label htmlFor="political-politician" className="mb-2 block text-sm text-gray-600">Politician</label>
             <input
               id="political-politician"
+              list="political-politician-options"
               value={filter.politician ?? ''}
               onChange={(event) => updateFilter({ politician: event.target.value || undefined })}
               placeholder="Ex: Gottheimer"
               className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+            <datalist id="political-politician-options">
+              {politicians.map((name) => (
+                <option key={name} value={name} />
+              ))}
+            </datalist>
           </div>
 
           <div>

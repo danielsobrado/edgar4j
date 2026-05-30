@@ -255,6 +255,7 @@ export interface UsaSpendingCompanyMatch {
   sourceField: string;
   sourceValue: string;
   matchMethod: string;
+  marketCap?: number;
 }
 
 // Settings Types

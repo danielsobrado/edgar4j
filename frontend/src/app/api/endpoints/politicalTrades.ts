@@ -1,4 +1,5 @@
 import { apiClient } from '../client';
+import { timestampedFilename } from '../../utils/formatters';
 import {
   PaginatedResponse,
   PoliticalTrade,
@@ -60,12 +61,19 @@ export const politicalTradesApi = {
     const query = new URLSearchParams(buildPoliticalTradesQuery(filter, false));
     query.set('format', format);
     const blob = await apiClient.downloadGet(`/political-trades/export?${query.toString()}`);
-    downloadBlob(blob, `political-trades.${format.toLowerCase()}`);
+    downloadBlob(blob, timestampedFilename('political-trades', format.toLowerCase()));
   },
 
   sync: (request: PoliticalTradeSyncRequest = {}): Promise<PoliticalTradeSyncResponse> => {
     const query = buildPoliticalTradesSyncQuery(request);
     return apiClient.post<PoliticalTradeSyncResponse>(`/political-trades/sync${query ? `?${query}` : ''}`);
+  },
+
+  politicians: (query = '', limit = 100): Promise<string[]> => {
+    const params = new URLSearchParams();
+    setString(params, 'query', query);
+    setNumber(params, 'limit', limit);
+    return apiClient.get<string[]>(`/political-trades/politicians?${params.toString()}`);
   },
 };
 

@@ -2,17 +2,21 @@ package org.jds.edgar4j.service.impl;
 
 import java.nio.file.Paths;
 import java.text.Normalizer;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import org.jds.edgar4j.dto.request.DownloadRequest;
@@ -29,6 +33,8 @@ import org.jds.edgar4j.port.TickerDataPort;
 import org.jds.edgar4j.service.DownloadJobService;
 import org.jds.edgar4j.service.UsaSpendingDownloadService;
 import org.jds.edgar4j.service.UsaSpendingDownloadService.UsaSpendingCsvPage;
+import org.jds.edgar4j.service.provider.MarketDataProvider;
+import org.jds.edgar4j.service.provider.MarketDataService;
 import org.springframework.stereotype.Service;
 
 import lombok.RequiredArgsConstructor;
@@ -39,10 +45,14 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class DownloadJobServiceImpl implements DownloadJobService {
 
+    private static final int MAX_MARKET_CAP_LOOKUPS = 60;
+    private static final Duration MARKET_CAP_TIMEOUT = Duration.ofSeconds(6);
+
     private final DownloadJobDataPort downloadJobRepository;
     private final TickerDataPort tickerRepository;
     private final DownloadJobExecutor downloadJobExecutor;
     private final UsaSpendingDownloadService usaSpendingDownloadService;
+    private final MarketDataService marketDataService;
 
     @Override
     public DownloadJobResponse startDownload(DownloadRequest request) {
@@ -261,12 +271,15 @@ public class DownloadJobServiceImpl implements DownloadJobService {
                 ? 0
                 : (int) Math.ceil(csvPage.totalRows() / (double) size);
 
+        List<List<UsaSpendingCompanyMatchResponse>> rowMatches = matchRows(csvPage);
+        attachMarketCaps(rowMatches);
+
         return UsaSpendingCsvPageResponse.builder()
                 .jobId(job.getId())
                 .fileName(csvPage.fileName())
                 .headers(csvPage.headers())
                 .rows(csvPage.rows())
-                .rowMatches(matchRows(csvPage))
+                .rowMatches(rowMatches)
                 .page(page)
                 .size(size)
                 .totalRows(csvPage.totalRows())
@@ -281,6 +294,85 @@ public class DownloadJobServiceImpl implements DownloadJobService {
         return csvPage.rows().stream()
                 .map(row -> matchRow(row, headerIndexes, candidates))
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Best-effort enrichment of the page's matches with market capitalization. Looks up distinct
+     * tickers in parallel through the configured market-data provider and never fails the preview:
+     * if no provider is configured, a lookup times out, or a ticker is unknown, the market cap is
+     * simply left blank.
+     */
+    private void attachMarketCaps(List<List<UsaSpendingCompanyMatchResponse>> rowMatches) {
+        // Only the best match per row is rendered, so resolve market caps for those tickers alone.
+        Set<String> tickers = rowMatches.stream()
+                .filter(matches -> !matches.isEmpty())
+                .map(matches -> matches.get(0))
+                .map(UsaSpendingCompanyMatchResponse::getTicker)
+                .map(this::normalizeTicker)
+                .filter(ticker -> ticker != null)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+
+        if (tickers.isEmpty()) {
+            return;
+        }
+
+        Map<String, Long> marketCapsByTicker = resolveMarketCaps(tickers);
+        if (marketCapsByTicker.isEmpty()) {
+            return;
+        }
+
+        for (List<UsaSpendingCompanyMatchResponse> matches : rowMatches) {
+            for (UsaSpendingCompanyMatchResponse match : matches) {
+                Long marketCap = marketCapsByTicker.get(normalizeTicker(match.getTicker()));
+                if (marketCap != null) {
+                    match.setMarketCap(marketCap);
+                }
+            }
+        }
+    }
+
+    private Map<String, Long> resolveMarketCaps(Set<String> tickers) {
+        Map<String, CompletableFuture<MarketDataProvider.CompanyProfile>> futures = new LinkedHashMap<>();
+        for (String ticker : tickers) {
+            if (futures.size() >= MAX_MARKET_CAP_LOOKUPS) {
+                break;
+            }
+            try {
+                futures.put(ticker, marketDataService.getCompanyProfile(ticker));
+            } catch (Exception e) {
+                log.debug("Unable to request market cap for {}", ticker, e);
+            }
+        }
+
+        try {
+            CompletableFuture.allOf(futures.values().toArray(CompletableFuture[]::new))
+                    .get(MARKET_CAP_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (Exception e) {
+            log.debug("Timed out resolving some USAspending market caps", e);
+        }
+
+        Map<String, Long> marketCaps = new LinkedHashMap<>();
+        for (Map.Entry<String, CompletableFuture<MarketDataProvider.CompanyProfile>> entry : futures.entrySet()) {
+            CompletableFuture<MarketDataProvider.CompanyProfile> future = entry.getValue();
+            if (!future.isDone() || future.isCompletedExceptionally()) {
+                continue;
+            }
+            MarketDataProvider.CompanyProfile profile = future.getNow(null);
+            if (profile == null || profile.getMarketCapitalization() == null || profile.getMarketCapitalization() <= 0) {
+                continue;
+            }
+            marketCaps.put(entry.getKey(), profile.getMarketCapitalization());
+        }
+        return marketCaps;
+    }
+
+    private String normalizeTicker(String ticker) {
+        if (ticker == null || ticker.isBlank()) {
+            return null;
+        }
+        return ticker.trim().toUpperCase(Locale.ROOT);
     }
 
     private Map<String, Integer> indexHeaders(List<String> headers) {

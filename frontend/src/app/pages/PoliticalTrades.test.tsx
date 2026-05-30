@@ -13,6 +13,7 @@ vi.mock('../api', async () => {
     politicalTradesApi: {
       export: vi.fn(),
       sync: vi.fn(),
+      politicians: vi.fn().mockResolvedValue([]),
     },
   };
 });

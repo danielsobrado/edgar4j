@@ -107,6 +107,21 @@ public class PoliticalTradeServiceImpl implements PoliticalTradeService {
     }
 
     @Override
+    public List<String> politicians(String query, int limit) {
+        String normalizedQuery = blankToNull(query);
+        int sanitizedLimit = Math.min(Math.max(limit, 1), 200);
+        return politicalTradeDataPort.findAll().stream()
+                .map(PoliticalTrade::getPoliticianName)
+                .map(this::blankToNull)
+                .filter(Objects::nonNull)
+                .distinct()
+                .filter(name -> containsIgnoreCase(name, normalizedQuery))
+                .sorted(String.CASE_INSENSITIVE_ORDER)
+                .limit(sanitizedLimit)
+                .toList();
+    }
+
+    @Override
     public PoliticalTradeSyncResponse sync(PoliticalTradeSyncRequest request) {
         if (!syncInProgress.compareAndSet(false, true)) {
             throw new PoliticalTradeSyncException(

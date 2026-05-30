@@ -14,4 +14,7 @@ public class UsaSpendingCompanyMatchResponse {
     private String sourceField;
     private String sourceValue;
     private String matchMethod;
+
+    /** Market capitalization in USD for the matched ticker, when a market-data provider can resolve it. */
+    private Long marketCap;
 }
