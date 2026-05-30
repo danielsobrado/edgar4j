@@ -10,6 +10,7 @@ import org.jds.edgar4j.model.DownloadJob;
 import org.jds.edgar4j.model.DownloadJob.JobStatus;
 import org.jds.edgar4j.port.DownloadJobDataPort;
 import org.jds.edgar4j.service.DownloadBulkDataService;
+import org.jds.edgar4j.service.DownloadBulkDataService.BulkDownloadResult;
 import org.jds.edgar4j.service.DownloadSubmissionsService;
 import org.jds.edgar4j.service.DownloadTickersService;
 import org.jds.edgar4j.service.RemoteEdgarService;
@@ -85,11 +86,13 @@ public class DownloadJobExecutor {
                     markCompleted(jobId, 1, result);
                     return;
                 case BULK_SUBMISSIONS:
-                    filesDownloaded = downloadBulkDataService.downloadBulkSubmissionsArchive();
-                    break;
+                    BulkDownloadResult submissionsResult = downloadBulkDataService.downloadBulkSubmissionsArchive();
+                    markCompleted(jobId, submissionsResult);
+                    return;
                 case BULK_COMPANY_FACTS:
-                    filesDownloaded = downloadBulkDataService.downloadBulkCompanyFactsArchive();
-                    break;
+                    BulkDownloadResult companyFactsResult = downloadBulkDataService.downloadBulkCompanyFactsArchive();
+                    markCompleted(jobId, companyFactsResult);
+                    return;
                 default:
                     log.warn("Unsupported download type: {}", request.getType());
             }
@@ -169,6 +172,21 @@ public class DownloadJobExecutor {
         job.setProgress(100);
         job.setFilesDownloaded(filesDownloaded);
         job.setTotalFiles(result.totalRows());
+        job.setSourceUrl(result.sourceUrl());
+        job.setOutputPath(result.outputPath().toString());
+        job.setCompletedAt(LocalDateTime.now());
+        downloadJobRepository.save(job);
+    }
+
+    private void markCompleted(String jobId, BulkDownloadResult result) {
+        DownloadJob job = downloadJobRepository.findById(jobId).orElse(null);
+        if (job == null || job.getStatus() == JobStatus.CANCELLED) {
+            return;
+        }
+        job.setStatus(JobStatus.COMPLETED);
+        job.setProgress(100);
+        job.setFilesDownloaded(result.filesDownloaded());
+        job.setTotalFiles(result.filesDownloaded());
         job.setSourceUrl(result.sourceUrl());
         job.setOutputPath(result.outputPath().toString());
         job.setCompletedAt(LocalDateTime.now());

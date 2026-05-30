@@ -21,6 +21,7 @@ const TICKER_TYPES: readonly TickerDownloadType[] = [
 
 export function Downloads() {
   const [cikInput, setCikInput] = React.useState('');
+  const [bulkStartingType, setBulkStartingType] = React.useState<BulkDownloadType | null>(null);
 
   const {
     jobs,
@@ -74,16 +75,23 @@ export function Downloads() {
   };
 
   const handleBulkDownload = async (type: BulkDownloadType) => {
+    setBulkStartingType(type);
     try {
-      await downloadBulk(type);
+      const job = await downloadBulk(type);
       const labelByType: Record<BulkDownloadType, string> = {
         BULK_SUBMISSIONS: 'All submissions archive',
         BULK_COMPANY_FACTS: 'Company facts XBRL archive',
       };
-      showSuccess('Download Started', `${labelByType[type]} download has been queued`);
+      await refresh();
+      showSuccess(
+        'Download Queued',
+        `${labelByType[type]} job ${job.id} has been queued. The archive will be saved on the backend.`
+      );
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to start bulk download';
       showError('Download Failed', message);
+    } finally {
+      setBulkStartingType(null);
     }
   };
 
@@ -135,6 +143,8 @@ export function Downloads() {
       return timestamp;
     }
   };
+
+  const isBulkJob = (job: DownloadJob) => job.type === 'BULK_SUBMISSIONS' || job.type === 'BULK_COMPANY_FACTS';
 
   return (
     <div className="space-y-6">
@@ -246,7 +256,7 @@ export function Downloads() {
       <div className="bg-white rounded-lg shadow-sm p-6">
         <h2 className="mb-4">SEC Bulk Data Files</h2>
         <p className="text-gray-600 mb-4">
-          Download comprehensive datasets from the SEC's bulk data repository.
+          Queue large SEC archive downloads to run on the backend. Completed ZIPs are saved locally on the server.
         </p>
         <div className="space-y-3 mb-4">
           <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
@@ -256,11 +266,15 @@ export function Downloads() {
             </div>
             <button
               onClick={() => void handleBulkDownload('BULK_COMPANY_FACTS')}
-              disabled={loading}
+              disabled={bulkStartingType === 'BULK_COMPANY_FACTS'}
               className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 disabled:opacity-50 flex items-center gap-2"
             >
-              <Download className="w-4 h-4" />
-              Download ZIP
+              {bulkStartingType === 'BULK_COMPANY_FACTS' ? (
+                <Loader className="w-4 h-4 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
+              Queue Download
             </button>
           </div>
 
@@ -271,11 +285,15 @@ export function Downloads() {
             </div>
             <button
               onClick={() => void handleBulkDownload('BULK_SUBMISSIONS')}
-              disabled={loading}
+              disabled={bulkStartingType === 'BULK_SUBMISSIONS'}
               className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 disabled:opacity-50 flex items-center gap-2"
             >
-              <Download className="w-4 h-4" />
-              Download ZIP
+              {bulkStartingType === 'BULK_SUBMISSIONS' ? (
+                <Loader className="w-4 h-4 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
+              Queue Download
             </button>
           </div>
         </div>
@@ -335,6 +353,23 @@ export function Downloads() {
                           style={{ transform: `translateX(-${100 - (job.progress || 0)}%)` }}
                         />
                       </Progress.Root>
+                    </div>
+                  )}
+
+                  {job.status === 'FAILED' && isBulkJob(job) && (
+                    <div className="mt-3 flex gap-2">
+                      <div className="w-full rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+                        {job.error || 'Bulk download failed'}
+                      </div>
+                    </div>
+                  )}
+                  {job.status === 'COMPLETED' && isBulkJob(job) && (
+                    <div className="mt-3 flex gap-2">
+                      <div className="w-full space-y-1 rounded-md bg-gray-50 px-3 py-2 text-sm text-gray-700">
+                        <p>{job.filesDownloaded?.toLocaleString() || 0} file{job.filesDownloaded === 1 ? '' : 's'} imported or saved.</p>
+                        {job.outputPath && <p className="break-all">Saved ZIP: {job.outputPath}</p>}
+                        {job.sourceUrl && <p className="break-all">Source URL: {job.sourceUrl}</p>}
+                      </div>
                     </div>
                   )}
 

@@ -22,6 +22,7 @@ import org.jds.edgar4j.port.FillingDataPort;
 import org.jds.edgar4j.port.SubmissionsDataPort;
 import org.jds.edgar4j.properties.Edgar4JProperties;
 import org.jds.edgar4j.properties.StorageProperties;
+import org.jds.edgar4j.service.DownloadBulkDataService.BulkDownloadResult;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -60,9 +61,11 @@ class DownloadBulkDataServiceImplTest {
         when(submissionsRepository.findByCik("1")).thenReturn(Optional.empty());
         when(fillingRepository.findByAccessionNumber("0000000001-24-000001")).thenReturn(Optional.empty());
 
-        long imported = service().downloadBulkSubmissionsArchive();
+        BulkDownloadResult result = service().downloadBulkSubmissionsArchive();
 
-        assertThat(imported).isEqualTo(1);
+        assertThat(result.filesDownloaded()).isEqualTo(1);
+        assertThat(result.sourceUrl()).isEqualTo("https://www.sec.gov/Archives/edgar/daily-index/bulkdata/submissions.zip");
+        assertThat(result.outputPath()).isEqualTo(tempDir.resolve("submissions.zip"));
         verify(submissionsRepository).save(submissions);
         verify(fillingRepository).saveAll(anyList());
         assertThat(tempDir.resolve("submissions.zip")).exists();
@@ -73,9 +76,11 @@ class DownloadBulkDataServiceImplTest {
         byte[] zipBytes = zip("CIK0000000001.json", "{\"facts\":{}}");
         when(secApiClient.fetchBulkCompanyFactsArchive()).thenReturn(zipBytes);
 
-        long imported = service().downloadBulkCompanyFactsArchive();
+        BulkDownloadResult result = service().downloadBulkCompanyFactsArchive();
 
-        assertThat(imported).isEqualTo(1);
+        assertThat(result.filesDownloaded()).isEqualTo(1);
+        assertThat(result.sourceUrl()).isEqualTo("https://www.sec.gov/Archives/edgar/daily-index/xbrl/companyfacts.zip");
+        assertThat(result.outputPath()).isEqualTo(tempDir.resolve("companyfacts.zip"));
         assertThat(tempDir.resolve("companyfacts.zip")).exists();
     }
 

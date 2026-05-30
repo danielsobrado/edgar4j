@@ -20,6 +20,7 @@ import org.jds.edgar4j.port.SubmissionsDataPort;
 import org.jds.edgar4j.properties.Edgar4JProperties;
 import org.jds.edgar4j.properties.StorageProperties;
 import org.jds.edgar4j.service.DownloadBulkDataService;
+import org.jds.edgar4j.service.DownloadBulkDataService.BulkDownloadResult;
 import org.springframework.stereotype.Service;
 
 import lombok.RequiredArgsConstructor;
@@ -38,23 +39,26 @@ public class DownloadBulkDataServiceImpl implements DownloadBulkDataService {
     private final StorageProperties storageProperties;
 
     @Override
-    public long downloadBulkSubmissionsArchive() {
+    public BulkDownloadResult downloadBulkSubmissionsArchive() {
+        String sourceUrl = edgar4JProperties.getUrls().getBulkSubmissionsFileUrl();
         Path archive = downloadArchive(
-                edgar4JProperties.getUrls().getBulkSubmissionsFileUrl(),
+                sourceUrl,
                 "submissions.zip",
                 secApiClient.fetchBulkSubmissionsArchive()
         );
-        return importSubmissionsArchive(archive);
+        long imported = importSubmissionsArchive(archive);
+        return new BulkDownloadResult(imported, sourceUrl, archive);
     }
 
     @Override
-    public long downloadBulkCompanyFactsArchive() {
-        downloadArchive(
-                edgar4JProperties.getUrls().getBulkCompanyFactsFileUrl(),
+    public BulkDownloadResult downloadBulkCompanyFactsArchive() {
+        String sourceUrl = edgar4JProperties.getUrls().getBulkCompanyFactsFileUrl();
+        Path archive = downloadArchive(
+                sourceUrl,
                 "companyfacts.zip",
                 secApiClient.fetchBulkCompanyFactsArchive()
         );
-        return 1;
+        return new BulkDownloadResult(1, sourceUrl, archive);
     }
 
     private Path downloadArchive(String url, String fileName, byte[] bytes) {

@@ -8,6 +8,7 @@ import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -20,8 +21,10 @@ import org.jds.edgar4j.model.DownloadJob.JobStatus;
 import org.jds.edgar4j.model.DownloadJob.JobType;
 import org.jds.edgar4j.port.DownloadJobDataPort;
 import org.jds.edgar4j.service.DownloadBulkDataService;
+import org.jds.edgar4j.service.DownloadBulkDataService.BulkDownloadResult;
 import org.jds.edgar4j.service.DownloadSubmissionsService;
 import org.jds.edgar4j.service.DownloadTickersService;
+import org.jds.edgar4j.service.UsaSpendingDownloadService;
 import org.jds.edgar4j.service.RemoteEdgarService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -48,6 +51,9 @@ class DownloadJobExecutorTest {
 
     @Mock
     private RemoteEdgarService remoteEdgarService;
+
+    @Mock
+    private UsaSpendingDownloadService usaSpendingDownloadService;
 
     @InjectMocks
     private DownloadJobExecutor downloadJobExecutor;
@@ -92,6 +98,43 @@ class DownloadJobExecutorTest {
         assertEquals(100, job.getProgress());
         assertEquals(12L, job.getFilesDownloaded());
         assertEquals(2L, job.getTotalFiles());
+        assertNotNull(job.getCompletedAt());
+    }
+
+    @Test
+    @DisplayName("executeDownloadAsync should complete bulk jobs with saved archive metadata")
+    void executeDownloadAsyncShouldCompleteBulkJobWithMetadata() {
+        DownloadJob job = DownloadJob.builder()
+                .id("job-2")
+                .type(JobType.BULK_COMPANY_FACTS)
+                .status(JobStatus.PENDING)
+                .startedAt(LocalDateTime.now())
+                .build();
+
+        Path outputPath = Path.of("data", "bulk-downloads", "companyfacts.zip");
+        when(downloadJobRepository.findById("job-2")).thenReturn(Optional.of(job));
+        when(downloadJobRepository.save(any(DownloadJob.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(downloadBulkDataService.downloadBulkCompanyFactsArchive())
+                .thenReturn(new BulkDownloadResult(
+                        1,
+                        "https://www.sec.gov/Archives/edgar/daily-index/xbrl/companyfacts.zip",
+                        outputPath));
+
+        DownloadRequest request = DownloadRequest.builder()
+                .type(DownloadRequest.DownloadType.BULK_COMPANY_FACTS)
+                .build();
+
+        downloadJobExecutor.executeDownloadAsync("job-2", request);
+
+        verify(downloadBulkDataService).downloadBulkCompanyFactsArchive();
+        verify(downloadJobRepository, atLeastOnce()).save(eq(job));
+
+        assertEquals(JobStatus.COMPLETED, job.getStatus());
+        assertEquals(100, job.getProgress());
+        assertEquals(1L, job.getFilesDownloaded());
+        assertEquals(1L, job.getTotalFiles());
+        assertEquals("https://www.sec.gov/Archives/edgar/daily-index/xbrl/companyfacts.zip", job.getSourceUrl());
+        assertEquals(outputPath.toString(), job.getOutputPath());
         assertNotNull(job.getCompletedAt());
     }
 }

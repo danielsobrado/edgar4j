@@ -1,8 +1,13 @@
 package org.jds.edgar4j.service;
 
+import java.nio.file.Path;
+
 public interface DownloadBulkDataService {
 
-    long downloadBulkSubmissionsArchive();
+    BulkDownloadResult downloadBulkSubmissionsArchive();
 
-    long downloadBulkCompanyFactsArchive();
+    BulkDownloadResult downloadBulkCompanyFactsArchive();
+
+    record BulkDownloadResult(long filesDownloaded, String sourceUrl, Path outputPath) {
+    }
 }

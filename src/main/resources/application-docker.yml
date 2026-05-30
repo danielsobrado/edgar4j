@@ -22,6 +22,9 @@ spring:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://postgres:5432/edgar4j}
     username: ${SPRING_DATASOURCE_USERNAME:edgar4j}
     password: ${SPRING_DATASOURCE_PASSWORD:edgar4j}
+  jpa:
+    hibernate:
+      ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
   data:
     redis:
       host: ${SPRING_DATA_REDIS_HOST:redis}
