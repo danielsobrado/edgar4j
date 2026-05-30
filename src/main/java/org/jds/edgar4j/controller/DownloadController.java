@@ -1,5 +1,6 @@
 package org.jds.edgar4j.controller;
 
+import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Locale;
@@ -8,9 +9,11 @@ import org.jds.edgar4j.dto.request.DownloadRequest;
 import org.jds.edgar4j.dto.response.ApiResponse;
 import org.jds.edgar4j.dto.response.DownloadJobResponse;
 import org.jds.edgar4j.dto.response.DownloadSummaryResponse;
+import org.jds.edgar4j.dto.response.UsaSpendingCoverageResponse;
 import org.jds.edgar4j.dto.response.UsaSpendingCsvPageResponse;
 import org.jds.edgar4j.service.DownloadJobService;
 import org.jds.edgar4j.util.PaginationUtils;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -160,6 +163,20 @@ public class DownloadController {
                 .map(job -> ResponseEntity.ok(ApiResponse.success(job)))
                 .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND)
                         .body(ApiResponse.error("Download job not found")));
+    }
+
+    @GetMapping("/usaspending/coverage")
+    public ResponseEntity<ApiResponse<UsaSpendingCoverageResponse>> getUsaSpendingCoverage(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        log.info("GET /api/downloads/usaspending/coverage?from={}&to={}", from, to);
+        if (to.isBefore(from)) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("to must be on or after from"));
+        }
+        if (ChronoUnit.DAYS.between(from, to) + 1 > 366) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("Coverage window may span at most one year"));
+        }
+        return ResponseEntity.ok(ApiResponse.success(downloadJobService.getUsaSpendingCoverage(from, to)));
     }
 
     @GetMapping("/jobs/{id}/usaspending-csv")

@@ -8,14 +8,17 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 import org.jds.edgar4j.config.AppConstants;
 import org.jds.edgar4j.dto.request.PoliticalTradeScreenRequest;
 import org.jds.edgar4j.dto.request.PoliticalTradeSyncRequest;
 import org.jds.edgar4j.dto.response.PaginatedResponse;
+import org.jds.edgar4j.dto.response.PoliticalTradeCoverageResponse;
 import org.jds.edgar4j.dto.response.PoliticalTradeResponse;
 import org.jds.edgar4j.dto.response.PoliticalTradeSyncResponse;
 import org.jds.edgar4j.exception.PoliticalTradeSyncException;
@@ -119,6 +122,39 @@ public class PoliticalTradeServiceImpl implements PoliticalTradeService {
                 .sorted(String.CASE_INSENSITIVE_ORDER)
                 .limit(sanitizedLimit)
                 .toList();
+    }
+
+    @Override
+    public PoliticalTradeCoverageResponse coverage(LocalDate from, LocalDate to) {
+        if (from == null || to == null) {
+            throw new IllegalArgumentException("from and to are required for political trade coverage");
+        }
+        if (to.isBefore(from)) {
+            throw new IllegalArgumentException("to must be on or after from");
+        }
+
+        Map<LocalDate, Long> countsByDate = politicalTradeDataPort.findAll().stream()
+                .map(PoliticalTrade::getDisclosureDate)
+                .filter(Objects::nonNull)
+                .filter(date -> !date.isBefore(from) && !date.isAfter(to))
+                .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
+
+        List<PoliticalTradeCoverageResponse.DayCount> days = countsByDate.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(entry -> PoliticalTradeCoverageResponse.DayCount.builder()
+                        .date(entry.getKey())
+                        .count(entry.getValue())
+                        .build())
+                .toList();
+
+        long total = days.stream().mapToLong(PoliticalTradeCoverageResponse.DayCount::getCount).sum();
+
+        return PoliticalTradeCoverageResponse.builder()
+                .from(from)
+                .to(to)
+                .totalTrades(total)
+                .days(days)
+                .build();
     }
 
     @Override

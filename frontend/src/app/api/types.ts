@@ -247,6 +247,20 @@ export interface UsaSpendingCsvPage {
   totalPages: number;
 }
 
+export interface UsaSpendingCoverageRange {
+  jobId: string;
+  dateFrom: string;
+  dateTo: string;
+  rows: number;
+  completedAt?: string;
+}
+
+export interface UsaSpendingCoverage {
+  from: string;
+  to: string;
+  ranges: UsaSpendingCoverageRange[];
+}
+
 export interface UsaSpendingCompanyMatch {
   cik: string;
   ticker?: string;
@@ -1330,6 +1344,18 @@ export interface PoliticalTrade {
   source: string | null;
   firstSeenAt: string | null;
   updatedAt: string | null;
+}
+
+export interface PoliticalTradeCoverageDay {
+  date: string;
+  count: number;
+}
+
+export interface PoliticalTradeCoverage {
+  from: string;
+  to: string;
+  totalTrades: number;
+  days: PoliticalTradeCoverageDay[];
 }
 
 export interface PoliticalTradeFilter {

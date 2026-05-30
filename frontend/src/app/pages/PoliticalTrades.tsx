@@ -1,6 +1,7 @@
 import React from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
+  CalendarRange,
   Download,
   FileJson,
   Filter,
@@ -21,6 +22,7 @@ import { EmptyState } from '../components/common/EmptyState';
 import { ErrorMessage } from '../components/common/ErrorMessage';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { Pagination } from '../components/common/Pagination';
+import { PoliticalCoverageHeatmap } from '../components/political/PoliticalCoverageHeatmap';
 import { formatCurrency, formatNumber, toDisplayDate } from '../utils';
 
 const DEFAULT_FILTER: Required<Pick<PoliticalTradeFilter, 'assetType' | 'page' | 'size' | 'sortBy' | 'sortDir'>> = {
@@ -234,6 +236,8 @@ export function PoliticalTradesPage() {
   const [syncMaxPages, setSyncMaxPages] = React.useState(25);
   const [forceSync, setForceSync] = React.useState(false);
   const [politicians, setPoliticians] = React.useState<string[]>([]);
+  const [showCoverage, setShowCoverage] = React.useState(false);
+  const [coverageRefreshKey, setCoverageRefreshKey] = React.useState(0);
 
   const updateFilter = React.useCallback((patch: Partial<PoliticalTradeFilter>) => {
     setSearchParams(writeFilter({
@@ -263,6 +267,7 @@ export function PoliticalTradesPage() {
       });
       setSyncResult(response);
       await refresh();
+      setCoverageRefreshKey((current) => current + 1);
       setPoliticians(await politicalTradesApi.politicians(filter.politician ?? ''));
     } catch (err) {
       setSyncError(err instanceof Error ? err.message : 'Political trade sync failed');
@@ -311,6 +316,17 @@ export function PoliticalTradesPage() {
 
         <div className="flex flex-wrap gap-2">
           <button
+            onClick={() => setShowCoverage((current) => !current)}
+            className={`inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm ${
+              showCoverage
+                ? 'border-blue-600 bg-blue-600 text-white'
+                : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            <CalendarRange className="h-4 w-4" />
+            Data Coverage
+          </button>
+          <button
             onClick={() => void exportResults('CSV')}
             disabled={Boolean(exporting)}
             className="inline-flex items-center gap-2 rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-60"
@@ -346,6 +362,15 @@ export function PoliticalTradesPage() {
       {syncError ? (
         <ErrorMessage title="Failed to sync political trades" message={syncError} onRetry={() => void syncTrades()} />
       ) : null}
+
+      {showCoverage && (
+        <PoliticalCoverageHeatmap
+          onSelectRange={(from, to) => updateFilter({ disclosureDateFrom: from, disclosureDateTo: to })}
+          onSync={() => void syncTrades()}
+          syncing={syncing}
+          refreshKey={String(coverageRefreshKey)}
+        />
+      )}
 
       <div className="rounded-lg bg-white p-5 shadow-sm">
         <div className="mb-4 flex items-center gap-2">

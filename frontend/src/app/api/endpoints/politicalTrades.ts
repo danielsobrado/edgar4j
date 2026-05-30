@@ -3,6 +3,7 @@ import { timestampedFilename } from '../../utils/formatters';
 import {
   PaginatedResponse,
   PoliticalTrade,
+  PoliticalTradeCoverage,
   PoliticalTradeExportFormat,
   PoliticalTradeFilter,
   PoliticalTradeSyncRequest,
@@ -62,6 +63,10 @@ export const politicalTradesApi = {
     query.set('format', format);
     const blob = await apiClient.downloadGet(`/political-trades/export?${query.toString()}`);
     downloadBlob(blob, timestampedFilename('political-trades', format.toLowerCase()));
+  },
+
+  coverage: (from: string, to: string): Promise<PoliticalTradeCoverage> => {
+    return apiClient.get<PoliticalTradeCoverage>(`/political-trades/coverage?from=${from}&to=${to}`);
   },
 
   sync: (request: PoliticalTradeSyncRequest = {}): Promise<PoliticalTradeSyncResponse> => {

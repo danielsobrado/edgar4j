@@ -8,6 +8,7 @@ import org.jds.edgar4j.dto.request.PoliticalTradeScreenRequest;
 import org.jds.edgar4j.dto.request.PoliticalTradeSyncRequest;
 import org.jds.edgar4j.dto.response.ApiResponse;
 import org.jds.edgar4j.dto.response.PaginatedResponse;
+import org.jds.edgar4j.dto.response.PoliticalTradeCoverageResponse;
 import org.jds.edgar4j.dto.response.PoliticalTradeResponse;
 import org.jds.edgar4j.dto.response.PoliticalTradeSyncResponse;
 import org.jds.edgar4j.service.PoliticalTradeService;
@@ -144,6 +145,18 @@ public class PoliticalTradeController {
         headers.setContentLength(body.length);
 
         return ResponseEntity.ok().headers(headers).body(body);
+    }
+
+    @Operation(summary = "Political trade coverage", description = "Per-day count of cached disclosures across a date window for the coverage heatmap.")
+    @GetMapping("/coverage")
+    public ResponseEntity<ApiResponse<PoliticalTradeCoverageResponse>> coverage(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        log.info("GET /api/political-trades/coverage?from={}&to={}", from, to);
+        if (to.isBefore(from)) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("to must be on or after from"));
+        }
+        return ResponseEntity.ok(ApiResponse.success(politicalTradeService.coverage(from, to)));
     }
 
     @Operation(summary = "List cached politicians", description = "Returns distinct politician names from cached political trade rows for filter suggestions.")

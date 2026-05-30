@@ -3,6 +3,7 @@ package org.jds.edgar4j.service.impl;
 import java.nio.file.Paths;
 import java.text.Normalizer;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -23,6 +24,7 @@ import org.jds.edgar4j.dto.request.DownloadRequest;
 import org.jds.edgar4j.dto.response.DownloadJobResponse;
 import org.jds.edgar4j.dto.response.DownloadSummaryResponse;
 import org.jds.edgar4j.dto.response.UsaSpendingCompanyMatchResponse;
+import org.jds.edgar4j.dto.response.UsaSpendingCoverageResponse;
 import org.jds.edgar4j.dto.response.UsaSpendingCsvPageResponse;
 import org.jds.edgar4j.model.DownloadJob;
 import org.jds.edgar4j.model.DownloadJob.JobStatus;
@@ -91,6 +93,38 @@ public class DownloadJobServiceImpl implements DownloadJobService {
                 .filter(job -> job.getStatus() == JobStatus.COMPLETED)
                 .filter(job -> job.getOutputPath() != null && !job.getOutputPath().isBlank())
                 .map(job -> toUsaSpendingCsvPageResponse(job, page, size));
+    }
+
+    @Override
+    public UsaSpendingCoverageResponse getUsaSpendingCoverage(LocalDate from, LocalDate to) {
+        if (from == null || to == null) {
+            throw new IllegalArgumentException("from and to are required for USAspending coverage");
+        }
+        if (to.isBefore(from)) {
+            throw new IllegalArgumentException("to must be on or after from");
+        }
+
+        List<UsaSpendingCoverageResponse.CoverageRange> ranges = downloadJobRepository
+                .findByStatusIn(List.of(JobStatus.COMPLETED)).stream()
+                .filter(job -> job.getType() == JobType.USA_SPENDING_AWARDS)
+                .filter(job -> job.getDateFrom() != null && job.getDateTo() != null)
+                // keep only ranges that overlap the requested window
+                .filter(job -> !job.getDateFrom().isAfter(to) && !job.getDateTo().isBefore(from))
+                .sorted(Comparator.comparing(DownloadJob::getDateFrom))
+                .map(job -> UsaSpendingCoverageResponse.CoverageRange.builder()
+                        .jobId(job.getId())
+                        .dateFrom(job.getDateFrom())
+                        .dateTo(job.getDateTo())
+                        .rows(job.getTotalFiles())
+                        .completedAt(job.getCompletedAt())
+                        .build())
+                .collect(Collectors.toList());
+
+        return UsaSpendingCoverageResponse.builder()
+                .from(from)
+                .to(to)
+                .ranges(ranges)
+                .build();
     }
 
     @Override

@@ -1,11 +1,12 @@
 import React from 'react';
-import { CalendarDays, CheckCircle, Clock, Download, Loader, RefreshCw, XCircle } from 'lucide-react';
+import { CalendarDays, CalendarRange, CheckCircle, Clock, Download, Loader, RefreshCw, XCircle } from 'lucide-react';
 import * as Progress from '@radix-ui/react-progress';
 import { downloadsApi, DownloadJob, UsaSpendingCsvPage } from '../api';
 import { useDownloadJob } from '../hooks';
 import { showError, showSuccess } from '../store/notificationStore';
 import { Pagination } from '../components/common/Pagination';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
+import { UsaSpendingCoverageHeatmap } from '../components/usaspending/UsaSpendingCoverageHeatmap';
 import { toDisplayDate } from '../utils';
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
@@ -109,10 +110,10 @@ function latestJobUpdateDay(job?: DownloadJob | null) {
 
 const PREVIEW_COLUMN_DEFS = [
   { id: 'col:candidate', label: 'Candidate EDGAR Match', sticky: true, baseWidth: 'min-w-72' },
-  { id: 'col:confidence', label: 'Confidence', baseWidth: 'min-w-28' },
-  { id: 'col:cik', label: 'CIK', baseWidth: 'min-w-32' },
-  { id: 'col:ticker', label: 'Ticker', baseWidth: 'min-w-24' },
-  { id: 'col:matchSource', label: 'Match Source', baseWidth: 'min-w-44' },
+  { id: 'col:confidence', label: 'Confidence', sticky: false, baseWidth: 'min-w-28' },
+  { id: 'col:cik', label: 'CIK', sticky: false, baseWidth: 'min-w-32' },
+  { id: 'col:ticker', label: 'Ticker', sticky: false, baseWidth: 'min-w-24' },
+  { id: 'col:matchSource', label: 'Match Source', sticky: false, baseWidth: 'min-w-44' },
 ] as const;
 
 export function UsaSpendingDownloads() {
@@ -127,6 +128,7 @@ export function UsaSpendingDownloads() {
   const [page, setPage] = React.useState(0);
   const [size, setSize] = React.useState(25);
   const [columnPage, setColumnPage] = React.useState(0);
+  const [showCoverage, setShowCoverage] = React.useState(false);
   const [filterCompany, setFilterCompany] = React.useState('');
   const [filterConfidenceMin, setFilterConfidenceMin] = React.useState('');
   const [filterConfidenceMax, setFilterConfidenceMax] = React.useState('');
@@ -450,6 +452,17 @@ export function UsaSpendingDownloads() {
         </div>
         <div className="flex items-center gap-2">
           <button
+            onClick={() => setShowCoverage((current) => !current)}
+            className={`inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm ${
+              showCoverage
+                ? 'border-[#1a1f36] bg-[#1a1f36] text-white'
+                : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            <CalendarRange className="w-4 h-4" />
+            Data Coverage
+          </button>
+          <button
             onClick={() => void refresh()}
             disabled={!jobId}
             className="inline-flex items-center gap-2 rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
@@ -533,6 +546,19 @@ export function UsaSpendingDownloads() {
           Requests use USAspending action dates, all prime award types, and CSV output. Date ranges may span up to one year.
         </p>
       </div>
+
+      {showCoverage && (
+        <UsaSpendingCoverageHeatmap
+          onJobQueued={(id) => {
+            setJobId(id);
+            setCsvPage(null);
+            setCsvError(null);
+            setPage(0);
+            setColumnPage(0);
+          }}
+          refreshKey={job?.status === 'COMPLETED' ? `${job.id}:${job.completedAt ?? ''}` : ''}
+        />
+      )}
 
       {job && (
         <div className="bg-white rounded-lg shadow-sm p-6">

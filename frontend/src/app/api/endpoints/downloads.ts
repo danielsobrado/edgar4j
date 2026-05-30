@@ -1,5 +1,5 @@
 import { apiClient } from '../client';
-import { DownloadJob, DownloadRequest, DownloadSummary, DownloadType, UsaSpendingCsvPage } from '../types';
+import { DownloadJob, DownloadRequest, DownloadSummary, DownloadType, UsaSpendingCoverage, UsaSpendingCsvPage } from '../types';
 
 export const downloadsApi = {
   downloadTickers: (type: DownloadType = 'TICKERS_ALL'): Promise<DownloadJob> => {
@@ -65,6 +65,10 @@ export const downloadsApi = {
 
   getUsaSpendingCsvPage: (id: string, page: number = 0, size: number = 25): Promise<UsaSpendingCsvPage> => {
     return apiClient.get<UsaSpendingCsvPage>(`/downloads/jobs/${id}/usaspending-csv?page=${page}&size=${size}`);
+  },
+
+  getUsaSpendingCoverage: (from: string, to: string): Promise<UsaSpendingCoverage> => {
+    return apiClient.get<UsaSpendingCoverage>(`/downloads/usaspending/coverage?from=${from}&to=${to}`);
   },
 
   cancelJob: (id: string): Promise<void> => {
