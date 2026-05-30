@@ -68,6 +68,10 @@ export function RemoteEdgar() {
   const [remoteDateFrom, setRemoteDateFrom] = useState(initialRemoteRange.dateFrom);
   const [remoteDateTo, setRemoteDateTo] = useState(initialRemoteRange.dateTo);
   const [remoteSearchLimit, setRemoteSearchLimit] = useState(100);
+  const [remoteFilingSyncMode, setRemoteFilingSyncMode] = useState<'COMPANY' | 'FILING_DATE'>('COMPANY');
+  const [remoteFilingChunkDays, setRemoteFilingChunkDays] = useState('7');
+  const [remoteFilingPauseSeconds, setRemoteFilingPauseSeconds] = useState('5');
+  const [showRemoteFilingAdvanced, setShowRemoteFilingAdvanced] = useState(false);
   const [remoteFilingSearchResult, setRemoteFilingSearchResult] = useState<RemoteFilingSearchResult | null>(null);
   const [remoteFilingSearchLoading, setRemoteFilingSearchLoading] = useState(false);
   const [remoteFilingSearchError, setRemoteFilingSearchError] = useState<string | null>(null);
@@ -241,10 +245,15 @@ export function RemoteEdgar() {
     setRemoteFilingActionError(null);
     setRemoteFilingActionMessage(null);
     try {
+      const chunkDays = Number.parseInt(remoteFilingChunkDays, 10);
+      const pauseSeconds = Number.parseInt(remoteFilingPauseSeconds, 10);
       const job = await downloadsApi.downloadRemoteFilings({
         formType: remoteFormType.trim(),
         dateFrom: remoteDateFrom,
         dateTo: remoteDateTo,
+        remoteFilingSyncMode,
+        chunkDays: Number.isInteger(chunkDays) ? chunkDays : undefined,
+        pauseSeconds: Number.isInteger(pauseSeconds) ? pauseSeconds : undefined,
       });
       setRemoteFilingActionMessage(`Sync queued for ${remoteFormType.trim()} filings from ${remoteDateFrom} to ${remoteDateTo}. Waiting for job ${job.id}...`);
 
@@ -492,9 +501,50 @@ export function RemoteEdgar() {
             </button>
           )}
         </div>
+        <button
+          type="button"
+          onClick={() => setShowRemoteFilingAdvanced((current) => !current)}
+          className="px-3 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 md:self-start"
+        >
+          {showRemoteFilingAdvanced ? 'Hide Advanced' : 'Advanced'}
+        </button>
+        {showRemoteFilingAdvanced && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div>
+              <label htmlFor="remote-filing-chunk-days" className="mb-1 block text-xs text-gray-500">
+                Days per chunk
+              </label>
+              <input
+                id="remote-filing-chunk-days"
+                type="number"
+                min={0}
+                max={366}
+                value={remoteFilingChunkDays}
+                onChange={(e) => setRemoteFilingChunkDays(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                title="Leave blank to use server defaults"
+              />
+            </div>
+            <div>
+              <label htmlFor="remote-filing-pause-seconds" className="mb-1 block text-xs text-gray-500">
+                Pause (seconds)
+              </label>
+              <input
+                id="remote-filing-pause-seconds"
+                type="number"
+                min={0}
+                max={3600}
+                value={remoteFilingPauseSeconds}
+                onChange={(e) => setRemoteFilingPauseSeconds(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                title="Leave blank to use server defaults"
+              />
+            </div>
+          </div>
+        )}
 
         <form
-          className="grid grid-cols-1 md:grid-cols-5 gap-3"
+          className="grid grid-cols-1 md:grid-cols-6 gap-3"
           onSubmit={(e) => {
             e.preventDefault();
             void searchRemoteFilings();
@@ -533,6 +583,15 @@ export function RemoteEdgar() {
             className="px-3 py-2 border border-gray-300 rounded-md"
             title="Preview row limit"
           />
+          <select
+            value={remoteFilingSyncMode}
+            onChange={(e) => setRemoteFilingSyncMode(e.target.value as 'COMPANY' | 'FILING_DATE')}
+            className="px-3 py-2 border border-gray-300 rounded-md"
+            title="Choose company-scoped or filing-date scoped sync mode"
+          >
+            <option value="COMPANY">Company-scoped sync</option>
+            <option value="FILING_DATE">Filing-date sync</option>
+          </select>
           <button
             type="submit"
             disabled={remoteFilingSearchLoading}

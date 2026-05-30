@@ -200,6 +200,8 @@ export type DownloadType =
   | 'BULK_SUBMISSIONS'
   | 'BULK_COMPANY_FACTS';
 
+export type RemoteFilingSyncMode = 'COMPANY' | 'FILING_DATE';
+
 export type JobStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
 
 export interface DownloadRequest {
@@ -208,7 +210,23 @@ export interface DownloadRequest {
   formType?: string;
   dateFrom?: string;
   dateTo?: string;
+  chunkDays?: number;
+  pauseSeconds?: number;
+  remoteFilingSyncMode?: RemoteFilingSyncMode;
   userAgent?: string;
+}
+
+export interface InsiderActivityCoverageDay {
+  date: string;
+  count: number;
+}
+
+export interface InsiderActivityCoverage {
+  form: string;
+  from: string;
+  to: string;
+  totalFilings: number;
+  days: InsiderActivityCoverageDay[];
 }
 
 export interface DownloadJob {

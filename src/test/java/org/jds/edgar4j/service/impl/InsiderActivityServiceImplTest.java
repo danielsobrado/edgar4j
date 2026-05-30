@@ -2,6 +2,7 @@ package org.jds.edgar4j.service.impl;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
@@ -13,6 +14,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import org.jds.edgar4j.dto.request.InsiderActivityScreenRequest;
+import org.jds.edgar4j.dto.response.InsiderActivityCoverageResponse;
 import org.jds.edgar4j.dto.response.InsiderActivityResponse;
 import org.jds.edgar4j.dto.response.PaginatedResponse;
 import org.jds.edgar4j.model.CompanyMarketData;
@@ -27,6 +29,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -57,7 +62,9 @@ class InsiderActivityServiceImplTest {
                 sp500Service,
                 new ObjectMapper().findAndRegisterModules(),
                 FIXED_CLOCK);
-        when(sp500Service.getAllTickers()).thenReturn(Set.of("AAPL"));
+        // Use a lenient mock for shared fixtures so coverage-focused tests can avoid
+        // unnecessary stubbing failures when they don't exercise market cap lookup logic.
+        org.mockito.Mockito.lenient().when(sp500Service.getAllTickers()).thenReturn(Set.of("AAPL"));
     }
 
     @Test
@@ -161,6 +168,43 @@ class InsiderActivityServiceImplTest {
     }
 
     @Test
+    @DisplayName("coverage returns per-day filing counts for form 4")
+    void coverageReturnsForm4DailyCounts() {
+        LocalDate from = BASE_DATE.minusDays(3);
+        LocalDate to = BASE_DATE.minusDays(1);
+        Form4 first = createForm4("0012", "AAPL", "Alice Buyer", "0000000012", BASE_DATE.minusDays(2));
+        Form4 second = createForm4("0013", "MSFT", "Bob Buyer", "0000000013", BASE_DATE.minusDays(1));
+        Form4 ignored = createForm4("0014", "MSFT", "Bob Buyer", "0000000013", null);
+
+        when(form4Repository.findByTransactionDateBetween(from, to, Pageable.unpaged()))
+                .thenReturn(new PageImpl<>(List.of(first, second, ignored)));
+
+        InsiderActivityCoverageResponse coverage = service.coverage("4", from, to);
+
+        assertEquals("4", coverage.getForm());
+        assertEquals(from, coverage.getFrom());
+        assertEquals(to, coverage.getTo());
+        assertEquals(2L, coverage.getTotalFilings());
+        assertEquals(2, coverage.getDays().size());
+        assertEquals(BASE_DATE.minusDays(2).toString(), coverage.getDays().get(0).getDate().toString());
+        assertEquals(1L, coverage.getDays().get(0).getCount());
+        assertEquals(BASE_DATE.minusDays(1).toString(), coverage.getDays().get(1).getDate().toString());
+        assertEquals(1L, coverage.getDays().get(1).getCount());
+    }
+
+    @Test
+    @DisplayName("coverage rejects unsupported form")
+    void coverageRejectsUnsupportedForm() {
+        assertThrows(IllegalArgumentException.class, () -> service.coverage("5", BASE_DATE.minusDays(3), BASE_DATE.minusDays(1)));
+    }
+
+    @Test
+    @DisplayName("coverage rejects inverted date windows")
+    void coverageRejectsInvertedWindow() {
+        assertThrows(IllegalArgumentException.class, () -> service.coverage("4", BASE_DATE.minusDays(1), BASE_DATE.minusDays(3)));
+    }
+
+    @Test
     @DisplayName("export supports CSV and JSON and applies the active filters")
     void exportSupportsCsvAndJson() {
         Form4 form = createForm4("0008", "AAPL", "Alice Buyer", "0000000008");
@@ -238,6 +282,27 @@ class InsiderActivityServiceImplTest {
                 .ownerType("Officer")
                 .officerTitle("Chief Executive Officer")
                 .transactionDate(BASE_DATE.minusDays(1))
+                .acquiredDisposedCode("A")
+                .build();
+    }
+
+    private Form4 createForm4(
+            String accessionNumber,
+            String ticker,
+            String ownerName,
+            String ownerCik,
+            LocalDate transactionDate) {
+        return Form4.builder()
+                .accessionNumber(accessionNumber)
+                .documentType("4")
+                .cik("0000123456")
+                .issuerName(ticker + " Inc.")
+                .tradingSymbol(ticker)
+                .rptOwnerCik(ownerCik)
+                .rptOwnerName(ownerName)
+                .ownerType("Officer")
+                .officerTitle("Chief Executive Officer")
+                .transactionDate(transactionDate)
                 .acquiredDisposedCode("A")
                 .build();
     }

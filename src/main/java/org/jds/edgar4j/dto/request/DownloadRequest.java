@@ -17,6 +17,11 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class DownloadRequest {
 
+    public enum RemoteFilingSyncMode {
+        COMPANY,
+        FILING_DATE
+    }
+
     public enum DownloadType {
         TICKERS_ALL,
         TICKERS_NYSE,
@@ -37,11 +42,17 @@ public class DownloadRequest {
 
     private String formType;
 
+    private RemoteFilingSyncMode remoteFilingSyncMode;
+
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate dateFrom;
 
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate dateTo;
+
+    private Integer chunkDays;
+
+    private Integer pauseSeconds;
 
     private String userAgent;
 }

@@ -62,6 +62,17 @@ public class SecApiConfig {
         return submissionsCIKUrl + formatCik(cik) + ".json";
     }
 
+    public String getSubmissionFileUrl(String fileName) {
+        String normalizedFileName = fileName == null ? "" : fileName.trim();
+        if (normalizedFileName.isEmpty()) {
+            return submissionsUrl;
+        }
+        if (normalizedFileName.startsWith("/")) {
+            return submissionsUrl + normalizedFileName;
+        }
+        return String.format("%s/%s", submissionsUrl, normalizedFileName);
+    }
+
     public String getCompanyFactsUrl(String cik) {
         return String.format("%s/api/xbrl/companyfacts/CIK%s.json", baseDataSecUrl, formatCik(cik));
     }

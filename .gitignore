@@ -65,6 +65,7 @@ frontend/node_modules/
 frontend/dist/
 frontend/.env.local
 frontend/.vite/
+.vite/
 
 ### Claude Code ###
 .claude/
@@ -92,6 +93,7 @@ README_PHASE3.md
 WORK_PROGRESS.md
 
 *.env
+*.nvmrc
 target/
 build.log
 start_log*.txt
@@ -112,3 +114,4 @@ yarn-error.log*
 
 docs\dual-mode-architecture\FINISH-IMPLEMENTATION-PROMPT.md
 docs/dual-mode-architecture/FINISH-IMPLEMENTATION-PROMPT.md
+docs/images/data-coverage.jpg

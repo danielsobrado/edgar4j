@@ -4,15 +4,19 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.ArrayList;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.jds.edgar4j.dto.request.DownloadRequest;
 import org.jds.edgar4j.dto.request.RemoteFilingSearchRequest;
@@ -26,6 +30,7 @@ import org.jds.edgar4j.service.DownloadSubmissionsService;
 import org.jds.edgar4j.service.DownloadTickersService;
 import org.jds.edgar4j.service.UsaSpendingDownloadService;
 import org.jds.edgar4j.service.RemoteEdgarService;
+import org.jds.edgar4j.properties.Edgar4JProperties;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -55,12 +60,23 @@ class DownloadJobExecutorTest {
     @Mock
     private UsaSpendingDownloadService usaSpendingDownloadService;
 
+    @Mock
+    private Edgar4JProperties edgar4JProperties;
+
     @InjectMocks
     private DownloadJobExecutor downloadJobExecutor;
+
+    private void withRemoteSyncDefaults(int chunkDays, int pauseSeconds) {
+        Edgar4JProperties.RemoteSync remoteSync = new Edgar4JProperties.RemoteSync();
+        remoteSync.setChunkDays(chunkDays);
+        remoteSync.setPauseSeconds(pauseSeconds);
+        when(edgar4JProperties.getRemoteSync()).thenReturn(remoteSync);
+    }
 
     @Test
     @DisplayName("executeDownloadAsync should sync all companies matching a remote filing search")
     void executeDownloadAsyncShouldSyncRemoteFilingMatches() {
+        withRemoteSyncDefaults(0, 0);
         DownloadJob job = DownloadJob.builder()
                 .id("job-1")
                 .type(JobType.REMOTE_FILINGS_SYNC)
@@ -80,6 +96,7 @@ class DownloadJobExecutorTest {
                 .formType("13F")
                 .dateFrom(LocalDate.of(2026, 3, 1))
                 .dateTo(LocalDate.of(2026, 3, 12))
+                .chunkDays(0)
                 .build();
 
         downloadJobExecutor.executeDownloadAsync("job-1", request);
@@ -99,6 +116,124 @@ class DownloadJobExecutorTest {
         assertEquals(12L, job.getFilesDownloaded());
         assertEquals(2L, job.getTotalFiles());
         assertNotNull(job.getCompletedAt());
+    }
+
+    @Test
+    @DisplayName("executeDownloadAsync should run filing-date sync when FILING_DATE mode is selected")
+    void executeDownloadAsyncShouldSyncRemoteFilingsByDateWhenRequested() {
+        withRemoteSyncDefaults(0, 0);
+        DownloadJob job = DownloadJob.builder()
+                .id("job-2")
+                .type(JobType.REMOTE_FILINGS_SYNC)
+                .status(JobStatus.PENDING)
+                .startedAt(LocalDateTime.now())
+                .build();
+
+        when(downloadJobRepository.findById("job-2")).thenReturn(Optional.of(job));
+        when(downloadJobRepository.save(any(DownloadJob.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(remoteEdgarService.findMatchingCompanyCiks(any(RemoteFilingSearchRequest.class)))
+                .thenReturn(List.of("0001234567"));
+        when(downloadSubmissionsService.downloadSubmissions("0001234567", "13F", LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 12)))
+                .thenReturn(3L);
+
+        DownloadRequest request = DownloadRequest.builder()
+                .type(DownloadRequest.DownloadType.REMOTE_FILINGS_SYNC)
+                .formType("13F")
+                .remoteFilingSyncMode(DownloadRequest.RemoteFilingSyncMode.FILING_DATE)
+                .chunkDays(0)
+                .dateFrom(LocalDate.of(2026, 3, 1))
+                .dateTo(LocalDate.of(2026, 3, 12))
+                .build();
+
+        downloadJobExecutor.executeDownloadAsync("job-2", request);
+
+        verify(downloadSubmissionsService).downloadSubmissions("0001234567", "13F", LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 12));
+        verify(downloadJobRepository, atLeastOnce()).save(eq(job));
+        assertEquals(JobStatus.COMPLETED, job.getStatus());
+        assertEquals(100, job.getProgress());
+    }
+
+    @Test
+    @DisplayName("executeRemoteFilingSync should split range into explicit day chunks")
+    void executeRemoteFilingSyncShouldSplitDateRangeIntoChunks() {
+        withRemoteSyncDefaults(3, 0);
+        DownloadJob job = DownloadJob.builder()
+                .id("job-3")
+                .type(JobType.REMOTE_FILINGS_SYNC)
+                .status(JobStatus.PENDING)
+                .startedAt(LocalDateTime.now())
+                .build();
+
+        when(downloadJobRepository.findById("job-3")).thenReturn(Optional.of(job));
+        when(downloadJobRepository.save(any(DownloadJob.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        List<RemoteFilingSearchRequest> capture = new ArrayList<>();
+        when(remoteEdgarService.findMatchingCompanyCiks(any(RemoteFilingSearchRequest.class)))
+                .thenAnswer(invocation -> {
+                    capture.add(invocation.getArgument(0));
+                    return List.of("0001234567");
+                });
+        when(downloadSubmissionsService.downloadSubmissions(anyString(), anyString(), any(LocalDate.class), any(LocalDate.class))).thenReturn(1L);
+
+        DownloadRequest request = DownloadRequest.builder()
+                .type(DownloadRequest.DownloadType.REMOTE_FILINGS_SYNC)
+                .formType("13F")
+                .remoteFilingSyncMode(DownloadRequest.RemoteFilingSyncMode.FILING_DATE)
+                .dateFrom(LocalDate.of(2026, 3, 1))
+                .dateTo(LocalDate.of(2026, 3, 6))
+                .chunkDays(3)
+                .build();
+
+        downloadJobExecutor.executeDownloadAsync("job-3", request);
+
+        verify(remoteEdgarService, times(2)).findMatchingCompanyCiks(any(RemoteFilingSearchRequest.class));
+        assertEquals(LocalDate.of(2026, 3, 1), capture.get(0).getDateFrom());
+        assertEquals(LocalDate.of(2026, 3, 3), capture.get(0).getDateTo());
+        assertEquals(LocalDate.of(2026, 3, 4), capture.get(1).getDateFrom());
+        assertEquals(LocalDate.of(2026, 3, 6), capture.get(1).getDateTo());
+    }
+
+    @Test
+    @DisplayName("executeRemoteFilingSync should stop when cancelled during chunk processing")
+    void executeRemoteFilingSyncShouldStopWhenCancelled() {
+        withRemoteSyncDefaults(1, 0);
+        DownloadJob job = DownloadJob.builder()
+                .id("job-4")
+                .type(JobType.REMOTE_FILINGS_SYNC)
+                .status(JobStatus.PENDING)
+                .startedAt(LocalDateTime.now())
+                .build();
+
+        when(downloadJobRepository.findById("job-4")).thenReturn(Optional.of(job));
+        when(downloadJobRepository.save(any(DownloadJob.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(remoteEdgarService.findMatchingCompanyCiks(any(RemoteFilingSearchRequest.class)))
+                .thenReturn(List.of("0001234567"));
+
+        AtomicInteger syncCalls = new AtomicInteger();
+        when(downloadSubmissionsService.downloadSubmissions(anyString(), anyString(), any(LocalDate.class), any(LocalDate.class)))
+                .thenAnswer(invocation -> {
+                    syncCalls.incrementAndGet();
+                    if (syncCalls.get() == 1) {
+                        job.setStatus(JobStatus.CANCELLED);
+                    }
+                    return 4L;
+                });
+
+        DownloadRequest request = DownloadRequest.builder()
+                .type(DownloadRequest.DownloadType.REMOTE_FILINGS_SYNC)
+                .formType("13F")
+                .remoteFilingSyncMode(DownloadRequest.RemoteFilingSyncMode.FILING_DATE)
+                .chunkDays(1)
+                .dateFrom(LocalDate.of(2026, 3, 1))
+                .dateTo(LocalDate.of(2026, 3, 3))
+                .build();
+
+        downloadJobExecutor.executeDownloadAsync("job-4", request);
+
+        assertEquals(JobStatus.CANCELLED, job.getStatus());
+        verify(remoteEdgarService, times(1)).findMatchingCompanyCiks(any(RemoteFilingSearchRequest.class));
+        verify(downloadSubmissionsService, times(1)).downloadSubmissions(anyString(), anyString(), any(LocalDate.class), any(LocalDate.class));
+        assertEquals(0L, job.getFilesDownloaded());
     }
 
     @Test

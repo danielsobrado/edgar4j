@@ -19,6 +19,9 @@ export const downloadsApi = {
     formType: string;
     dateFrom: string;
     dateTo: string;
+    remoteFilingSyncMode?: 'COMPANY' | 'FILING_DATE';
+    chunkDays?: number;
+    pauseSeconds?: number;
     userAgent?: string;
   }): Promise<DownloadJob> => {
     const payload: DownloadRequest = {
@@ -26,6 +29,9 @@ export const downloadsApi = {
       formType: request.formType,
       dateFrom: request.dateFrom,
       dateTo: request.dateTo,
+      remoteFilingSyncMode: request.remoteFilingSyncMode,
+      chunkDays: request.chunkDays,
+      pauseSeconds: request.pauseSeconds,
       userAgent: request.userAgent,
     };
     return apiClient.post<DownloadJob>('/downloads/remote-filings', payload);

@@ -2,6 +2,7 @@ import { apiClient } from '../client';
 import { timestampedFilename } from '../../utils/formatters';
 import {
   InsiderActivity,
+  InsiderActivityCoverage,
   InsiderActivityExportFormat,
   InsiderActivityFilter,
   PaginatedResponse,
@@ -39,6 +40,11 @@ export const insiderActivityApi = {
   screen: (filter: InsiderActivityFilter = {}): Promise<PaginatedResponse<InsiderActivity>> => {
     const query = buildInsiderActivityQuery(filter);
     return apiClient.get<PaginatedResponse<InsiderActivity>>(`/insider-activity/screen?${query}`);
+  },
+
+  coverage: (form: string, from: string, to: string): Promise<InsiderActivityCoverage> => {
+    const params = new URLSearchParams({ form, from, to });
+    return apiClient.get<InsiderActivityCoverage>(`/insider-activity/coverage?${params.toString()}`);
   },
 
   export: async (filter: InsiderActivityFilter = {}, format: InsiderActivityExportFormat): Promise<void> => {

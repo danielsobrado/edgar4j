@@ -243,6 +243,12 @@ Download and track USAspending datasets from the app, keeping procurement and fe
 
 ![Alerts](docs/images/Alerts_1.jpg)
 
+### Data Coverage
+
+Review available filing and enrichment coverage across the local dataset to spot gaps before running deeper analysis.
+
+![Data Coverage](docs/images/data-coverage.jpg)
+
 ### Company Fundamentals
 
 ![Company Fundamentals](docs/images/Fundamentals_1.jpg)

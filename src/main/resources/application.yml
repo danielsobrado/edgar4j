@@ -110,6 +110,9 @@ edgar4j:
             lookback-hours: ${REALTIME_FILING_SYNC_LOOKBACK_HOURS:1}
             max-pages: ${REALTIME_FILING_SYNC_MAX_PAGES:10}
             page-size: ${REALTIME_FILING_SYNC_PAGE_SIZE:100}
+    remote-sync:
+        chunk-days: 7
+        pause-seconds: 5
     # Phase 3: Market Data Provider Configuration
     providers:
         alpha-vantage:

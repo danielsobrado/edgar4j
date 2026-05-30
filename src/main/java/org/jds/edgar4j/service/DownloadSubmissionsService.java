@@ -12,4 +12,6 @@ public interface DownloadSubmissionsService {
 
     long downloadSubmissions(String cik);
 
+    long downloadSubmissions(String cik, String formType, java.time.LocalDate filingDateFrom, java.time.LocalDate filingDateTo);
+
 }

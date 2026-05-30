@@ -92,6 +92,16 @@ public class DownloadController {
             return ResponseEntity.badRequest()
                     .body(ApiResponse.error("dateFrom and dateTo are required for remote filing sync"));
         }
+        if (request.getDateTo().isBefore(request.getDateFrom())) {
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("dateTo must be on or after dateFrom"));
+        }
+        if (ChronoUnit.DAYS.between(request.getDateFrom(), request.getDateTo()) + 1 > 366) {
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("Remote filing sync may span at most one year"));
+        }
+
+        request.setRemoteFilingSyncMode(resolveRemoteFilingSyncMode(request.getRemoteFilingSyncMode()));
 
         request.setType(DownloadRequest.DownloadType.REMOTE_FILINGS_SYNC);
         DownloadJobResponse job = downloadJobService.startDownload(request);
@@ -211,5 +221,13 @@ public class DownloadController {
         } catch (IllegalArgumentException ex) {
             throw new IllegalArgumentException("Unsupported download type: " + type);
         }
+    }
+
+    private DownloadRequest.RemoteFilingSyncMode resolveRemoteFilingSyncMode(
+            DownloadRequest.RemoteFilingSyncMode requestedMode) {
+        if (requestedMode == null) {
+            return DownloadRequest.RemoteFilingSyncMode.COMPANY;
+        }
+        return requestedMode;
     }
 }

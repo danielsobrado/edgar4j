@@ -3,6 +3,8 @@ package org.jds.edgar4j.service.impl;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -19,6 +21,7 @@ import java.util.stream.Stream;
 
 import org.jds.edgar4j.config.AppConstants;
 import org.jds.edgar4j.dto.request.InsiderActivityScreenRequest;
+import org.jds.edgar4j.dto.response.InsiderActivityCoverageResponse;
 import org.jds.edgar4j.dto.response.InsiderActivityResponse;
 import org.jds.edgar4j.dto.response.PaginatedResponse;
 import org.jds.edgar4j.model.CompanyMarketData;
@@ -31,6 +34,7 @@ import org.jds.edgar4j.service.InsiderActivityService;
 import org.jds.edgar4j.service.Sp500Service;
 import org.jds.edgar4j.util.TickerNormalizer;
 import org.jds.edgar4j.util.UsMarketCalendar;
+import org.springframework.data.domain.Pageable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -108,6 +112,51 @@ public class InsiderActivityServiceImpl implements InsiderActivityService {
         }
 
         return toCsv(limited).getBytes(StandardCharsets.UTF_8);
+    }
+
+    @Override
+    public InsiderActivityCoverageResponse coverage(String form, LocalDate from, LocalDate to) {
+        LocalDate normalizedFrom = Objects.requireNonNull(from, "from is required");
+        LocalDate normalizedTo = Objects.requireNonNull(to, "to is required");
+        if (normalizedTo.isBefore(normalizedFrom)) {
+            throw new IllegalArgumentException("to must be on or after from");
+        }
+        if (ChronoUnit.DAYS.between(normalizedFrom, normalizedTo) + 1 > 366) {
+            throw new IllegalArgumentException("Coverage window may span at most one year");
+        }
+
+        String normalizedForm = normalizeForm(form);
+        if (!"4".equals(normalizedForm)) {
+            throw new IllegalArgumentException("Unsupported insider form: " + normalizedForm);
+        }
+
+        Map<LocalDate, Long> countsByDate = form4Repository
+                .findByTransactionDateBetween(normalizedFrom, normalizedTo, Pageable.unpaged())
+                .stream()
+                .map(Form4::getTransactionDate)
+                .filter(Objects::nonNull)
+                .collect(Collectors.groupingBy(date -> date, Collectors.counting()));
+
+        List<InsiderActivityCoverageResponse.DayCount> days = countsByDate.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(entry -> InsiderActivityCoverageResponse.DayCount.builder()
+                        .date(entry.getKey())
+                        .count(entry.getValue())
+                        .build())
+                .toList();
+        long totalFilings = days.stream().mapToLong(InsiderActivityCoverageResponse.DayCount::getCount).sum();
+
+        return InsiderActivityCoverageResponse.builder()
+                .form(normalizedForm)
+                .from(normalizedFrom)
+                .to(normalizedTo)
+                .totalFilings(totalFilings)
+                .days(days)
+                .build();
+    }
+
+    private String normalizeForm(String form) {
+        return form == null || form.isBlank() ? "4" : form.trim();
     }
 
     private List<InsiderActivityResponse> buildResponses(ResolvedRequest request) {

@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
+  CalendarRange,
   Download,
   FileJson,
   Filter,
@@ -12,6 +13,7 @@ import {
   Users,
 } from 'lucide-react';
 import { insiderActivityApi } from '../api';
+import { downloadsApi } from '../api';
 import type {
   InsiderActivity,
   InsiderActivityFilter,
@@ -25,6 +27,8 @@ import { ErrorMessage } from '../components/common/ErrorMessage';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { Pagination } from '../components/common/Pagination';
 import { buildForm4SearchUrl, formatCompact, formatCurrency, formatNumber, toDisplayDate } from '../utils';
+import { showError, showSuccess } from '../store/notificationStore';
+import { InsiderCoverageHeatmap } from '../components/insider/InsiderCoverageHeatmap';
 
 const PRESETS: ReadonlyArray<{
   value: InsiderActivityPreset;
@@ -271,6 +275,9 @@ export function InsiderActivityPage() {
   const { results, loading, error, refresh } = useInsiderActivity(filter);
   const [exporting, setExporting] = React.useState<'CSV' | 'JSON' | null>(null);
   const [codeInput, setCodeInput] = React.useState((filter.transactionCodes ?? []).join(','));
+  const [showCoverage, setShowCoverage] = React.useState(false);
+  const [coverageRefreshKey, setCoverageRefreshKey] = React.useState(0);
+  const [downloadingCoverage, setDownloadingCoverage] = React.useState(false);
 
   React.useEffect(() => {
     setCodeInput((filter.transactionCodes ?? []).join(','));
@@ -311,6 +318,32 @@ export function InsiderActivityPage() {
     navigate(buildForm4SearchUrl({ ticker: row.ticker, cik: row.cik ?? undefined }));
   }, [navigate]);
 
+  const downloadInsiderForm = React.useCallback(async (
+    form: string,
+    from: string,
+    to: string,
+    syncMode: 'COMPANY' | 'FILING_DATE'
+  ) => {
+    setDownloadingCoverage(true);
+    try {
+      const job = await downloadsApi.downloadRemoteFilings({
+        formType: form,
+        dateFrom: from,
+        dateTo: to,
+        remoteFilingSyncMode: syncMode,
+      });
+      showSuccess(
+        'Download queued',
+        `Form ${form} sync queued for ${from} to ${to} (${syncMode}). Check Downloads for job ${job.id}.`
+      );
+    } catch (error) {
+      showError('Download failed', error instanceof Error ? error.message : 'Failed to queue insider filing sync');
+    } finally {
+      setDownloadingCoverage(false);
+      setCoverageRefreshKey((current) => current + 1);
+    }
+  }, []);
+
   const activePreset = PRESETS.find((preset) => preset.value === filter.preset) ?? PRESETS[0];
   const isAggregate = filter.view === 'AGGREGATE';
 
@@ -330,6 +363,17 @@ export function InsiderActivityPage() {
         </div>
 
         <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setShowCoverage((current) => !current)}
+            className={`inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm ${
+              showCoverage
+                ? 'border-blue-600 bg-blue-600 text-white'
+                : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            <CalendarRange className="h-4 w-4" />
+            Data Coverage
+          </button>
           <button
             onClick={() => void exportResults('CSV')}
             disabled={Boolean(exporting)}
@@ -359,6 +403,15 @@ export function InsiderActivityPage() {
       {error ? (
         <ErrorMessage title="Failed to load insider activity" message={error} onRetry={refresh} />
       ) : null}
+
+      {showCoverage && (
+        <InsiderCoverageHeatmap
+          onSelectRange={(from, to) => updateFilter({ dateFrom: from, dateTo: to })}
+          onDownload={downloadInsiderForm}
+          downloading={downloadingCoverage}
+          refreshKey={String(coverageRefreshKey)}
+        />
+      )}
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-3 xl:grid-cols-6">
         {PRESETS.map((preset) => {
@@ -635,3 +688,4 @@ export function InsiderActivityPage() {
     </div>
   );
 }
+

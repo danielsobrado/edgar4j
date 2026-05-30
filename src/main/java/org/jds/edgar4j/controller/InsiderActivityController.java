@@ -5,6 +5,7 @@ import java.util.Set;
 
 import org.jds.edgar4j.dto.request.InsiderActivityScreenRequest;
 import org.jds.edgar4j.dto.response.ApiResponse;
+import org.jds.edgar4j.dto.response.InsiderActivityCoverageResponse;
 import org.jds.edgar4j.dto.response.InsiderActivityResponse;
 import org.jds.edgar4j.dto.response.PaginatedResponse;
 import org.jds.edgar4j.service.InsiderActivityService;
@@ -77,6 +78,20 @@ public class InsiderActivityController {
                 size);
         log.info("GET /api/insider-activity/screen request={}", request);
         return ResponseEntity.ok(ApiResponse.success(insiderActivityService.screen(request)));
+    }
+
+    @GetMapping("/coverage")
+    public ResponseEntity<ApiResponse<InsiderActivityCoverageResponse>> coverage(
+            @RequestParam(defaultValue = "4") String form,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        if (to.isBefore(from)) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("to must be on or after from"));
+        }
+        if (java.time.temporal.ChronoUnit.DAYS.between(from, to) + 1 > 366) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("Coverage window may span at most one year"));
+        }
+        return ResponseEntity.ok(ApiResponse.success(insiderActivityService.coverage(form, from, to)));
     }
 
     @Operation(summary = "Export insider activity", description = "Exports the active insider screener result set as CSV or JSON.")

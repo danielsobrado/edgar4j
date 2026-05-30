@@ -131,6 +131,62 @@ public class SecResponseParser {
         return fillings;
     }
 
+    public List<Filling> toFillings(String json, String cikFallback) {
+        if (json == null || json.isBlank()) {
+            return new ArrayList<>();
+        }
+
+        try {
+            JsonNode root = objectMapper.readTree(json);
+            JsonNode recentNode = root.path("filings").path("recent");
+            if (!recentNode.isObject() || !recentNode.has("accessionNumber")) {
+                recentNode = root;
+            }
+
+            JsonNode accessionNode = recentNode.path("accessionNumber");
+            if (!accessionNode.isArray() || accessionNode.size() == 0) {
+                return new ArrayList<>();
+            }
+
+            String fallbackCik = root.path("cik").asText(null);
+            if ((fallbackCik == null || fallbackCik.isBlank()) && cikFallback != null && !cikFallback.isBlank()) {
+                fallbackCik = cikFallback;
+            }
+            String company = root.path("name").asText(null);
+
+            List<Filling> fillings = new ArrayList<>();
+            int count = accessionNode.size();
+            for (int i = 0; i < count; i++) {
+                try {
+                    Filling filling = Filling.builder()
+                            .cik(fallbackCik)
+                            .company(company)
+                            .accessionNumber(getTextAt(accessionNode, i))
+                            .formType(FormType.builder()
+                                    .number(getTextAt(recentNode.path("form"), i))
+                                    .build())
+                            .fillingDate(parseDate(getTextAt(recentNode.path("filingDate"), i)))
+                            .reportDate(parseDate(getTextAt(recentNode.path("reportDate"), i)))
+                            .fileNumber(getTextAt(recentNode.path("fileNumber"), i))
+                            .filmNumber(getTextAt(recentNode.path("filmNumber"), i))
+                            .items(getTextAt(recentNode.path("items"), i))
+                            .primaryDocument(getTextAt(recentNode.path("primaryDocument"), i))
+                            .primaryDocDescription(getTextAt(recentNode.path("primaryDocDescription"), i))
+                            .isXBRL(getIntAt(recentNode.path("isXBRL"), i) == 1)
+                            .isInlineXBRL(getIntAt(recentNode.path("isInlineXBRL"), i) == 1)
+                            .build();
+                    fillings.add(filling);
+                } catch (Exception e) {
+                    log.warn("Failed to parse filing at index {}: {}", i, e.getMessage());
+                }
+            }
+            return fillings;
+        } catch (Exception e) {
+            log.error("Failed to parse filings JSON", e);
+            throw new RuntimeException("Failed to parse SEC filing JSON", e);
+        }
+    }
+
     public List<Ticker> parseTickersJson(String json) {
         List<Ticker> tickers = new ArrayList<>();
         try {
@@ -244,6 +300,27 @@ public class SecResponseParser {
             return 0;
         }
         return list.get(index);
+    }
+
+    private String getTextAt(JsonNode list, int index) {
+        if (list == null || !list.isArray() || index >= list.size() || list.get(index) == null || list.get(index).isNull()) {
+            return null;
+        }
+        return list.get(index).asText();
+    }
+
+    private int getIntAt(JsonNode list, int index) {
+        if (list == null || !list.isArray() || index >= list.size() || list.get(index) == null || list.get(index).isNull()) {
+            return 0;
+        }
+        if (!list.get(index).isInt()) {
+            try {
+                return Integer.parseInt(list.get(index).asText());
+            } catch (NumberFormatException e) {
+                return 0;
+            }
+        }
+        return list.get(index).asInt();
     }
 }
 

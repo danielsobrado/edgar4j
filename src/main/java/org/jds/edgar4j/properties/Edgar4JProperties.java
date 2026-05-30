@@ -24,6 +24,7 @@ public class Edgar4JProperties {
     private Urls urls = new Urls();
     private Persistence persistence = new Persistence();
     private Batch batch = new Batch();
+    private RemoteSync remoteSync = new RemoteSync();
     private Migration migration = new Migration();
     private String userAgent = "Edgar4J/1.0";
     private String dailyIndexesPath = "/tmp/edgar4j/daily-indexes";
@@ -60,6 +61,12 @@ public class Edgar4JProperties {
         private String targetPath;
         private String sourcePath;
         private List<String> collections = new ArrayList<>();
+    }
+
+    @Data
+    public static class RemoteSync {
+        private int chunkDays = 7;
+        private int pauseSeconds = 5;
     }
 
     public String getDailyMasterUrl(LocalDate date) {

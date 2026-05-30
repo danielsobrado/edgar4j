@@ -1,5 +1,5 @@
 # Stage 1: Build
-FROM cgr.dev/chainguard/node:latest AS builder
+FROM cgr.dev/chainguard/node:22 AS builder
 
 USER root
 WORKDIR /app

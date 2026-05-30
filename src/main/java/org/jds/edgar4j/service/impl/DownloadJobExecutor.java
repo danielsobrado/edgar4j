@@ -1,8 +1,13 @@
 package org.jds.edgar4j.service.impl;
 
 import java.time.LocalDateTime;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 import org.jds.edgar4j.dto.request.DownloadRequest;
 import org.jds.edgar4j.dto.request.RemoteFilingSearchRequest;
@@ -16,6 +21,7 @@ import org.jds.edgar4j.service.DownloadTickersService;
 import org.jds.edgar4j.service.RemoteEdgarService;
 import org.jds.edgar4j.service.UsaSpendingDownloadService;
 import org.jds.edgar4j.service.UsaSpendingDownloadService.UsaSpendingDownloadResult;
+import org.jds.edgar4j.properties.Edgar4JProperties;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -31,8 +37,13 @@ public class DownloadJobExecutor {
     private final DownloadTickersService downloadTickersService;
     private final DownloadSubmissionsService downloadSubmissionsService;
     private final DownloadBulkDataService downloadBulkDataService;
+    private final Edgar4JProperties edgar4JProperties;
     private final RemoteEdgarService remoteEdgarService;
     private final UsaSpendingDownloadService usaSpendingDownloadService;
+
+    private static final int MAX_CHUNK_DAYS = 366;
+    private static final int MAX_PAUSE_SECONDS = 3_600;
+    private static final int MIN_PAUSE_SECONDS = 0;
 
     @Async("downloadExecutor")
     public void executeDownloadAsync(String jobId, DownloadRequest request) {
@@ -108,33 +119,155 @@ public class DownloadJobExecutor {
     }
 
     private long executeRemoteFilingSync(String jobId, DownloadRequest request) {
+        DownloadRequest.RemoteFilingSyncMode syncMode = Objects.requireNonNullElse(
+                request.getRemoteFilingSyncMode(),
+                DownloadRequest.RemoteFilingSyncMode.COMPANY);
+
+        int chunkDays = resolveChunkDays(request.getChunkDays());
+        long pauseMs = resolvePauseSeconds(request.getPauseSeconds()) * 1_000L;
+        List<DateRange> chunks = splitIntoChunks(request.getDateFrom(), request.getDateTo(), chunkDays);
+
+        long importedFilingRecords = 0;
+        Set<String> matchedCompanyCiks = new LinkedHashSet<>();
+        for (int i = 0; i < chunks.size(); i++) {
+            if (isCancelled(jobId)) {
+                return importedFilingRecords;
+            }
+            if (Thread.currentThread().isInterrupted()) {
+                throw new IllegalStateException("Remote filing sync was interrupted");
+            }
+
+            SyncRangeResult syncResult = syncRange(jobId, request, syncMode, chunks.get(i));
+            importedFilingRecords += syncResult.filesDownloaded();
+            matchedCompanyCiks.addAll(syncResult.companyCiks());
+            updateProgress(
+                    jobId,
+                    Math.round((i + 1) * 100.0f / chunks.size()),
+                    importedFilingRecords,
+                    matchedCompanyCiks.size());
+
+            if (isCancelled(jobId)) {
+                return importedFilingRecords;
+            }
+
+            if (i < chunks.size() - 1) {
+                if (!sleepInterruptibly(pauseMs, jobId)) {
+                    throw new IllegalStateException("Remote filing sync was interrupted during pause");
+                }
+            }
+        }
+
+        if (!chunks.isEmpty()) {
+            updateProgress(jobId, 100, importedFilingRecords, matchedCompanyCiks.size());
+        }
+
+        return importedFilingRecords;
+    }
+
+    private SyncRangeResult syncRange(
+            String jobId,
+            DownloadRequest request,
+            DownloadRequest.RemoteFilingSyncMode syncMode,
+            DateRange range) {
         RemoteFilingSearchRequest searchRequest = RemoteFilingSearchRequest.builder()
                 .formType(request.getFormType())
-                .dateFrom(request.getDateFrom())
-                .dateTo(request.getDateTo())
+                .dateFrom(range.start())
+                .dateTo(range.end())
                 .limit(1)
                 .build();
 
         List<String> companyCiks = remoteEdgarService.findMatchingCompanyCiks(searchRequest);
-        updateProgress(jobId, 0, 0, companyCiks.size());
-
         long importedFilingRecords = 0;
-        int processedCompanies = 0;
-
         for (String cik : companyCiks) {
             if (isCancelled(jobId)) {
-                log.info("Stopping cancelled remote filing sync job {}", jobId);
-                return importedFilingRecords;
+                log.info("Stopping cancelled remote filing sync job {} during chunk {} to {}", jobId, range.start(), range.end());
+                return new SyncRangeResult(importedFilingRecords, companyCiks);
             }
-
-            importedFilingRecords += downloadSubmissionsService.downloadSubmissions(cik);
-            processedCompanies++;
-
-            int progress = companyCiks.isEmpty() ? 100 : (int) Math.round((processedCompanies * 100.0) / companyCiks.size());
-            updateProgress(jobId, progress, importedFilingRecords, companyCiks.size());
+            importedFilingRecords += switch (syncMode) {
+                case FILING_DATE ->
+                        downloadSubmissionsService.downloadSubmissions(
+                                cik,
+                                request.getFormType(),
+                                range.start(),
+                                range.end());
+                default -> downloadSubmissionsService.downloadSubmissions(cik);
+            };
         }
 
-        return importedFilingRecords;
+        return new SyncRangeResult(importedFilingRecords, companyCiks);
+    }
+
+    private record SyncRangeResult(long filesDownloaded, List<String> companyCiks) {
+    }
+
+    private List<DateRange> splitIntoChunks(LocalDate from, LocalDate to, int chunkDays) {
+        if (from == null || to == null || from.isAfter(to) || chunkDays <= 0) {
+            return List.of(new DateRange(from, to));
+        }
+
+        List<DateRange> ranges = new ArrayList<>();
+        for (LocalDate start = from; !start.isAfter(to); start = start.plusDays(chunkDays)) {
+            LocalDate end = start.plusDays(chunkDays - 1);
+            ranges.add(new DateRange(start, end.isAfter(to) ? to : end));
+        }
+        return ranges;
+    }
+
+    private boolean sleepInterruptibly(long pauseMs, String jobId) {
+        if (pauseMs <= 0) {
+            return !isCancelled(jobId);
+        }
+
+        final long sleepStepMs = 500L;
+        long remainingMs = pauseMs;
+        while (remainingMs > 0) {
+            if (isCancelled(jobId)) {
+                return false;
+            }
+
+            long sleep = Math.min(sleepStepMs, remainingMs);
+            try {
+                Thread.sleep(sleep);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+            remainingMs -= sleep;
+        }
+        return true;
+    }
+
+    private int resolveChunkDays(Integer requestedChunkDays) {
+        Integer resolved = requestedChunkDays;
+        if (resolved == null) {
+            resolved = getRemoteSyncDefaults().getChunkDays();
+        }
+        if (resolved <= 0) {
+            return 0;
+        }
+        return Math.min(Math.max(1, resolved), MAX_CHUNK_DAYS);
+    }
+
+    private int resolvePauseSeconds(Integer requestedPauseSeconds) {
+        Integer resolved = requestedPauseSeconds;
+        if (resolved == null) {
+            resolved = getRemoteSyncDefaults().getPauseSeconds();
+        }
+        if (resolved <= MIN_PAUSE_SECONDS) {
+            return MIN_PAUSE_SECONDS;
+        }
+        return Math.min(resolved, MAX_PAUSE_SECONDS);
+    }
+
+    private Edgar4JProperties.RemoteSync getRemoteSyncDefaults() {
+        Edgar4JProperties.RemoteSync remoteSync = edgar4JProperties != null ? edgar4JProperties.getRemoteSync() : null;
+        if (remoteSync == null) {
+            return new Edgar4JProperties.RemoteSync();
+        }
+        return remoteSync;
+    }
+
+    private record DateRange(LocalDate start, LocalDate end) {
     }
 
     private void updateProgress(String jobId, int progress, long filesDownloaded, long totalFiles) {

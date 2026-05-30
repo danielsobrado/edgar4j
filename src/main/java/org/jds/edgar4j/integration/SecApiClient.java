@@ -46,6 +46,11 @@ public class SecApiClient {
         return executeRequest(url);
     }
 
+    public String fetchSubmissionFile(String fileName) {
+        String url = config.getSubmissionFileUrl(fileName);
+        return executeRequest(url);
+    }
+
     public String fetchCompanyTickers() {
         return executeRequest(config.getCompanyTickersUrl());
     }
