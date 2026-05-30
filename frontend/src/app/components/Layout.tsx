@@ -56,7 +56,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
     [analysisNavItems, isPathActive, location.pathname]
   );
   const navItems = [...primaryNavItems, ...secondaryNavItems];
-  
+
+  // Routes whose content benefits from the full browser width (wide data tables).
+  const fullWidthRoutes = ['/usaspending-downloads'];
+  const isFullWidthRoute = fullWidthRoutes.includes(location.pathname);
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -254,7 +258,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </div>
       
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className={`mx-auto px-4 sm:px-6 lg:px-8 py-8 ${isFullWidthRoute ? 'max-w-none' : 'max-w-7xl'}`}>
         {children}
       </main>
     </div>

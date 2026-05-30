@@ -107,6 +107,14 @@ function latestJobUpdateDay(job?: DownloadJob | null) {
   return toDisplayDate(job?.completedAt ?? job?.startedAt);
 }
 
+const PREVIEW_COLUMN_DEFS = [
+  { id: 'col:candidate', label: 'Candidate EDGAR Match', sticky: true, baseWidth: 'min-w-72' },
+  { id: 'col:confidence', label: 'Confidence', baseWidth: 'min-w-28' },
+  { id: 'col:cik', label: 'CIK', baseWidth: 'min-w-32' },
+  { id: 'col:ticker', label: 'Ticker', baseWidth: 'min-w-24' },
+  { id: 'col:matchSource', label: 'Match Source', baseWidth: 'min-w-44' },
+] as const;
+
 export function UsaSpendingDownloads() {
   const fiscalYearRange = React.useMemo(getFiscalYearRange, []);
   const [dateFrom, setDateFrom] = React.useState(fiscalYearRange.start);
@@ -119,6 +127,15 @@ export function UsaSpendingDownloads() {
   const [page, setPage] = React.useState(0);
   const [size, setSize] = React.useState(25);
   const [columnPage, setColumnPage] = React.useState(0);
+  const [filterCompany, setFilterCompany] = React.useState('');
+  const [filterConfidenceMin, setFilterConfidenceMin] = React.useState('');
+  const [filterConfidenceMax, setFilterConfidenceMax] = React.useState('');
+  const [filterCik, setFilterCik] = React.useState('');
+  const [filterTicker, setFilterTicker] = React.useState('');
+  const [filterSource, setFilterSource] = React.useState('');
+  const [hiddenColumns, setHiddenColumns] = React.useState<Set<string>>(new Set());
+  const [sortColumnId, setSortColumnId] = React.useState<string | null>(null);
+  const [sortDirection, setSortDirection] = React.useState<'asc' | 'desc'>('asc');
   const dateFromRef = React.useRef<HTMLInputElement>(null);
   const dateToRef = React.useRef<HTMLInputElement>(null);
   const rangeInitializedFromLatestJobRef = React.useRef(false);
@@ -226,9 +243,198 @@ export function UsaSpendingDownloads() {
   const latestUpdateDay = latestJobUpdateDay(job);
   const visibleColumnStart = columnPage * COLUMN_PAGE_SIZE;
   const visibleHeaders = csvPage?.headers
-    .map((header, index) => ({ header, index }))
+    .map((header, index) => ({ header, index, columnId: `col:csv:${index}` }))
     .slice(visibleColumnStart, visibleColumnStart + COLUMN_PAGE_SIZE) ?? [];
   const columnPageCount = csvPage ? Math.ceil(csvPage.headers.length / COLUMN_PAGE_SIZE) : 0;
+  const allCsvColumns = React.useMemo(() => {
+    if (!csvPage) {
+      return [];
+    }
+    return csvPage.headers.map((header, index) => ({
+      header,
+      index,
+      columnId: `col:csv:${index}`,
+    }));
+  }, [csvPage]);
+  const visibleMainColumns = React.useMemo(() => PREVIEW_COLUMN_DEFS.filter(({ id }) => !hiddenColumns.has(id)), [hiddenColumns]);
+  const visibleCsvHeaders = React.useMemo(
+    () => visibleHeaders.filter(({ columnId }) => !hiddenColumns.has(columnId)),
+    [visibleHeaders, hiddenColumns]
+  );
+  const visibleColumnCount = visibleMainColumns.length + visibleCsvHeaders.length;
+  const hasActiveColumnVisibilityFilters = visibleColumnCount < (PREVIEW_COLUMN_DEFS.length + (csvPage?.headers.length ?? 0));
+  const toggleColumn = React.useCallback((columnId: string) => {
+    setHiddenColumns((current) => {
+      const next = new Set(current);
+      if (next.has(columnId)) {
+        next.delete(columnId);
+      } else {
+        next.add(columnId);
+        if (sortColumnId === columnId) {
+          setSortColumnId(null);
+        }
+      }
+      return next;
+    });
+  }, [sortColumnId]);
+  const showAllColumns = () => {
+    setHiddenColumns(new Set());
+  };
+  const normalizedCompanyFilter = filterCompany.trim().toLowerCase();
+  const normalizedCikFilter = filterCik.trim().toLowerCase();
+  const normalizedTickerFilter = filterTicker.trim().toLowerCase();
+  const minConfidence = Number.parseInt(filterConfidenceMin, 10);
+  const maxConfidence = Number.parseInt(filterConfidenceMax, 10);
+  const hasActiveFilters = Boolean(
+    normalizedCompanyFilter ||
+      filterConfidenceMin ||
+      filterConfidenceMax ||
+      normalizedCikFilter ||
+      normalizedTickerFilter ||
+      filterSource
+  );
+  const matchSourceOptions = React.useMemo(() => {
+    if (!csvPage) {
+      return [];
+    }
+    const sources = new Set<string>();
+    for (const rowMatch of csvPage.rowMatches) {
+      const bestMatch = rowMatch[0];
+      if (bestMatch?.sourceField) {
+        sources.add(bestMatch.sourceField);
+      }
+    }
+    return [...sources].sort();
+  }, [csvPage]);
+  const filteredCsvRows = React.useMemo(() => {
+    if (!csvPage) {
+      return [];
+    }
+    return csvPage.rows
+      .map((row, rowIndex) => ({
+        row,
+        rowIndex,
+        matches: csvPage.rowMatches[rowIndex] ?? [],
+      }))
+      .filter(({ matches }) => {
+        const bestMatch = matches[0];
+        if (!bestMatch) {
+          return (
+            !normalizedCompanyFilter &&
+            !filterConfidenceMin &&
+            !filterConfidenceMax &&
+            !normalizedCikFilter &&
+            !normalizedTickerFilter &&
+            !filterSource
+          );
+        }
+        if (normalizedCompanyFilter && !bestMatch.companyName.toLowerCase().includes(normalizedCompanyFilter)) {
+          return false;
+        }
+        if (filterSource && bestMatch.sourceField !== filterSource) {
+          return false;
+        }
+        if (normalizedCikFilter && !bestMatch.cik.toLowerCase().includes(normalizedCikFilter)) {
+          return false;
+        }
+        if (normalizedTickerFilter && !(bestMatch.ticker ?? '').toLowerCase().includes(normalizedTickerFilter)) {
+          return false;
+        }
+        if (Number.isFinite(minConfidence) && bestMatch.confidence < minConfidence) {
+          return false;
+        }
+        if (Number.isFinite(maxConfidence) && maxConfidence >= 0 && bestMatch.confidence > maxConfidence) {
+          return false;
+        }
+        return true;
+      });
+  }, [csvPage, normalizedCompanyFilter, normalizedCikFilter, normalizedTickerFilter, filterSource, minConfidence, maxConfidence, filterConfidenceMin, filterConfidenceMax]);
+  const getSortValue = React.useCallback(
+    (entry: { row: string[]; matches: UsaSpendingCsvPage['rowMatches'][number] }, columnId: string) => {
+      const bestMatch = entry.matches[0];
+      if (columnId.startsWith('col:csv:')) {
+        const csvIndex = Number.parseInt(columnId.replace('col:csv:', ''), 10);
+        if (Number.isNaN(csvIndex)) {
+          return '';
+        }
+        return entry.row[csvIndex] ?? '';
+      }
+
+      if (!bestMatch) {
+        return '';
+      }
+
+      if (columnId === 'col:candidate') {
+        return bestMatch.companyName;
+      }
+      if (columnId === 'col:confidence') {
+        return bestMatch.confidence;
+      }
+      if (columnId === 'col:cik') {
+        return bestMatch.cik;
+      }
+      if (columnId === 'col:ticker') {
+        return bestMatch.ticker ?? '';
+      }
+      if (columnId === 'col:matchSource') {
+        return bestMatch.sourceField;
+      }
+      return '';
+    },
+    []
+  );
+  const sortedCsvRows = React.useMemo(() => {
+    if (!sortColumnId) {
+      return filteredCsvRows;
+    }
+
+    return [...filteredCsvRows].sort((left, right) => {
+      const leftValue = getSortValue(left, sortColumnId);
+      const rightValue = getSortValue(right, sortColumnId);
+
+      const leftNumber = typeof leftValue === 'number' && Number.isFinite(leftValue) ? leftValue : Number.parseFloat(String(leftValue));
+      const rightNumber = typeof rightValue === 'number' && Number.isFinite(rightValue) ? rightValue : Number.parseFloat(String(rightValue));
+
+      let comparison = 0;
+      if (Number.isFinite(leftNumber) && Number.isFinite(rightNumber)) {
+        comparison = leftNumber - rightNumber;
+      } else {
+        const leftText = String(leftValue).toLowerCase();
+        const rightText = String(rightValue).toLowerCase();
+        comparison = leftText.localeCompare(rightText, 'en');
+      }
+
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+  }, [filteredCsvRows, sortColumnId, sortDirection, getSortValue]);
+  const sortStateLabel = (columnId: string) => {
+    if (sortColumnId !== columnId) {
+      return '↕';
+    }
+    return sortDirection === 'asc' ? '↑' : '↓';
+  };
+  const handleSortToggle = (columnId: string) => {
+    setSortDirection((currentDirection) => {
+      if (sortColumnId === columnId) {
+        return currentDirection === 'asc' ? 'desc' : 'asc';
+      }
+      return 'asc';
+    });
+    setSortColumnId(columnId);
+  };
+  const hideColumn = (columnId: string) => {
+    if (hiddenColumns.has(columnId)) {
+      return;
+    }
+    setHiddenColumns((current) => {
+      const next = new Set(current);
+      next.add(columnId);
+      return next;
+    });
+    if (sortColumnId === columnId) {
+      setSortColumnId(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -370,7 +576,7 @@ export function UsaSpendingDownloads() {
       )}
 
       {job?.status === 'COMPLETED' && (
-        <div className="relative left-1/2 w-screen max-w-[100vw] -translate-x-1/2 bg-white p-6 shadow-sm sm:px-6 lg:px-8">
+        <div className="bg-white rounded-lg shadow-sm p-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2>CSV Preview</h2>
@@ -394,53 +600,225 @@ export function UsaSpendingDownloads() {
             <div className="py-8 text-sm text-gray-600">Loading CSV rows...</div>
           ) : csvPage ? (
             <div className="mt-4 space-y-4">
+              <div className="rounded-md border border-gray-200 p-4">
+                <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+                  <label className="space-y-2">
+                    <span className="text-sm text-gray-700">Candidate Search</span>
+                    <input
+                      value={filterCompany}
+                      onChange={(event) => setFilterCompany(event.target.value)}
+                      placeholder="Company or awardee"
+                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-sm text-gray-700">Min Confidence</span>
+                    <input
+                      value={filterConfidenceMin}
+                      onChange={(event) => setFilterConfidenceMin(event.target.value)}
+                      type="number"
+                      min={0}
+                      max={100}
+                      placeholder="0"
+                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-sm text-gray-700">Max Confidence</span>
+                    <input
+                      value={filterConfidenceMax}
+                      onChange={(event) => setFilterConfidenceMax(event.target.value)}
+                      type="number"
+                      min={0}
+                      max={100}
+                      placeholder="100"
+                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-sm text-gray-700">CIK</span>
+                    <input
+                      value={filterCik}
+                      onChange={(event) => setFilterCik(event.target.value)}
+                      placeholder="CIK"
+                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-sm text-gray-700">Ticker</span>
+                    <input
+                      value={filterTicker}
+                      onChange={(event) => setFilterTicker(event.target.value)}
+                      placeholder="Ticker"
+                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-sm text-gray-700">Match Source</span>
+                    <select
+                      value={filterSource}
+                      onChange={(event) => setFilterSource(event.target.value)}
+                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">All sources</option>
+                      {matchSourceOptions.map((source) => (
+                        <option key={source} value={source}>
+                          {source}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                {hasActiveFilters && (
+                  <div className="mt-3 flex justify-end">
+                    <button
+                      onClick={() => {
+                        setFilterCompany('');
+                        setFilterConfidenceMin('');
+                        setFilterConfidenceMax('');
+                        setFilterCik('');
+                        setFilterTicker('');
+                        setFilterSource('');
+                      }}
+                      className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    >
+                      Clear Filters
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div className="rounded-md border border-gray-200 p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div className="text-sm text-gray-700">Show / Hide Columns</div>
+                  {hasActiveColumnVisibilityFilters && (
+                    <button
+                      onClick={showAllColumns}
+                      className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+                    >
+                      Show All
+                    </button>
+                  )}
+                </div>
+                <div className="space-y-3">
+                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+                    {PREVIEW_COLUMN_DEFS.map(({ id, label }) => (
+                      <label key={id} className="flex items-center gap-2 text-sm text-gray-700">
+                        <input
+                          type="checkbox"
+                          checked={!hiddenColumns.has(id)}
+                          onChange={() => toggleColumn(id)}
+                        />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                  <div className="grid max-h-56 gap-2 overflow-y-auto pr-1 sm:grid-cols-2 lg:grid-cols-3">
+                    {allCsvColumns.map(({ header, columnId }) => (
+                      <label key={columnId} className="flex items-center gap-2 text-sm text-gray-700">
+                        <input
+                          type="checkbox"
+                          checked={!hiddenColumns.has(columnId)}
+                          onChange={() => toggleColumn(columnId)}
+                        />
+                        <span className="truncate" title={header}>{header}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                {visibleColumnCount === 0 && (
+                  <p className="mt-3 text-sm text-amber-700">
+                    No columns are selected. Turn columns back on to render rows.
+                  </p>
+                )}
+              </div>
+
               <div className="rounded-md border border-gray-200">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="sticky left-0 z-10 min-w-72 bg-gray-50">
-                        Candidate EDGAR Match
-                      </TableHead>
-                      <TableHead className="min-w-28 bg-gray-50">
-                        Confidence
-                      </TableHead>
-                      <TableHead className="min-w-32 bg-gray-50">
-                        CIK
-                      </TableHead>
-                      <TableHead className="min-w-24 bg-gray-50">
-                        Ticker
-                      </TableHead>
-                      <TableHead className="min-w-44 bg-gray-50">
-                        Match Source
-                      </TableHead>
-                      {visibleHeaders.map(({ header, index }) => (
-                        <TableHead key={`${header}-${index}`} className="max-w-72 bg-gray-50">
-                          <span className="block truncate" title={header}>{header}</span>
+                        {visibleMainColumns.map(({ id, label, sticky, baseWidth }) => (
+                          <TableHead
+                            key={id}
+                            className={`${sticky ? 'sticky left-0 z-10' : ''} ${baseWidth} bg-gray-50`}
+                          >
+                            <button
+                              onClick={() => void handleSortToggle(id)}
+                              className="inline-flex w-full items-center justify-between gap-2"
+                              type="button"
+                            >
+                              <span>{label}</span>
+                              <span className="ml-2 text-xs text-gray-500">{sortStateLabel(id)}</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                hideColumn(id);
+                              }}
+                              className="mt-1 text-xs text-gray-500 underline underline-offset-4 hover:text-gray-700"
+                            >
+                              Hide
+                            </button>
+                          </TableHead>
+                        ))}
+                      {visibleCsvHeaders.map(({ header, columnId }) => (
+                        <TableHead key={columnId} className="max-w-72 bg-gray-50">
+                          <div className="flex items-center justify-between gap-2">
+                            <button
+                              onClick={() => void handleSortToggle(columnId)}
+                              className="inline-flex min-w-0 items-center justify-between gap-2"
+                              type="button"
+                            >
+                              <span className="block truncate" title={header}>{header}</span>
+                              <span className="ml-2 text-xs text-gray-500">{sortStateLabel(columnId)}</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                hideColumn(columnId);
+                              }}
+                              className="shrink-0 text-xs text-gray-500 underline underline-offset-4 hover:text-gray-700"
+                            >
+                              Hide
+                            </button>
+                          </div>
                         </TableHead>
                       ))}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {csvPage.rows.length === 0 ? (
+                    {sortedCsvRows.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={Math.max(visibleHeaders.length + 5, 1)} className="py-8 text-center text-gray-500">
-                          No rows returned for this date range.
+                        <TableCell colSpan={Math.max(visibleColumnCount, 1)} className="py-8 text-center text-gray-500">
+                          {csvPage.rows.length === 0
+                            ? 'No rows returned for this date range.'
+                            : 'No rows returned for the active filters.'}
                         </TableCell>
                       </TableRow>
                     ) : (
-                      csvPage.rows.map((row, rowIndex) => (
+                      sortedCsvRows.map(({ row, rowIndex, matches }) => (
                         <TableRow key={`${csvPage.page}-${rowIndex}`}>
                           {(() => {
-                            const matches = csvPage.rowMatches?.[rowIndex] ?? [];
                             const bestMatch = matches[0];
                             if (!bestMatch) {
                               return (
                                 <>
-                                  <TableCell className="sticky left-0 z-10 min-w-72 bg-white text-gray-500">No candidate</TableCell>
-                                  <TableCell className="text-gray-500">-</TableCell>
-                                  <TableCell className="text-gray-500">-</TableCell>
-                                  <TableCell className="text-gray-500">-</TableCell>
-                                  <TableCell className="text-gray-500">-</TableCell>
+                                  {visibleMainColumns.map(({ id, baseWidth, sticky }) => {
+                                    const cellClasses = `${sticky ? 'sticky left-0 z-10 ' : ''}${baseWidth} text-gray-500`;
+                                    if (id === 'col:candidate') {
+                                      return (
+                                        <TableCell key={id} className={`${cellClasses} bg-white`}>
+                                          No candidate
+                                        </TableCell>
+                                      );
+                                    }
+                                    return (
+                                      <TableCell key={id} className={cellClasses}>
+                                        -
+                                      </TableCell>
+                                    );
+                                  })}
                                 </>
                               );
                             }
@@ -450,42 +828,58 @@ export function UsaSpendingDownloads() {
                               : bestMatch.companyName;
                             return (
                               <>
-                                <TableCell className="sticky left-0 z-10 min-w-72 max-w-72 bg-white">
-                                  <div className="space-y-1">
-                                    <span className="block truncate" title={companyTitle}>
-                                      {bestMatch.companyName}
-                                    </span>
-                                    {marketCapLabel && (
-                                      <span className="block text-xs text-gray-500">Mkt cap {marketCapLabel}</span>
-                                    )}
-                                    {matches.length > 1 && (
-                                      <span className="block text-xs text-gray-500">
-                                        {matches.length - 1} more candidate{matches.length > 2 ? 's' : ''}
+                                {visibleMainColumns.map(({ id, baseWidth, sticky }) => {
+                                  if (id === 'col:candidate') {
+                                    return (
+                                      <TableCell key={id} className={`${sticky ? 'sticky left-0 z-10 ' : ''}${baseWidth} max-w-72 bg-white`}>
+                                        <div className="space-y-1">
+                                          <span className="block truncate" title={companyTitle}>
+                                            {bestMatch.companyName}
+                                          </span>
+                                          {marketCapLabel && (
+                                            <span className="block text-xs text-gray-500">Mkt cap {marketCapLabel}</span>
+                                          )}
+                                          {matches.length > 1 && (
+                                            <span className="block text-xs text-gray-500">
+                                              {matches.length - 1} more candidate{matches.length > 2 ? 's' : ''}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </TableCell>
+                                    );
+                                  }
+                                  if (id === 'col:confidence') {
+                                    return (
+                                      <TableCell key={id}>
+                                        <span className={`rounded-md px-2 py-1 text-xs ${getConfidenceClass(bestMatch.confidence)}`}>
+                                          {bestMatch.confidence}%
+                                        </span>
+                                      </TableCell>
+                                    );
+                                  }
+                                  if (id === 'col:cik') {
+                                    return <TableCell key={id} className="font-mono text-xs">{bestMatch.cik}</TableCell>;
+                                  }
+                                  if (id === 'col:ticker') {
+                                    return <TableCell key={id} className="font-mono text-xs">{bestMatch.ticker || '-'}</TableCell>;
+                                  }
+                                  return (
+                                    <TableCell key={id} className="max-w-44">
+                                      <span className="block truncate" title={`${bestMatch.sourceField}: ${bestMatch.sourceValue}`}>
+                                        {bestMatch.sourceField}
                                       </span>
-                                    )}
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <span className={`rounded-md px-2 py-1 text-xs ${getConfidenceClass(bestMatch.confidence)}`}>
-                                    {bestMatch.confidence}%
-                                  </span>
-                                </TableCell>
-                                <TableCell className="font-mono text-xs">{bestMatch.cik}</TableCell>
-                                <TableCell className="font-mono text-xs">{bestMatch.ticker || '-'}</TableCell>
-                                <TableCell className="max-w-44">
-                                  <span className="block truncate" title={`${bestMatch.sourceField}: ${bestMatch.sourceValue}`}>
-                                    {bestMatch.sourceField}
-                                  </span>
-                                </TableCell>
+                                    </TableCell>
+                                  );
+                                })}
                               </>
                             );
                           })()}
-                          {visibleHeaders.map(({ header, index }) => {
+                          {visibleCsvHeaders.map(({ header, index, columnId }) => {
                             const value = row[index] ?? '';
                             const currency = isCurrencyColumn(header);
                             const displayValue = currency ? formatCurrencyCell(value) : value;
                             return (
-                              <TableCell key={`${header}-${index}`} className={`max-w-72 ${currency ? 'text-right tabular-nums' : ''}`}>
+                              <TableCell key={columnId} className={`max-w-72 ${currency ? 'text-right tabular-nums' : ''}`}>
                                 <span className="block truncate" title={displayValue}>{displayValue}</span>
                               </TableCell>
                             );

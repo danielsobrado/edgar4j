@@ -233,6 +233,12 @@ Example from Microsoft: https://www.sec.gov/Archives/edgar/data/789019/000162643
 
 ![Downloads and Bulk Data](docs/images/Downloads_1.jpg)
 
+### USAspending Downloads
+
+Download and track USAspending datasets from the app, keeping procurement and federal spending data available for local analysis workflows.
+
+![USAspending Downloads](docs/images/usa-spending-downloads.jpg)
+
 ### Alerts
 
 ![Alerts](docs/images/Alerts_1.jpg)
