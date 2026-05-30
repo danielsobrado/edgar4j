@@ -241,6 +241,12 @@ Example from Microsoft: https://www.sec.gov/Archives/edgar/data/789019/000162643
 
 ![Company Fundamentals](docs/images/Fundamentals_1.jpg)
 
+### Politicians Trading Disclosures
+
+Track congressional trading disclosures alongside SEC-derived market context, including ticker, transaction, politician, and disclosure timing details.
+
+![Politicians Trading Disclosures](docs/images/politicians-trading-disclosures.jpg)
+
 ## Forms
 
 ### Ownership: 13D/13G and 13F
