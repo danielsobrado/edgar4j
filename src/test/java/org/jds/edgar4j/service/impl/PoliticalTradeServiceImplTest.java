@@ -136,6 +136,8 @@ class PoliticalTradeServiceImplTest {
         verify(source).fetch(requestCaptor.capture());
         assertEquals("stock", requestCaptor.getValue().assetType());
         assertEquals(25, requestCaptor.getValue().maxPages());
+        assertEquals(5, requestCaptor.getValue().chunkPages());
+        assertEquals(2, requestCaptor.getValue().pauseSeconds());
 
         ArgumentCaptor<PoliticalTrade> savedCaptor = ArgumentCaptor.forClass(PoliticalTrade.class);
         verify(dataPort).save(savedCaptor.capture());
@@ -162,14 +164,16 @@ class PoliticalTradeServiceImplTest {
 
         PoliticalTradeSyncResponse response = service.sync(PoliticalTradeSyncRequest.builder()
                 .assetType("stock")
-                .maxPages(999)
+                .maxPages(9999)
                 .force(true)
                 .build());
 
         ArgumentCaptor<PoliticalTradeSourceRequest> requestCaptor = ArgumentCaptor.forClass(PoliticalTradeSourceRequest.class);
         verify(source).fetch(requestCaptor.capture());
         assertEquals("stock", requestCaptor.getValue().assetType());
-        assertEquals(250, requestCaptor.getValue().maxPages());
+        assertEquals(5000, requestCaptor.getValue().maxPages());
+        assertEquals(5, requestCaptor.getValue().chunkPages());
+        assertEquals(2, requestCaptor.getValue().pauseSeconds());
 
         ArgumentCaptor<PoliticalTrade> savedCaptor = ArgumentCaptor.forClass(PoliticalTrade.class);
         verify(dataPort).save(savedCaptor.capture());
@@ -198,6 +202,51 @@ class PoliticalTradeServiceImplTest {
                 requestCaptor.getAllValues().stream().map(PoliticalTradeSourceRequest::maxPages).toList());
         assertEquals("all", response.getAssetType());
         assertEquals(10, response.getFetchedPages());
+    }
+
+    @Test
+    void syncPassesClampedThrottleOptionsToSource() {
+        when(source.fetch(any(PoliticalTradeSourceRequest.class))).thenReturn(List.of());
+        when(source.sourceName()).thenReturn("CAPITOL_TRADES");
+
+        service.sync(PoliticalTradeSyncRequest.builder()
+                .assetType("stock")
+                .maxPages(1)
+                .chunkPages(999)
+                .pauseSeconds(999)
+                .force(true)
+                .build());
+
+        ArgumentCaptor<PoliticalTradeSourceRequest> requestCaptor = ArgumentCaptor.forClass(PoliticalTradeSourceRequest.class);
+        verify(source).fetch(requestCaptor.capture());
+        assertEquals(50, requestCaptor.getValue().chunkPages());
+        assertEquals(60, requestCaptor.getValue().pauseSeconds());
+    }
+
+    @Test
+    void syncSkipsRowsOutsideRequestedDisclosureDateRange() {
+        PoliticalTrade inRange = trade("20003798315", "Tim Moore", "T", "stock", "BUY", 15_000d, 50_000d, LocalDate.of(2026, 5, 30));
+        inRange.setSourceTradeId("CAPITOL_TRADES:20003798315");
+        PoliticalTrade outOfRange = trade("20003798316", "Tim Moore", "MSFT", "stock", "BUY", 15_000d, 50_000d, LocalDate.of(2026, 5, 20));
+        outOfRange.setSourceTradeId("CAPITOL_TRADES:20003798316");
+
+        when(source.fetch(any(PoliticalTradeSourceRequest.class))).thenReturn(List.of(inRange, outOfRange));
+        when(source.sourceName()).thenReturn("CAPITOL_TRADES");
+        when(dataPort.findBySourceTradeId("CAPITOL_TRADES:20003798315")).thenReturn(Optional.empty());
+        when(dataPort.existsBySourceTradeId("CAPITOL_TRADES:20003798315")).thenReturn(false);
+
+        PoliticalTradeSyncResponse response = service.sync(PoliticalTradeSyncRequest.builder()
+                .assetType("stock")
+                .maxPages(1)
+                .disclosureDateFrom(LocalDate.of(2026, 5, 29))
+                .disclosureDateTo(LocalDate.of(2026, 5, 31))
+                .force(true)
+                .build());
+
+        verify(dataPort).save(inRange);
+        assertEquals(2, response.getFetchedRows());
+        assertEquals(1, response.getInsertedRows());
+        assertEquals(1, response.getSkippedRows());
     }
 
     @Test

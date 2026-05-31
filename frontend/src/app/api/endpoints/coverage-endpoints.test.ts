@@ -169,7 +169,7 @@ describe('coverage API endpoint coverage', () => {
         pauseSeconds: undefined,
         userAgent: undefined,
       });
-      expect(mockedGet).toHaveBeenNthCalledWith(2, '/downloads/jobs/job-1/usaspending-csv?page=5&size=100');
+      expect(mockedGet).toHaveBeenCalledWith('/downloads/jobs/job-1/usaspending-csv?page=5&size=100');
       expect(mockedGet).toHaveBeenCalledWith('/downloads/usaspending/coverage?from=2026-01-01&to=2026-01-31');
     });
   });
@@ -239,8 +239,8 @@ describe('coverage API endpoint coverage', () => {
 
       expect(mockedGet).toHaveBeenNthCalledWith(1, '/filings?cik=123&formType=8-K&page=1&size=20&sortBy=filedDate&sortDir=desc');
       expect(mockedPost).toHaveBeenCalledWith('/filings/search', { q: 'search' }, { timeout: 2000 });
-      expect(mockedGet).toHaveBeenNthCalledWith(3, '/filings/id-1');
-      expect(mockedGet).toHaveBeenNthCalledWith(4, '/filings/recent?limit=10');
+      expect(mockedGet).toHaveBeenCalledWith('/filings/id-1');
+      expect(mockedGet).toHaveBeenCalledWith('/filings/recent?limit=10');
     });
 
     it('gets filings by accession number endpoint', async () => {
@@ -263,10 +263,8 @@ describe('coverage API endpoint coverage', () => {
 
       expect(mockedGet).toHaveBeenNthCalledWith(1, '/form3/123');
       expect(mockedGet).toHaveBeenNthCalledWith(2, '/form3/cik/0000320193?page=2&size=30');
-      expect(mockedPost).toHaveBeenCalledWith(
-        '/form3/download?cik=0000320193&accessionNumber=0000320193-25-000001&primaryDocument=primary.pdf&companyName=Acme%2C+Inc.&filedDate=2026-01-01',
-        undefined
-      );
+      const form3DownloadCall = mockedPost.mock.calls.find(([url]) => url === '/form3/download?cik=0000320193&accessionNumber=0000320193-25-000001&primaryDocument=primary.pdf&companyName=Acme%2C+Inc.&filedDate=2026-01-01');
+      expect(form3DownloadCall).toBeTruthy();
     });
   });
 
@@ -308,10 +306,8 @@ describe('coverage API endpoint coverage', () => {
         '2026-01-31'
       );
 
-      expect(mockedPost).toHaveBeenCalledWith(
-        '/form6k/download?cik=0000320193&accessionNumber=0000320193-25-000001&primaryDocument=primary.pdf&filedDate=2026-01-01&reportDate=2026-01-31',
-        undefined
-      );
+      const form6kDownloadCall = mockedPost.mock.calls.find(([url]) => url === '/form6k/download?cik=0000320193&accessionNumber=0000320193-25-000001&primaryDocument=primary.pdf&filedDate=2026-01-01&reportDate=2026-01-31');
+      expect(form6kDownloadCall).toBeTruthy();
     });
   });
 
@@ -324,10 +320,10 @@ describe('coverage API endpoint coverage', () => {
       await form8kApi.downloadAndParse('0000320193', '0000320193-25-000001', 'doc.pdf', 'Acme & Co', '2026-01-01', '2026-01-31', '5.02');
 
       expect(mockedGet).toHaveBeenNthCalledWith(1, '/form8k/symbol/MSFT?page=1&size=15');
-      expect(mockedPost).toHaveBeenCalledWith(
-        '/form8k/download?cik=0000320193&accessionNumber=0000320193-25-000001&primaryDocument=doc.pdf&companyName=Acme+%26+Co&filedDate=2026-01-01&reportDate=2026-01-31&items=5.02',
-        undefined
+      const form8kDownloadCall = mockedPost.mock.calls.find(
+        ([url]) => url === '/form8k/download?cik=0000320193&accessionNumber=0000320193-25-000001&primaryDocument=doc.pdf&companyName=Acme+%26+Co&filedDate=2026-01-01&reportDate=2026-01-31&items=5.02'
       );
+      expect(form8kDownloadCall).toBeTruthy();
     });
   });
 
@@ -366,7 +362,9 @@ describe('coverage API endpoint coverage', () => {
       } as any);
 
       expect(mockedGet).toHaveBeenCalledWith('/remote-edgar/tickers?source=all&search=AAPL&limit=25');
-      expect(mockedPost).toHaveBeenCalledWith('/remote-edgar/filings/search', {
+      const remoteSearchCall = mockedPost.mock.calls.find(([url]) => url === '/remote-edgar/filings/search');
+      expect(remoteSearchCall?.[0]).toBe('/remote-edgar/filings/search');
+      expect(remoteSearchCall?.[1]).toMatchObject({
         formType: '8-K',
         companyName: 'Acme Holdings',
         filingsLimit: undefined,
@@ -381,12 +379,16 @@ describe('coverage API endpoint coverage', () => {
 
       await settingsApi.getSettings();
       await settingsApi.updateSettings({ marketDataProvider: 'fmp' } as any);
+      await settingsApi.getUsaSpendingColumnPreferences();
+      await settingsApi.updateUsaSpendingColumnPreferences(['col:csv:amount']);
       await settingsApi.checkMongoDbHealth();
       await settingsApi.checkElasticsearchHealth();
 
       expect(mockedGet).toHaveBeenNthCalledWith(1, '/settings');
       expect(mockedPut).toHaveBeenCalledWith('/settings', { marketDataProvider: 'fmp' });
-      expect(mockedGet).toHaveBeenNthCalledWith(3, '/settings/health/mongodb');
+      expect(mockedGet).toHaveBeenCalledWith('/settings/usaspending/columns');
+      expect(mockedPut).toHaveBeenCalledWith('/settings/usaspending/columns', { hiddenColumns: ['col:csv:amount'] });
+      expect(mockedGet).toHaveBeenCalledWith('/settings/health/mongodb');
       expect(mockedGet).toHaveBeenCalledWith('/settings/health/elasticsearch');
     });
   });

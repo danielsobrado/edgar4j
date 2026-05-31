@@ -86,6 +86,7 @@ public class HighResourceCacheConfig {
                         marketDataCacheConfig != null ? marketDataCacheConfig.getFinancialMetricsTtl() : Duration.ofHours(6),
                         providerCacheSize),
                 new ConcurrentMapCache(CacheConfig.CACHE_SP500),
+                new ConcurrentMapCache(CacheConfig.CACHE_SP500_TICKERS),
                 newCaffeineCache(CacheConfig.CACHE_INSIDER_PURCHASES, INSIDER_PURCHASES_CACHE_TTL, 1_000)
         ));
         cacheManager.initializeCaches();
@@ -110,6 +111,7 @@ public class HighResourceCacheConfig {
         cacheConfigurations.put(CacheConfig.CACHE_FINANCIAL_METRICS,
                 baseConfiguration(marketDataCacheConfig != null ? marketDataCacheConfig.getFinancialMetricsTtl() : Duration.ofHours(6)));
         cacheConfigurations.put(CacheConfig.CACHE_SP500, baseConfiguration(SP500_CACHE_TTL));
+        cacheConfigurations.put(CacheConfig.CACHE_SP500_TICKERS, baseConfiguration(SP500_CACHE_TTL));
         cacheConfigurations.put(CacheConfig.CACHE_INSIDER_PURCHASES, baseConfiguration(INSIDER_PURCHASES_CACHE_TTL));
         return cacheConfigurations;
     }

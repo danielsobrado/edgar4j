@@ -88,30 +88,48 @@ public class UsaSpendingDownloadServiceImpl implements UsaSpendingDownloadServic
 
         long startRow = (long) page * size;
         long endExclusive = startRow + size;
-        List<List<String>> pageRows = new ArrayList<>();
 
         try (ZipInputStream zipInputStream = new ZipInputStream(Files.newInputStream(archivePath))) {
-            ZipEntry csvEntry = nextCsvEntry(zipInputStream);
-            if (csvEntry == null) {
-                throw new IllegalStateException("USAspending archive does not contain a CSV file");
-            }
-
-            BufferedReader reader = new BufferedReader(new InputStreamReader(zipInputStream, java.nio.charset.StandardCharsets.UTF_8));
-            List<String> headers = stripBom(readCsvRecord(reader));
-            long dataRowIndex = 0;
-            List<String> record;
-            while ((record = readCsvRecord(reader)) != null) {
-                if (dataRowIndex >= startRow && dataRowIndex < endExclusive) {
-                    pageRows.add(record);
+            UsaSpendingCsvPage headerOnlyPage = null;
+            ZipEntry csvEntry;
+            while ((csvEntry = nextCsvEntry(zipInputStream)) != null) {
+                UsaSpendingCsvPage csvPage = readCsvEntryPage(zipInputStream, csvEntry, startRow, endExclusive);
+                if (csvPage.totalRows() > 0) {
+                    return csvPage;
                 }
-                dataRowIndex++;
+                if (headerOnlyPage == null) {
+                    headerOnlyPage = csvPage;
+                }
             }
 
-            long totalRows = totalRowsHint >= 0 ? totalRowsHint : dataRowIndex;
-            return new UsaSpendingCsvPage(csvEntry.getName(), headers, pageRows, totalRows);
+            if (headerOnlyPage != null) {
+                return headerOnlyPage;
+            }
+
+            throw new IllegalStateException("USAspending archive does not contain a CSV file");
         } catch (IOException e) {
             throw new IllegalStateException("Failed to read USAspending CSV archive " + archivePath, e);
         }
+    }
+
+    private UsaSpendingCsvPage readCsvEntryPage(
+            ZipInputStream zipInputStream,
+            ZipEntry csvEntry,
+            long startRow,
+            long endExclusive) throws IOException {
+        BufferedReader reader = new BufferedReader(new InputStreamReader(zipInputStream, java.nio.charset.StandardCharsets.UTF_8));
+        List<String> headers = stripBom(readCsvRecord(reader));
+        List<List<String>> pageRows = new ArrayList<>();
+        long dataRowIndex = 0;
+        List<String> record;
+        while ((record = readCsvRecord(reader)) != null) {
+            if (dataRowIndex >= startRow && dataRowIndex < endExclusive) {
+                pageRows.add(record);
+            }
+            dataRowIndex++;
+        }
+
+        return new UsaSpendingCsvPage(csvEntry.getName(), headers, pageRows, dataRowIndex);
     }
 
     private JsonNode requestAwardDownload(LocalDate dateFrom, LocalDate dateTo) throws Exception {

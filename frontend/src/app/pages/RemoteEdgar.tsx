@@ -11,12 +11,16 @@ import {
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { ErrorMessage } from '../components/common/ErrorMessage';
 
-type RemotePeriodPreset = '1W' | '1M' | '1Y' | 'CUSTOM';
+type RemotePeriodPreset = '1W' | '1M' | '1Y' | 'ALL_HISTORY' | 'CUSTOM';
+
+const EDGAR_HISTORY_START = '1994-01-01';
+const REMOTE_SEARCH_PREVIEW_MAX_DAYS = 366;
 
 const REMOTE_PERIOD_OPTIONS: Array<{ value: RemotePeriodPreset; label: string }> = [
   { value: '1W', label: 'Last 1 week' },
   { value: '1M', label: 'Last 1 month' },
   { value: '1Y', label: 'Last 1 year' },
+  { value: 'ALL_HISTORY', label: 'All history' },
   { value: 'CUSTOM', label: 'Custom range' },
 ];
 
@@ -33,6 +37,11 @@ function getPresetRange(preset: Exclude<RemotePeriodPreset, 'CUSTOM'>): { dateFr
   const from = new Date(today);
 
   switch (preset) {
+    case 'ALL_HISTORY':
+      return {
+        dateFrom: EDGAR_HISTORY_START,
+        dateTo: formatDateInput(today),
+      };
     case '1W':
       from.setDate(from.getDate() - 6);
       break;
@@ -48,6 +57,18 @@ function getPresetRange(preset: Exclude<RemotePeriodPreset, 'CUSTOM'>): { dateFr
     dateFrom: formatDateInput(from),
     dateTo: formatDateInput(today),
   };
+}
+
+function inclusiveDays(from: string, to: string): number | null {
+  if (!from || !to) {
+    return null;
+  }
+  const start = new Date(`${from}T00:00:00`);
+  const end = new Date(`${to}T00:00:00`);
+  if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || end < start) {
+    return null;
+  }
+  return Math.floor((end.getTime() - start.getTime()) / 86_400_000) + 1;
 }
 
 export function RemoteEdgar() {
@@ -126,6 +147,10 @@ export function RemoteEdgar() {
     const nextRange = getPresetRange(preset);
     setRemoteDateFrom(nextRange.dateFrom);
     setRemoteDateTo(nextRange.dateTo);
+    if (preset === 'ALL_HISTORY') {
+      setRemoteFilingSyncMode('FILING_DATE');
+      setShowRemoteFilingAdvanced(true);
+    }
   };
 
   const searchTickers = async () => {
@@ -154,6 +179,11 @@ export function RemoteEdgar() {
     }
     if (!remoteDateFrom || !remoteDateTo) {
       setRemoteFilingSearchError('Both from and to dates are required');
+      return;
+    }
+    const selectedDays = inclusiveDays(remoteDateFrom, remoteDateTo);
+    if (selectedDays != null && selectedDays > REMOTE_SEARCH_PREVIEW_MAX_DAYS) {
+      setRemoteFilingSearchError('Search preview is limited to one year. Queue a sync to load this historical range in chunks.');
       return;
     }
 
@@ -236,8 +266,12 @@ export function RemoteEdgar() {
   };
 
   const handleRemoteFilingSyncLocal = async () => {
-    if (!remoteFilingSearchResult || remoteFilingSearchResult.totalMatches === 0) {
-      setRemoteFilingActionError('No remote filings are loaded to sync.');
+    if (!remoteFormType.trim()) {
+      setRemoteFilingActionError('Form type is required');
+      return;
+    }
+    if (!remoteDateFrom || !remoteDateTo) {
+      setRemoteFilingActionError('Both from and to dates are required');
       return;
     }
 
@@ -255,7 +289,9 @@ export function RemoteEdgar() {
         chunkDays: Number.isInteger(chunkDays) ? chunkDays : undefined,
         pauseSeconds: Number.isInteger(pauseSeconds) ? pauseSeconds : undefined,
       });
-      setRemoteFilingActionMessage(`Sync queued for ${remoteFormType.trim()} filings from ${remoteDateFrom} to ${remoteDateTo}. Waiting for job ${job.id}...`);
+      const rangeDays = inclusiveDays(remoteDateFrom, remoteDateTo);
+      const rangeLabel = rangeDays && rangeDays > REMOTE_SEARCH_PREVIEW_MAX_DAYS ? 'Historical sync' : 'Sync';
+      setRemoteFilingActionMessage(`${rangeLabel} queued for ${remoteFormType.trim()} filings from ${remoteDateFrom} to ${remoteDateTo}. Waiting for job ${job.id}...`);
 
       const completedJob = await waitForDownloadJob(job.id);
       if (!completedJob) {
@@ -489,17 +525,22 @@ export function RemoteEdgar() {
               Search SEC daily master indexes live by form and date range, then queue a local sync for all matching companies.
             </p>
           </div>
-          {remoteFilingSearchResult && (
+          <div className="flex flex-wrap gap-2">
+            {remoteFilingSearchResult && (
+              <span className="inline-flex items-center rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-600">
+                {remoteFilingSearchResult.uniqueCompanyCount.toLocaleString()} companies
+              </span>
+            )}
             <button
               type="button"
               onClick={() => void handleRemoteFilingSyncLocal()}
-              disabled={syncingRemoteFilings || remoteFilingSearchResult.totalMatches === 0}
+              disabled={syncingRemoteFilings}
               className="px-4 py-2 bg-[#1a1f36] text-white rounded-md hover:bg-[#252b47] disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Queue a local submissions sync for every company matching this remote search"
+              title="Queue an async filing-date sync for the selected form and date range"
             >
-              {syncingRemoteFilings ? 'Syncing...' : `Sync ${remoteFilingSearchResult.uniqueCompanyCount} Companies`}
+              {syncingRemoteFilings ? 'Syncing...' : remotePeriodPreset === 'ALL_HISTORY' ? 'Sync All History' : 'Sync Range'}
             </button>
-          )}
+          </div>
         </div>
         <button
           type="button"

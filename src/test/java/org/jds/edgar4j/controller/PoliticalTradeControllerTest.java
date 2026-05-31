@@ -113,6 +113,10 @@ class PoliticalTradeControllerTest {
         ResponseEntity<ApiResponse<PoliticalTradeSyncResponse>> response = controller.sync(
                 request.getAssetType(),
                 request.getMaxPages(),
+                request.getChunkPages(),
+                request.getPauseSeconds(),
+                request.getDisclosureDateFrom(),
+                request.getDisclosureDateTo(),
                 request.isForce(),
                 Mono.just(Map.of()))
                 .block();
@@ -138,7 +142,7 @@ class PoliticalTradeControllerTest {
                 .build();
         when(politicalTradeService.sync(request)).thenReturn(expected);
 
-        ResponseEntity<ApiResponse<PoliticalTradeSyncResponse>> response = controller.sync("stock", 1, false).block();
+        ResponseEntity<ApiResponse<PoliticalTradeSyncResponse>> response = controller.sync("stock", 1, null, null, null, null, false).block();
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertTrue(response.getBody().isSuccess());
@@ -161,6 +165,10 @@ class PoliticalTradeControllerTest {
         when(politicalTradeService.sync(request)).thenReturn(expected);
 
         ResponseEntity<ApiResponse<PoliticalTradeSyncResponse>> response = controller.sync(
+                null,
+                null,
+                null,
+                null,
                 null,
                 null,
                 null,

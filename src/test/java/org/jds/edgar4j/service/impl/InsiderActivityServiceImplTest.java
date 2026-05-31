@@ -64,7 +64,7 @@ class InsiderActivityServiceImplTest {
                 FIXED_CLOCK);
         // Use a lenient mock for shared fixtures so coverage-focused tests can avoid
         // unnecessary stubbing failures when they don't exercise market cap lookup logic.
-        org.mockito.Mockito.lenient().when(sp500Service.getAllTickers()).thenReturn(Set.of("AAPL"));
+        org.mockito.Mockito.lenient().when(sp500Service.getAllTickers()).thenReturn(List.of("AAPL"));
     }
 
     @Test
@@ -168,15 +168,15 @@ class InsiderActivityServiceImplTest {
     }
 
     @Test
-    @DisplayName("coverage returns per-day filing counts for form 4")
+    @DisplayName("coverage returns per-day filing-date counts for form 4")
     void coverageReturnsForm4DailyCounts() {
         LocalDate from = BASE_DATE.minusDays(3);
         LocalDate to = BASE_DATE.minusDays(1);
-        Form4 first = createForm4("0012", "AAPL", "Alice Buyer", "0000000012", BASE_DATE.minusDays(2));
-        Form4 second = createForm4("0013", "MSFT", "Bob Buyer", "0000000013", BASE_DATE.minusDays(1));
-        Form4 ignored = createForm4("0014", "MSFT", "Bob Buyer", "0000000013", null);
+        Form4 first = createForm4("0012", "AAPL", "Alice Buyer", "0000000012", BASE_DATE.minusDays(5), BASE_DATE.minusDays(2));
+        Form4 second = createForm4("0013", "MSFT", "Bob Buyer", "0000000013", BASE_DATE.minusDays(4), BASE_DATE.minusDays(1));
+        Form4 ignored = createForm4("0014", "MSFT", "Bob Buyer", "0000000013", BASE_DATE.minusDays(4), null);
 
-        when(form4Repository.findByTransactionDateBetween(from, to, Pageable.unpaged()))
+        when(form4Repository.findByFiledDateBetween(from, to, Pageable.unpaged()))
                 .thenReturn(new PageImpl<>(List.of(first, second, ignored)));
 
         InsiderActivityCoverageResponse coverage = service.coverage("4", from, to);
@@ -292,9 +292,20 @@ class InsiderActivityServiceImplTest {
             String ownerName,
             String ownerCik,
             LocalDate transactionDate) {
+        return createForm4(accessionNumber, ticker, ownerName, ownerCik, transactionDate, transactionDate.plusDays(2));
+    }
+
+    private Form4 createForm4(
+            String accessionNumber,
+            String ticker,
+            String ownerName,
+            String ownerCik,
+            LocalDate transactionDate,
+            LocalDate filedDate) {
         return Form4.builder()
                 .accessionNumber(accessionNumber)
                 .documentType("4")
+                .filedDate(filedDate)
                 .cik("0000123456")
                 .issuerName(ticker + " Inc.")
                 .tradingSymbol(ticker)

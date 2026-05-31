@@ -14,7 +14,6 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 
 import org.jds.edgar4j.model.CompanyTicker;
 import org.jds.edgar4j.model.Sp500Constituent;
@@ -180,7 +179,7 @@ class Sp500ServiceImplTest {
         when(sp500Repository.count()).thenReturn(1L);
 
         assertEquals(List.of(microsoft), sp500Service.getAll());
-        assertEquals(Set.of("MSFT"), sp500Service.getAllTickers());
+        assertEquals(List.of("MSFT"), sp500Service.getAllTickers());
         assertTrue(sp500Service.isSp500("msft"));
         assertEquals(Optional.of(microsoft), sp500Service.findByTicker("msft"));
         assertEquals(1L, sp500Service.count());

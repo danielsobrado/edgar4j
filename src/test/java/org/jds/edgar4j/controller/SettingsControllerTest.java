@@ -5,10 +5,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.List;
 import java.util.concurrent.Executor;
 
+import org.jds.edgar4j.dto.request.UsaSpendingColumnPreferencesRequest;
 import org.jds.edgar4j.dto.response.ApiResponse;
 import org.jds.edgar4j.dto.response.SettingsResponse;
+import org.jds.edgar4j.dto.response.UsaSpendingColumnPreferencesResponse;
 import org.jds.edgar4j.job.TickerSyncJob;
 import org.jds.edgar4j.service.SettingsService;
 import org.junit.jupiter.api.BeforeEach;
@@ -50,6 +53,41 @@ class SettingsControllerTest {
         when(settingsService.getSettings()).thenReturn(expected);
 
         ResponseEntity<ApiResponse<SettingsResponse>> response = settingsController.getSettings();
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertTrue(response.getBody().isSuccess());
+        assertEquals(expected, response.getBody().getData());
+    }
+
+    @Test
+    @DisplayName("getUsaSpendingColumnPreferences should return saved column preferences")
+    void getUsaSpendingColumnPreferencesShouldReturnPayload() {
+        UsaSpendingColumnPreferencesResponse expected = UsaSpendingColumnPreferencesResponse.builder()
+                .hiddenColumns(List.of("col:csv:amount"))
+                .build();
+        when(settingsService.getUsaSpendingColumnPreferences()).thenReturn(expected);
+
+        ResponseEntity<ApiResponse<UsaSpendingColumnPreferencesResponse>> response =
+                settingsController.getUsaSpendingColumnPreferences();
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertTrue(response.getBody().isSuccess());
+        assertEquals(expected, response.getBody().getData());
+    }
+
+    @Test
+    @DisplayName("updateUsaSpendingColumnPreferences should persist hidden columns")
+    void updateUsaSpendingColumnPreferencesShouldPersistPayload() {
+        UsaSpendingColumnPreferencesResponse expected = UsaSpendingColumnPreferencesResponse.builder()
+                .hiddenColumns(List.of("col:candidate", "col:csv:amount"))
+                .build();
+        when(settingsService.updateUsaSpendingColumnPreferences(List.of("col:candidate", "col:csv:amount")))
+                .thenReturn(expected);
+
+        ResponseEntity<ApiResponse<UsaSpendingColumnPreferencesResponse>> response =
+                settingsController.updateUsaSpendingColumnPreferences(UsaSpendingColumnPreferencesRequest.builder()
+                        .hiddenColumns(List.of("col:candidate", "col:csv:amount"))
+                        .build());
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertTrue(response.getBody().isSuccess());

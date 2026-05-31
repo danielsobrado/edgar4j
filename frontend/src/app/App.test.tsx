@@ -1,7 +1,7 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 
-import { App } from './App';
+import App from './App';
 
 vi.mock('./components/Layout', () => ({
   Layout: ({ children }: { children: ReactNode }) => <div>{children}</div>,

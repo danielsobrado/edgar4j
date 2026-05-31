@@ -62,6 +62,8 @@ class PoliticalTradeControllerWebTest {
         PoliticalTradeSyncRequest request = PoliticalTradeSyncRequest.builder()
                 .assetType("crypto")
                 .maxPages(2)
+                .disclosureDateFrom(java.time.LocalDate.of(2026, 5, 29))
+                .disclosureDateTo(java.time.LocalDate.of(2026, 5, 31))
                 .force(true)
                 .build();
         when(politicalTradeService.sync(request)).thenReturn(response("crypto", 2));
@@ -69,7 +71,12 @@ class PoliticalTradeControllerWebTest {
         webClient.post()
                 .uri("/api/political-trades/sync")
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(Map.of("assetType", "crypto", "maxPages", 2, "force", true))
+                .bodyValue(Map.of(
+                        "assetType", "crypto",
+                        "maxPages", 2,
+                        "disclosureDateFrom", "2026-05-29",
+                        "disclosureDateTo", "2026-05-31",
+                        "force", true))
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()

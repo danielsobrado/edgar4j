@@ -15,6 +15,11 @@ vi.mock('../api', async () => {
       getJobs: vi.fn(),
       getUsaSpendingCsvPage: vi.fn(),
     },
+    settingsApi: {
+      ...actual.settingsApi,
+      getUsaSpendingColumnPreferences: vi.fn(),
+      updateUsaSpendingColumnPreferences: vi.fn(),
+    },
   };
 });
 
@@ -23,12 +28,14 @@ vi.mock('../store/notificationStore', () => ({
   showError: vi.fn(),
 }));
 
-import { downloadsApi, UsoSpendingCoverage } from '../api';
+import { downloadsApi, settingsApi } from '../api';
 import { useDownloadJob } from '../hooks';
 
 const mockGetJobs = vi.fn();
 const mockStartDownload = vi.fn();
 const mockGetPage = vi.fn();
+const mockGetColumnPreferences = vi.fn();
+const mockUpdateColumnPreferences = vi.fn();
 const mockRefresh = vi.fn();
 
 const completedJob = {
@@ -81,9 +88,13 @@ describe('UsaSpendingDownloads', () => {
     mockGetJobs.mockResolvedValue([]);
     mockStartDownload.mockResolvedValue({ id: 'job-1' });
     mockGetPage.mockResolvedValue(csvPage);
+    mockGetColumnPreferences.mockResolvedValue({ hiddenColumns: [] });
+    mockUpdateColumnPreferences.mockResolvedValue({ hiddenColumns: [] });
     (downloadsApi.getJobs as unknown as ReturnType<typeof vi.fn>).mockImplementation(mockGetJobs);
     (downloadsApi.downloadUsaSpendingAwards as unknown as ReturnType<typeof vi.fn>).mockImplementation(mockStartDownload);
     (downloadsApi.getUsaSpendingCsvPage as unknown as ReturnType<typeof vi.fn>).mockImplementation(mockGetPage);
+    (settingsApi.getUsaSpendingColumnPreferences as unknown as ReturnType<typeof vi.fn>).mockImplementation(mockGetColumnPreferences);
+    (settingsApi.updateUsaSpendingColumnPreferences as unknown as ReturnType<typeof vi.fn>).mockImplementation(mockUpdateColumnPreferences);
   });
 
   it('renders the default heading and award controls', () => {
@@ -145,5 +156,28 @@ describe('UsaSpendingDownloads', () => {
     });
     const restoredRows = await screen.findAllByText('Acme Holdings');
     expect(restoredRows.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('loads and saves column visibility preferences', async () => {
+    mockGetColumnPreferences.mockResolvedValue({ hiddenColumns: ['col:csv:amount'] });
+
+    render(<UsaSpendingDownloads />);
+
+    fireEvent.change(screen.getByLabelText('Start Date'), { target: { value: '2026-05-01' } });
+    fireEvent.change(screen.getByLabelText('End Date'), { target: { value: '2026-05-31' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Download CSV' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('CSV Preview')).toBeInTheDocument();
+      expect(screen.getByLabelText('amount')).not.toBeChecked();
+      expect(screen.queryByText('1000')).not.toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByLabelText('amount'));
+
+    await waitFor(() => {
+      expect(mockUpdateColumnPreferences).toHaveBeenCalledWith([]);
+      expect(screen.getByText('1000')).toBeInTheDocument();
+    });
   });
 });

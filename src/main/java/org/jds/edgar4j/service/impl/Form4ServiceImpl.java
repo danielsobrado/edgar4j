@@ -165,6 +165,9 @@ public class Form4ServiceImpl implements Form4Service {
         form4Repository.findByAccessionNumber(form4.getAccessionNumber()).ifPresent(existingForm4 -> {
             form4.setId(existingForm4.getId());
             form4.setCreatedAt(existingForm4.getCreatedAt());
+            if (form4.getFiledDate() == null) {
+                form4.setFiledDate(existingForm4.getFiledDate());
+            }
             log.debug("Updating existing Form 4: {}", form4.getAccessionNumber());
         });
 
@@ -197,6 +200,9 @@ public class Form4ServiceImpl implements Form4Service {
                     current.setId(existing.getId());
                     if (current.getCreatedAt() == null) {
                         current.setCreatedAt(existing.getCreatedAt());
+                    }
+                    if (current.getFiledDate() == null) {
+                        current.setFiledDate(existing.getFiledDate());
                     }
                 });
 
@@ -452,6 +458,10 @@ public class Form4ServiceImpl implements Form4Service {
             form4.setPeriodOfReport(toLocalDate(rawFiling.getReportDate()));
             changed = true;
         }
+        if (form4.getFiledDate() == null && rawFiling.getFillingDate() != null) {
+            form4.setFiledDate(toLocalDate(rawFiling.getFillingDate()));
+            changed = true;
+        }
         if (form4.getTransactionDate() == null && rawFiling.getFillingDate() != null) {
             form4.setTransactionDate(toLocalDate(rawFiling.getFillingDate()));
             changed = true;
@@ -621,6 +631,7 @@ public class Form4ServiceImpl implements Form4Service {
                         String form4Xml = secApiClient.fetchForm4(cik, accessionNumber, rawPrimaryDocument);
                         Form4 form4 = parseForm4(form4Xml, accessionNumber);
                         if (form4 != null) {
+                            form4.setFiledDate(filingLocalDate);
                             if (form4.getTradingSymbol() == null || form4.getTradingSymbol().isBlank()) {
                                 form4.setTradingSymbol(symbol);
                             }

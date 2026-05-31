@@ -33,6 +33,7 @@ public final class TestFixtures {
                 .id("form4-" + accessionNumber)
                 .accessionNumber(accessionNumber)
                 .documentType("4")
+                .filedDate(transactionDate.plusDays(2))
                 .cik("0000320193")
                 .issuerName(symbol + " INC")
                 .tradingSymbol(symbol)

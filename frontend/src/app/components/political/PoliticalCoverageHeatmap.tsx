@@ -7,10 +7,14 @@ interface Props {
   /** Apply the selected disclosure-date range as a table filter. */
   onSelectRange: (from: string, to: string) => void;
   /** Pull the latest disclosures into the database (not date-scoped). */
-  onSync: () => void;
+  onSync: (from?: string, to?: string) => void;
   syncing: boolean;
   /** Changes after a sync so coverage refetches to show newly cached disclosures. */
   refreshKey: string;
+  syncChunkPages?: number;
+  syncPauseSeconds?: number;
+  onSyncChunkPagesChange?: (value: number) => void;
+  onSyncPauseSecondsChange?: (value: number) => void;
 }
 
 function bucket(count: number) {
@@ -29,7 +33,16 @@ const LEVEL_CLASSES = [
   'bg-emerald-700 hover:bg-emerald-800',
 ];
 
-export function PoliticalCoverageHeatmap({ onSelectRange, onSync, syncing, refreshKey }: Props) {
+export function PoliticalCoverageHeatmap({
+  onSelectRange,
+  onSync,
+  syncing,
+  refreshKey,
+  syncChunkPages = 5,
+  syncPauseSeconds = 2,
+  onSyncChunkPagesChange,
+  onSyncPauseSecondsChange,
+}: Props) {
   const todayStr = todayIso();
   const currentYear = Number(todayStr.slice(0, 4));
 
@@ -169,8 +182,8 @@ export function PoliticalCoverageHeatmap({ onSelectRange, onSync, syncing, refre
         </span>
       </div>
 
-      <div className="mt-4 flex flex-col gap-3 border-t border-gray-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-gray-600">
+      <div className="mt-4 flex flex-col gap-3 border-t border-gray-100 pt-4 lg:flex-row lg:items-end lg:justify-between">
+        <p className="text-sm text-gray-600 lg:pb-2">
           {selection ? (
             <>
               Selected <span className="font-mono">{selection.start}</span> → <span className="font-mono">{selection.end}</span>
@@ -180,11 +193,35 @@ export function PoliticalCoverageHeatmap({ onSelectRange, onSync, syncing, refre
             'Drag across the grid to select a disclosure-date range.'
           )}
         </p>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-end gap-2 lg:ml-auto">
+          <label htmlFor="political-coverage-chunk-pages" className="block text-xs text-gray-500">
+            Chunk pages
+            <input
+              id="political-coverage-chunk-pages"
+              type="number"
+              min="1"
+              max="50"
+              value={syncChunkPages}
+              onChange={(event) => onSyncChunkPagesChange?.(Number(event.target.value) || 5)}
+              className="mt-1 h-9 w-24 rounded-md border border-gray-300 px-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </label>
+          <label htmlFor="political-coverage-pause-seconds" className="block text-xs text-gray-500">
+            Pause sec
+            <input
+              id="political-coverage-pause-seconds"
+              type="number"
+              min="0"
+              max="60"
+              value={syncPauseSeconds}
+              onChange={(event) => onSyncPauseSecondsChange?.(Math.max(0, Number(event.target.value) || 0))}
+              className="mt-1 h-9 w-24 rounded-md border border-gray-300 px-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </label>
           <button
-            onClick={() => void onSync()}
+            onClick={() => void onSync(selection?.start, selection?.end)}
             disabled={syncing}
-            title="Pull the latest disclosures into the database"
+            title={selection ? 'Pull latest disclosures and save only the selected disclosure-date range' : 'Pull the latest disclosures into the database'}
             className="inline-flex items-center justify-center gap-2 rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {syncing ? <Loader className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}

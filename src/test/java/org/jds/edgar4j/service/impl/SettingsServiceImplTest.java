@@ -10,6 +10,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.bson.Document;
@@ -82,6 +83,7 @@ class SettingsServiceImplTest {
         when(appSettingsRepository.findById("default")).thenReturn(Optional.of(AppSettings.builder()
                 .id("default")
                 .userAgent("Edgar4j/1.0 (sec-ops@mycompany.com)")
+                .usaSpendingHiddenColumns(List.of("col:csv:amount"))
                 .smtpPassword("smtp-secret")
                 .marketDataProvider("TIINGO")
                 .marketDataProviders(AppSettings.MarketDataProvidersSettings.builder()
@@ -105,6 +107,31 @@ class SettingsServiceImplTest {
         assertTrue(response.getMarketDataProviders().getTiingo().isApiKeyConfigured());
         assertEquals(SettingsResponse.ApiKeySource.STORED, response.getMarketDataProviders().getTiingo().getApiKeySource());
         assertTrue(response.getMarketDataProviders().getTiingo().isConfigured());
+        assertEquals(List.of("col:csv:amount"), response.getUsaSpendingHiddenColumns());
+    }
+
+    @Test
+    @DisplayName("updateUsaSpendingColumnPreferences should persist normalized hidden columns only")
+    void updateUsaSpendingColumnPreferencesShouldPersistNormalizedColumns() {
+        AppSettings existingSettings = AppSettings.builder()
+                .id("default")
+                .userAgent("Edgar4j/1.0 (sec-ops@mycompany.com)")
+                .marketDataProvider("NONE")
+                .build();
+        when(appSettingsRepository.findById("default")).thenReturn(Optional.of(existingSettings));
+        when(appSettingsRepository.save(any(AppSettings.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var response = settingsService.updateUsaSpendingColumnPreferences(List.of(
+                " col:candidate ",
+                "",
+                "col:csv:amount",
+                "col:csv:amount"));
+
+        ArgumentCaptor<AppSettings> savedCaptor = ArgumentCaptor.forClass(AppSettings.class);
+        verify(appSettingsRepository).save(savedCaptor.capture());
+
+        assertEquals(List.of("col:candidate", "col:csv:amount"), savedCaptor.getValue().getUsaSpendingHiddenColumns());
+        assertEquals(List.of("col:candidate", "col:csv:amount"), response.getHiddenColumns());
     }
 
     @Test

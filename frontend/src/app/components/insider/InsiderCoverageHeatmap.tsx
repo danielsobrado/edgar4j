@@ -4,7 +4,7 @@ import { CoverageHeatmapGrid, CoverageSelection, todayIso, ymd } from '../covera
 import { insiderActivityApi } from '../../api';
 
 interface Props {
-  /** Apply the selected transaction-date range as screener filter. */
+  /** Apply the selected date range as screener filter. */
   onSelectRange: (from: string, to: string) => void;
   /** Queue filings download for selected date window and form. */
   onDownload: (form: string, from: string, to: string, remoteFilingSyncMode: 'COMPANY' | 'FILING_DATE') => void;
@@ -106,8 +106,7 @@ export function InsiderCoverageHeatmap({ onSelectRange, onDownload, downloading,
             Data Coverage
           </h2>
           <p className="text-sm text-gray-500">
-            {`Cached Form ${form} filings per transaction date, shaded by volume. Drag a date range for screener filtering.
-            Download is synced by filing date, so there can be up to ~2-day lag for fresh transaction dates.`}
+            {`Cached Form ${form} filings per filing date, shaded by volume. Drag a date range to sync and filter the screener.`}
           </p>
           <div className="mt-3 inline-flex rounded-md border border-gray-200">
             {(['4', '3', '5'] as const).map((option) => (
@@ -215,7 +214,7 @@ export function InsiderCoverageHeatmap({ onSelectRange, onDownload, downloading,
               {' '}({selectedTransactions.toLocaleString()} filing{selectedTransactions === 1 ? '' : 's'} in range)
             </>
           ) : (
-            'Drag across the grid to select a transaction-date range.'
+            'Drag across the grid to select a filing-date range.'
           )}
         </p>
         <div className="flex items-center gap-2">

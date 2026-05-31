@@ -1,7 +1,7 @@
 import React from 'react';
 import { CalendarDays, CalendarRange, CheckCircle, Clock, Download, Loader, RefreshCw, XCircle } from 'lucide-react';
 import * as Progress from '@radix-ui/react-progress';
-import { downloadsApi, DownloadJob, UsaSpendingCsvPage } from '../api';
+import { downloadsApi, settingsApi, DownloadJob, UsaSpendingCsvPage } from '../api';
 import { useDownloadJob } from '../hooks';
 import { showError, showSuccess } from '../store/notificationStore';
 import { Pagination } from '../components/common/Pagination';
@@ -11,6 +11,7 @@ import { toDisplayDate } from '../utils';
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const COLUMN_PAGE_SIZE = 30;
+const CSV_COLUMN_PREFIX = 'col:csv:';
 
 function toDateInputValue(date: Date) {
   return date.toISOString().slice(0, 10);
@@ -108,6 +109,10 @@ function latestJobUpdateDay(job?: DownloadJob | null) {
   return toDisplayDate(job?.completedAt ?? job?.startedAt);
 }
 
+function getCsvColumnId(header: string) {
+  return `${CSV_COLUMN_PREFIX}${header}`;
+}
+
 const PREVIEW_COLUMN_DEFS = [
   { id: 'col:candidate', label: 'Candidate EDGAR Match', sticky: true, baseWidth: 'min-w-72' },
   { id: 'col:confidence', label: 'Confidence', sticky: false, baseWidth: 'min-w-28' },
@@ -141,7 +146,28 @@ export function UsaSpendingDownloads() {
   const dateFromRef = React.useRef<HTMLInputElement>(null);
   const dateToRef = React.useRef<HTMLInputElement>(null);
   const rangeInitializedFromLatestJobRef = React.useRef(false);
+  const hiddenColumnsTouchedRef = React.useRef(false);
   const { job, refresh } = useDownloadJob(jobId, 5000);
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    const loadColumnPreferences = async () => {
+      try {
+        const preferences = await settingsApi.getUsaSpendingColumnPreferences();
+        if (!cancelled && !hiddenColumnsTouchedRef.current) {
+          setHiddenColumns(new Set(preferences.hiddenColumns ?? []));
+        }
+      } catch {
+        // Column preferences are optional; the page remains usable with all columns visible.
+      }
+    };
+
+    void loadColumnPreferences();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   React.useEffect(() => {
     if (jobId) {
@@ -245,7 +271,7 @@ export function UsaSpendingDownloads() {
   const latestUpdateDay = latestJobUpdateDay(job);
   const visibleColumnStart = columnPage * COLUMN_PAGE_SIZE;
   const visibleHeaders = csvPage?.headers
-    .map((header, index) => ({ header, index, columnId: `col:csv:${index}` }))
+    .map((header, index) => ({ header, index, columnId: getCsvColumnId(header) }))
     .slice(visibleColumnStart, visibleColumnStart + COLUMN_PAGE_SIZE) ?? [];
   const columnPageCount = csvPage ? Math.ceil(csvPage.headers.length / COLUMN_PAGE_SIZE) : 0;
   const allCsvColumns = React.useMemo(() => {
@@ -255,7 +281,7 @@ export function UsaSpendingDownloads() {
     return csvPage.headers.map((header, index) => ({
       header,
       index,
-      columnId: `col:csv:${index}`,
+      columnId: getCsvColumnId(header),
     }));
   }, [csvPage]);
   const visibleMainColumns = React.useMemo(() => PREVIEW_COLUMN_DEFS.filter(({ id }) => !hiddenColumns.has(id)), [hiddenColumns]);
@@ -265,22 +291,33 @@ export function UsaSpendingDownloads() {
   );
   const visibleColumnCount = visibleMainColumns.length + visibleCsvHeaders.length;
   const hasActiveColumnVisibilityFilters = visibleColumnCount < (PREVIEW_COLUMN_DEFS.length + (csvPage?.headers.length ?? 0));
+  const persistHiddenColumns = React.useCallback(async (nextHiddenColumns: Set<string>) => {
+    try {
+      await settingsApi.updateUsaSpendingColumnPreferences([...nextHiddenColumns]);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to save USAspending column preferences';
+      showError('Column Preferences Not Saved', message);
+    }
+  }, []);
+  const updateHiddenColumns = React.useCallback((nextHiddenColumns: Set<string>) => {
+    hiddenColumnsTouchedRef.current = true;
+    setHiddenColumns(nextHiddenColumns);
+    void persistHiddenColumns(nextHiddenColumns);
+  }, [persistHiddenColumns]);
   const toggleColumn = React.useCallback((columnId: string) => {
-    setHiddenColumns((current) => {
-      const next = new Set(current);
-      if (next.has(columnId)) {
-        next.delete(columnId);
-      } else {
-        next.add(columnId);
-        if (sortColumnId === columnId) {
-          setSortColumnId(null);
-        }
+    const next = new Set(hiddenColumns);
+    if (next.has(columnId)) {
+      next.delete(columnId);
+    } else {
+      next.add(columnId);
+      if (sortColumnId === columnId) {
+        setSortColumnId(null);
       }
-      return next;
-    });
-  }, [sortColumnId]);
+    }
+    updateHiddenColumns(next);
+  }, [hiddenColumns, sortColumnId, updateHiddenColumns]);
   const showAllColumns = () => {
-    setHiddenColumns(new Set());
+    updateHiddenColumns(new Set());
   };
   const normalizedCompanyFilter = filterCompany.trim().toLowerCase();
   const normalizedCikFilter = filterCik.trim().toLowerCase();
@@ -354,9 +391,10 @@ export function UsaSpendingDownloads() {
   const getSortValue = React.useCallback(
     (entry: { row: string[]; matches: UsaSpendingCsvPage['rowMatches'][number] }, columnId: string) => {
       const bestMatch = entry.matches[0];
-      if (columnId.startsWith('col:csv:')) {
-        const csvIndex = Number.parseInt(columnId.replace('col:csv:', ''), 10);
-        if (Number.isNaN(csvIndex)) {
+      if (columnId.startsWith(CSV_COLUMN_PREFIX)) {
+        const csvHeader = columnId.slice(CSV_COLUMN_PREFIX.length);
+        const csvIndex = csvPage?.headers.indexOf(csvHeader) ?? -1;
+        if (csvIndex < 0) {
           return '';
         }
         return entry.row[csvIndex] ?? '';
@@ -383,7 +421,7 @@ export function UsaSpendingDownloads() {
       }
       return '';
     },
-    []
+    [csvPage]
   );
   const sortedCsvRows = React.useMemo(() => {
     if (!sortColumnId) {
@@ -428,11 +466,9 @@ export function UsaSpendingDownloads() {
     if (hiddenColumns.has(columnId)) {
       return;
     }
-    setHiddenColumns((current) => {
-      const next = new Set(current);
-      next.add(columnId);
-      return next;
-    });
+    const next = new Set(hiddenColumns);
+    next.add(columnId);
+    updateHiddenColumns(next);
     if (sortColumnId === columnId) {
       setSortColumnId(null);
     }
@@ -765,38 +801,40 @@ export function UsaSpendingDownloads() {
                         {visibleMainColumns.map(({ id, label, sticky, baseWidth }) => (
                           <TableHead
                             key={id}
-                            className={`${sticky ? 'sticky left-0 z-10' : ''} ${baseWidth} bg-gray-50`}
+                            className={`${sticky ? 'sticky left-0 z-10' : ''} ${baseWidth} bg-gray-50 align-top [white-space:normal]`}
                           >
-                            <button
-                              onClick={() => void handleSortToggle(id)}
-                              className="inline-flex w-full items-center justify-between gap-2"
-                              type="button"
-                            >
-                              <span>{label}</span>
-                              <span className="ml-2 text-xs text-gray-500">{sortStateLabel(id)}</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                hideColumn(id);
-                              }}
-                              className="mt-1 text-xs text-gray-500 underline underline-offset-4 hover:text-gray-700"
-                            >
-                              Hide
-                            </button>
+                            <div className="flex min-w-0 flex-col gap-1">
+                              <button
+                                onClick={() => void handleSortToggle(id)}
+                                className="flex w-full min-w-0 items-start justify-between gap-2 text-left"
+                                type="button"
+                              >
+                                <span className="min-w-0 truncate" title={label}>{label}</span>
+                                <span className="shrink-0 text-xs text-gray-500">{sortStateLabel(id)}</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  hideColumn(id);
+                                }}
+                                className="self-start text-xs text-gray-500 underline underline-offset-4 hover:text-gray-700"
+                              >
+                                Hide
+                              </button>
+                            </div>
                           </TableHead>
                         ))}
                       {visibleCsvHeaders.map(({ header, columnId }) => (
-                        <TableHead key={columnId} className="max-w-72 bg-gray-50">
-                          <div className="flex items-center justify-between gap-2">
+                        <TableHead key={columnId} className="min-w-48 max-w-72 bg-gray-50 align-top [white-space:normal]">
+                          <div className="flex min-w-0 flex-col gap-1">
                             <button
                               onClick={() => void handleSortToggle(columnId)}
-                              className="inline-flex min-w-0 items-center justify-between gap-2"
+                              className="flex w-full min-w-0 items-start justify-between gap-2 text-left"
                               type="button"
                             >
-                              <span className="block truncate" title={header}>{header}</span>
-                              <span className="ml-2 text-xs text-gray-500">{sortStateLabel(columnId)}</span>
+                              <span className="min-w-0 truncate" title={header}>{header}</span>
+                              <span className="shrink-0 text-xs text-gray-500">{sortStateLabel(columnId)}</span>
                             </button>
                             <button
                               type="button"
@@ -804,7 +842,7 @@ export function UsaSpendingDownloads() {
                                 event.stopPropagation();
                                 hideColumn(columnId);
                               }}
-                              className="shrink-0 text-xs text-gray-500 underline underline-offset-4 hover:text-gray-700"
+                              className="self-start text-xs text-gray-500 underline underline-offset-4 hover:text-gray-700"
                             >
                               Hide
                             </button>

@@ -323,6 +323,7 @@ export interface Settings {
   realtimeSyncLookbackHours?: number;
   realtimeSyncMaxPages?: number;
   realtimeSyncPageSize?: number;
+  usaSpendingHiddenColumns?: string[];
   apiEndpoints?: ApiEndpointsInfo;
   mongoDbStatus?: ConnectionStatus;
   elasticsearchStatus?: ConnectionStatus;
@@ -371,6 +372,10 @@ export interface SettingsRequest {
   realtimeSyncLookbackHours?: number;
   realtimeSyncMaxPages?: number;
   realtimeSyncPageSize?: number;
+}
+
+export interface UsaSpendingColumnPreferences {
+  hiddenColumns: string[];
 }
 
 export type MarketDataProvider = 'NONE' | 'TIINGO' | 'YAHOOFINANCE' | 'FINNHUB' | 'ALPHAVANTAGE';
@@ -1043,6 +1048,7 @@ export interface Form4 {
   accessionNumber: string;
   documentType?: string;
   periodOfReport?: string;
+  filedDate?: string;
   // Issuer information
   cik: string;
   issuerName?: string;
@@ -1401,6 +1407,10 @@ export interface PoliticalTradeFilter {
 export interface PoliticalTradeSyncRequest {
   assetType?: string;
   maxPages?: number;
+  chunkPages?: number;
+  pauseSeconds?: number;
+  disclosureDateFrom?: string;
+  disclosureDateTo?: string;
   force?: boolean;
 }
 

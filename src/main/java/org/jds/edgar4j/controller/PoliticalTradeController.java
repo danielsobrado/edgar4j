@@ -171,14 +171,18 @@ public class PoliticalTradeController {
     @PostMapping(value = "/sync", consumes = MediaType.APPLICATION_JSON_VALUE)
     public Mono<ResponseEntity<ApiResponse<PoliticalTradeSyncResponse>>> sync(
             @RequestParam(required = false) String assetType,
-            @RequestParam(required = false) @Min(1) @Max(250) Integer maxPages,
+            @RequestParam(required = false) @Min(1) @Max(5000) Integer maxPages,
+            @RequestParam(required = false) @Min(1) @Max(50) Integer chunkPages,
+            @RequestParam(required = false) @Min(0) @Max(60) Integer pauseSeconds,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate disclosureDateFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate disclosureDateTo,
             @RequestParam(required = false) Boolean force,
             @RequestBody(required = false) Mono<Map<String, Object>> requestBody) {
         Mono<Map<String, Object>> body = requestBody == null
                 ? Mono.just(Map.of())
                 : requestBody.defaultIfEmpty(Map.of());
         return body
-                .map(values -> buildSyncRequest(values, assetType, maxPages, force))
+                .map(values -> buildSyncRequest(values, assetType, maxPages, chunkPages, pauseSeconds, disclosureDateFrom, disclosureDateTo, force))
                 .flatMap(this::syncAsync);
     }
 
@@ -186,9 +190,13 @@ public class PoliticalTradeController {
     @PostMapping(value = "/sync", consumes = "!application/json")
     public Mono<ResponseEntity<ApiResponse<PoliticalTradeSyncResponse>>> sync(
             @RequestParam(required = false) String assetType,
-            @RequestParam(required = false) @Min(1) @Max(250) Integer maxPages,
+            @RequestParam(required = false) @Min(1) @Max(5000) Integer maxPages,
+            @RequestParam(required = false) @Min(1) @Max(50) Integer chunkPages,
+            @RequestParam(required = false) @Min(0) @Max(60) Integer pauseSeconds,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate disclosureDateFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate disclosureDateTo,
             @RequestParam(required = false) Boolean force) {
-        PoliticalTradeSyncRequest request = buildSyncRequest(Map.of(), assetType, maxPages, force);
+        PoliticalTradeSyncRequest request = buildSyncRequest(Map.of(), assetType, maxPages, chunkPages, pauseSeconds, disclosureDateFrom, disclosureDateTo, force);
         return syncAsync(request);
     }
 
@@ -239,10 +247,18 @@ public class PoliticalTradeController {
             Map<String, Object> body,
             String assetType,
             Integer maxPages,
+            Integer chunkPages,
+            Integer pauseSeconds,
+            LocalDate disclosureDateFrom,
+            LocalDate disclosureDateTo,
             Boolean force) {
         return PoliticalTradeSyncRequest.builder()
                 .assetType(StringUtils.hasText(assetType) ? assetType : stringValue(body.get("assetType")))
                 .maxPages(maxPages != null ? maxPages : integerValue(body.get("maxPages")))
+                .chunkPages(chunkPages != null ? chunkPages : integerValue(body.get("chunkPages")))
+                .pauseSeconds(pauseSeconds != null ? pauseSeconds : integerValue(body.get("pauseSeconds")))
+                .disclosureDateFrom(disclosureDateFrom != null ? disclosureDateFrom : localDateValue(body.get("disclosureDateFrom")))
+                .disclosureDateTo(disclosureDateTo != null ? disclosureDateTo : localDateValue(body.get("disclosureDateTo")))
                 .force(force != null ? force : booleanValue(body.get("force")))
                 .build();
     }
@@ -272,6 +288,11 @@ public class PoliticalTradeController {
         }
         String text = stringValue(value);
         return text != null && Boolean.parseBoolean(text);
+    }
+
+    private LocalDate localDateValue(Object value) {
+        String text = stringValue(value);
+        return text == null ? null : LocalDate.parse(text);
     }
 
     private ResponseEntity<ApiResponse<PoliticalTradeSyncResponse>> syncResponse(PoliticalTradeSyncResponse response) {

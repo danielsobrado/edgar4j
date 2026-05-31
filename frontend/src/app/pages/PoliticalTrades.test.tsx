@@ -157,6 +157,8 @@ describe('PoliticalTradesPage', () => {
       expect(politicalTradesApi.sync).toHaveBeenCalledWith(expect.objectContaining({
         assetType: 'stock',
         maxPages: 25,
+        chunkPages: 5,
+        pauseSeconds: 2,
         force: false,
       }));
       expect(mockRefresh).toHaveBeenCalled();

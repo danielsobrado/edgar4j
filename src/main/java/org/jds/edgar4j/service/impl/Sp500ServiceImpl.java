@@ -60,7 +60,7 @@ public class Sp500ServiceImpl implements Sp500Service {
     private final SettingsService settingsService;
 
     @Override
-    @CacheEvict(value = CacheConfig.CACHE_SP500, allEntries = true)
+    @CacheEvict(value = {CacheConfig.CACHE_SP500, CacheConfig.CACHE_SP500_TICKERS}, allEntries = true)
     public List<Sp500Constituent> syncFromWikipedia() {
         log.info("Starting S&P 500 sync from Wikipedia");
 
@@ -119,11 +119,12 @@ public class Sp500ServiceImpl implements Sp500Service {
     }
 
     @Override
-    @Cacheable(value = CacheConfig.CACHE_SP500, key = "'tickers'")
-    public Set<String> getAllTickers() {
+    @Cacheable(value = CacheConfig.CACHE_SP500_TICKERS, key = "'all'")
+    public List<String> getAllTickers() {
         return sp500Repository.findAllByOrderByTickerAsc().stream()
                 .map(Sp500Constituent::getTicker)
-                .collect(Collectors.toUnmodifiableSet());
+                .distinct()
+                .toList();
     }
 
     @Override

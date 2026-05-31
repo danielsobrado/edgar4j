@@ -43,8 +43,12 @@ public class PoliticalTradeServiceImpl implements PoliticalTradeService {
     private static final String DEFAULT_ASSET_TYPE = "stock";
     private static final int DEFAULT_PAGE_SIZE = 50;
     private static final int DEFAULT_SYNC_PAGES = 25;
-    private static final int MAX_SYNC_PAGES = 250;
+    private static final int MAX_SYNC_PAGES = 5_000;
     private static final int MAX_UNFORCED_SYNC_PAGES = 25;
+    private static final int DEFAULT_SYNC_CHUNK_PAGES = 5;
+    private static final int MAX_SYNC_CHUNK_PAGES = 50;
+    private static final int DEFAULT_SYNC_PAUSE_SECONDS = 2;
+    private static final int MAX_SYNC_PAUSE_SECONDS = 60;
     private static final int EXPORT_LIMIT = 10_000;
     private static final List<String> ALL_ASSET_SYNC_TYPES = List.of(
             "stock",
@@ -170,6 +174,8 @@ public class PoliticalTradeServiceImpl implements PoliticalTradeService {
             String assetType = normalizeAssetType(source.getAssetType(), DEFAULT_ASSET_TYPE);
             validateSyncAssetType(assetType);
             int maxPages = sanitizeSyncPages(source.getMaxPages());
+            int chunkPages = sanitizeChunkPages(source.getChunkPages());
+            int pauseSeconds = sanitizePauseSeconds(source.getPauseSeconds());
             if (maxPages > MAX_UNFORCED_SYNC_PAGES && !source.isForce()) {
                 throw new PoliticalTradeSyncException(
                         "Political trade backfills over 25 pages require force=true",
@@ -182,7 +188,14 @@ public class PoliticalTradeServiceImpl implements PoliticalTradeService {
                     ? ALL_ASSET_SYNC_TYPES
                     : List.of(assetType);
             List<PoliticalTrade> fetched = sourceAssetTypes.stream()
-                    .flatMap(sourceAssetType -> politicalTradeSource.fetch(new PoliticalTradeSourceRequest(sourceAssetType, maxPages)).stream())
+                    .flatMap(sourceAssetType -> politicalTradeSource.fetch(new PoliticalTradeSourceRequest(
+                            sourceAssetType,
+                            maxPages,
+                            chunkPages,
+                            pauseSeconds)).stream())
+                    .toList();
+            List<PoliticalTrade> rowsInRequestedRange = fetched.stream()
+                    .filter(trade -> within(trade.getDisclosureDate(), source.getDisclosureDateFrom(), source.getDisclosureDateTo()))
                     .toList();
 
             if (fetched.isEmpty() && !source.isForce()) {
@@ -194,8 +207,8 @@ public class PoliticalTradeServiceImpl implements PoliticalTradeService {
 
             int inserted = 0;
             int updated = 0;
-            int skipped = 0;
-            for (PoliticalTrade fetchedTrade : fetched) {
+            int skipped = fetched.size() - rowsInRequestedRange.size();
+            for (PoliticalTrade fetchedTrade : rowsInRequestedRange) {
                 if (fetchedTrade.getSourceTradeId() == null) {
                     skipped++;
                     continue;
@@ -360,6 +373,20 @@ public class PoliticalTradeServiceImpl implements PoliticalTradeService {
             return DEFAULT_SYNC_PAGES;
         }
         return Math.min(maxPages, MAX_SYNC_PAGES);
+    }
+
+    private int sanitizeChunkPages(Integer chunkPages) {
+        if (chunkPages == null || chunkPages < 1) {
+            return DEFAULT_SYNC_CHUNK_PAGES;
+        }
+        return Math.min(chunkPages, MAX_SYNC_CHUNK_PAGES);
+    }
+
+    private int sanitizePauseSeconds(Integer pauseSeconds) {
+        if (pauseSeconds == null || pauseSeconds < 0) {
+            return DEFAULT_SYNC_PAUSE_SECONDS;
+        }
+        return Math.min(pauseSeconds, MAX_SYNC_PAUSE_SECONDS);
     }
 
     private void validateSyncAssetType(String assetType) {

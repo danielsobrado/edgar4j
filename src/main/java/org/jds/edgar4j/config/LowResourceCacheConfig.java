@@ -59,6 +59,7 @@ public class LowResourceCacheConfig {
                         marketDataCacheConfig != null ? marketDataCacheConfig.getFinancialMetricsTtl() : Duration.ofHours(6),
                         providerCacheSize),
                 new ConcurrentMapCache(CacheConfig.CACHE_SP500),
+                new ConcurrentMapCache(CacheConfig.CACHE_SP500_TICKERS),
                 newCaffeineCache(CacheConfig.CACHE_INSIDER_PURCHASES, INSIDER_PURCHASES_CACHE_TTL, 1_000)
         ));
         cacheManager.initializeCaches();

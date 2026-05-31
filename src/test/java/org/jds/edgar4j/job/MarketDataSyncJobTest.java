@@ -57,7 +57,7 @@ class MarketDataSyncJobTest {
     void syncMarketDataShouldBatchUnionOfTickerSources() {
                 MarketDataSyncJob job = new MarketDataSyncJob(companyMarketDataService, sp500Service, form4Repository, true, 2);
 
-        when(sp500Service.getAllTickers()).thenReturn(Set.of("AAPL", "MSFT"));
+        when(sp500Service.getAllTickers()).thenReturn(List.of("AAPL", "MSFT"));
         when(form4Repository.findRecentAcquisitions(any(LocalDate.class))).thenReturn(List.of(
                 Form4.builder()
                         .tradingSymbol("TSLA")
@@ -101,7 +101,7 @@ class MarketDataSyncJobTest {
                 .updatedTickers(1)
                 .build();
 
-        when(sp500Service.getAllTickers()).thenReturn(Set.of("MSFT", "AAPL"));
+        when(sp500Service.getAllTickers()).thenReturn(List.of("MSFT", "AAPL"));
         when(form4Repository.findRecentAcquisitions(any(LocalDate.class))).thenReturn(List.of(
                 Form4.builder()
                         .tradingSymbol("tsla")
@@ -132,7 +132,7 @@ class MarketDataSyncJobTest {
                 .updatedTickers(0)
                 .build();
 
-        when(sp500Service.getAllTickers()).thenReturn(Set.of("AAPL"));
+        when(sp500Service.getAllTickers()).thenReturn(List.of("AAPL"));
         when(form4Repository.findRecentAcquisitions(any(LocalDate.class))).thenReturn(List.of());
         when(companyMarketDataService.backfillMissingMarketCaps(any(List.class), any(Integer.class), any(Integer.class)))
                 .thenReturn(expectedResponse);

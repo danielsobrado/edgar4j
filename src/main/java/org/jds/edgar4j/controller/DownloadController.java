@@ -39,6 +39,8 @@ import lombok.extern.slf4j.Slf4j;
 @Validated
 public class DownloadController {
 
+    private static final long MAX_REMOTE_FILING_SYNC_DAYS = 365L * 50L;
+
     private final DownloadJobService downloadJobService;
 
     @PostMapping("/tickers")
@@ -96,9 +98,9 @@ public class DownloadController {
             return ResponseEntity.badRequest()
                     .body(ApiResponse.error("dateTo must be on or after dateFrom"));
         }
-        if (ChronoUnit.DAYS.between(request.getDateFrom(), request.getDateTo()) + 1 > 366) {
+        if (ChronoUnit.DAYS.between(request.getDateFrom(), request.getDateTo()) + 1 > MAX_REMOTE_FILING_SYNC_DAYS) {
             return ResponseEntity.badRequest()
-                    .body(ApiResponse.error("Remote filing sync may span at most one year"));
+                    .body(ApiResponse.error("Remote filing sync may span at most 50 years"));
         }
 
         request.setRemoteFilingSyncMode(resolveRemoteFilingSyncMode(request.getRemoteFilingSyncMode()));

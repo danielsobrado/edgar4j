@@ -1,8 +1,10 @@
 package org.jds.edgar4j.controller;
 
 import org.jds.edgar4j.dto.request.SettingsRequest;
+import org.jds.edgar4j.dto.request.UsaSpendingColumnPreferencesRequest;
 import org.jds.edgar4j.dto.response.ApiResponse;
 import org.jds.edgar4j.dto.response.SettingsResponse;
+import org.jds.edgar4j.dto.response.UsaSpendingColumnPreferencesResponse;
 import org.jds.edgar4j.job.TickerSyncJob;
 import org.jds.edgar4j.service.SettingsService;
 import java.util.concurrent.CompletableFuture;
@@ -51,6 +53,22 @@ public class SettingsController {
         log.info("PUT /api/settings: {}", request);
         SettingsResponse settings = settingsService.updateSettings(request);
         return ResponseEntity.ok(ApiResponse.success(settings, "Settings updated successfully"));
+    }
+
+    @GetMapping("/usaspending/columns")
+    public ResponseEntity<ApiResponse<UsaSpendingColumnPreferencesResponse>> getUsaSpendingColumnPreferences() {
+        log.info("GET /api/settings/usaspending/columns");
+        UsaSpendingColumnPreferencesResponse preferences = settingsService.getUsaSpendingColumnPreferences();
+        return ResponseEntity.ok(ApiResponse.success(preferences));
+    }
+
+    @PutMapping("/usaspending/columns")
+    public ResponseEntity<ApiResponse<UsaSpendingColumnPreferencesResponse>> updateUsaSpendingColumnPreferences(
+            @RequestBody @Valid UsaSpendingColumnPreferencesRequest request) {
+        log.info("PUT /api/settings/usaspending/columns");
+        UsaSpendingColumnPreferencesResponse preferences = settingsService.updateUsaSpendingColumnPreferences(
+                request != null ? request.getHiddenColumns() : null);
+        return ResponseEntity.ok(ApiResponse.success(preferences, "USAspending column preferences updated successfully"));
     }
 
     @GetMapping("/health/mongodb")

@@ -42,6 +42,8 @@ public class CapitolTradesPoliticalTradeSource implements PoliticalTradeSource {
     @Override
     public List<PoliticalTrade> fetch(PoliticalTradeSourceRequest request) {
         int maxPages = request == null ? 1 : Math.max(1, request.maxPages());
+        int chunkPages = request == null ? 0 : Math.max(0, request.chunkPages());
+        long pauseMillis = request == null ? 0L : Math.max(0, request.pauseSeconds()) * 1_000L;
         String assetType = normalizeAssetType(request == null ? null : request.assetType());
         List<PoliticalTrade> trades = new ArrayList<>();
 
@@ -61,7 +63,7 @@ public class CapitolTradesPoliticalTradeSource implements PoliticalTradeSource {
                 log.info("Parsed {} political trades from {}", pageTrades.size(), pageUri);
                 trades.addAll(pageTrades);
                 if (page < maxPages) {
-                    sleepBetweenPages();
+                    sleepAfterPage(page, chunkPages, pauseMillis);
                 }
             } catch (IOException ex) {
                 throw new PoliticalTradeSyncException(
@@ -103,12 +105,20 @@ public class CapitolTradesPoliticalTradeSource implements PoliticalTradeSource {
         return value.trim().toLowerCase(Locale.ROOT);
     }
 
-    private void sleepBetweenPages() {
+    private void sleepAfterPage(int page, int chunkPages, long pauseMillis) {
+        if (chunkPages > 0 && pauseMillis > 0 && page % chunkPages == 0) {
+            sleepMillis(pauseMillis, "Political trade sync interrupted during throttle pause");
+            return;
+        }
+        sleepMillis(PAGE_DELAY_MILLIS, "Political trade sync interrupted");
+    }
+
+    private void sleepMillis(long millis, String message) {
         try {
-            Thread.sleep(PAGE_DELAY_MILLIS);
+            Thread.sleep(millis);
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
-            throw new IllegalStateException("Political trade sync interrupted", ex);
+            throw new IllegalStateException(message, ex);
         }
     }
 }

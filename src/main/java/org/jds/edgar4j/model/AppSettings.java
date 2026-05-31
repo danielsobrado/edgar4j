@@ -1,5 +1,8 @@
 package org.jds.edgar4j.model;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -96,6 +99,9 @@ public class AppSettings {
 
     @Builder.Default
     private Integer realtimeSyncPageSize = 100;
+
+    @Builder.Default
+    private List<String> usaSpendingHiddenColumns = new ArrayList<>();
 
     @Data
     @Builder

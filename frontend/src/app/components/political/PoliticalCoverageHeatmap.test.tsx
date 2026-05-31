@@ -47,7 +47,44 @@ describe('PoliticalCoverageHeatmap', () => {
     });
     expect(screen.getByText('Data Coverage')).toBeInTheDocument();
     expect(screen.getByText(/Cached disclosures per day, shaded by volume/i)).toBeInTheDocument();
+    expect(screen.getByLabelText('Chunk pages')).toHaveValue(5);
+    expect(screen.getByLabelText('Pause sec')).toHaveValue(2);
     expect(screen.getByRole('button', { name: 'Filter to selection' })).toBeInTheDocument();
+  });
+
+  it('exposes sync throttle controls', async () => {
+    vi.mocked(politicalTradesApi.coverage).mockResolvedValue({
+      from: `${year}-01-01`,
+      to: `${year}-12-31`,
+      totalTrades: 0,
+      days: [],
+    });
+
+    const onSyncChunkPagesChange = vi.fn();
+    const onSyncPauseSecondsChange = vi.fn();
+
+    render(
+      <PoliticalCoverageHeatmap
+        onSelectRange={vi.fn()}
+        onSync={vi.fn()}
+        syncing={false}
+        refreshKey="0"
+        syncChunkPages={7}
+        syncPauseSeconds={3}
+        onSyncChunkPagesChange={onSyncChunkPagesChange}
+        onSyncPauseSecondsChange={onSyncPauseSecondsChange}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(politicalTradesApi.coverage).toHaveBeenCalled();
+    });
+
+    fireEvent.change(screen.getByLabelText('Chunk pages'), { target: { value: '10' } });
+    fireEvent.change(screen.getByLabelText('Pause sec'), { target: { value: '4' } });
+
+    expect(onSyncChunkPagesChange).toHaveBeenCalledWith(10);
+    expect(onSyncPauseSecondsChange).toHaveBeenCalledWith(4);
   });
 
   it('passes selected date range and starts sync when actions are clicked', async () => {
@@ -85,7 +122,7 @@ describe('PoliticalCoverageHeatmap', () => {
     expect(onSelectRange).toHaveBeenCalledWith(`${year}-01-10`, `${year}-01-11`);
 
     fireEvent.click(screen.getByRole('button', { name: 'Sync now' }));
-    expect(onSync).toHaveBeenCalledTimes(1);
+    expect(onSync).toHaveBeenCalledWith(`${year}-01-10`, `${year}-01-11`);
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Sync now' })).toBeInTheDocument();

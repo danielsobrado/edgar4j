@@ -131,9 +131,9 @@ public class InsiderActivityServiceImpl implements InsiderActivityService {
         }
 
         Map<LocalDate, Long> countsByDate = form4Repository
-                .findByTransactionDateBetween(normalizedFrom, normalizedTo, Pageable.unpaged())
+                .findByFiledDateBetween(normalizedFrom, normalizedTo, Pageable.unpaged())
                 .stream()
-                .map(Form4::getTransactionDate)
+                .map(Form4::getFiledDate)
                 .filter(Objects::nonNull)
                 .collect(Collectors.groupingBy(date -> date, Collectors.counting()));
 

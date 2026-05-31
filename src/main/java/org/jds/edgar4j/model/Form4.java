@@ -31,7 +31,8 @@ import lombok.NoArgsConstructor;
 @CompoundIndexes({
     @CompoundIndex(name = "cik_date_idx", def = "{'cik': 1, 'transactionDate': -1}"),
     @CompoundIndex(name = "symbol_date_idx", def = "{'tradingSymbol': 1, 'transactionDate': -1}"),
-    @CompoundIndex(name = "owner_date_idx", def = "{'rptOwnerName': 1, 'transactionDate': -1}")
+    @CompoundIndex(name = "owner_date_idx", def = "{'rptOwnerName': 1, 'transactionDate': -1}"),
+    @CompoundIndex(name = "filed_date_idx", def = "{'filedDate': -1}")
 })
 public class Form4 {
 
@@ -44,6 +45,9 @@ public class Form4 {
     private String documentType;
 
     private LocalDate periodOfReport;
+
+    @Indexed
+    private LocalDate filedDate;
 
     // Issuer information
     @Indexed

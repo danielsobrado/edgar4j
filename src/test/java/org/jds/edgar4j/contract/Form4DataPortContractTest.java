@@ -98,6 +98,24 @@ abstract class Form4DataPortContractTest {
     }
 
     @Test
+    void findByFiledDateBetween_filtersDateRange() {
+        Form4 first = TestFixtures.createTestForm4("0001234567-24-410001", "AAPL", LocalDate.of(2024, 1, 5));
+        first.setFiledDate(LocalDate.of(2024, 1, 7));
+        Form4 second = TestFixtures.createTestForm4("0001234567-24-410002", "AAPL", LocalDate.of(2024, 1, 10));
+        second.setFiledDate(LocalDate.of(2024, 1, 12));
+        Form4 ignored = TestFixtures.createTestForm4("0001234567-24-410003", "AAPL", LocalDate.of(2024, 1, 15));
+        ignored.setFiledDate(LocalDate.of(2024, 2, 1));
+        port().saveAll(List.of(first, second, ignored));
+
+        Page<Form4> page = port().findByFiledDateBetween(
+                LocalDate.of(2024, 1, 1),
+                LocalDate.of(2024, 1, 31),
+                PageRequest.of(0, 10));
+
+        assertEquals(2, page.getTotalElements());
+    }
+
+    @Test
     void findBySymbolAndDateRange_combinesFilters() {
         port().save(TestFixtures.createTestForm4("0001234567-24-500001", "AAPL", LocalDate.of(2024, 1, 5)));
         port().save(TestFixtures.createTestForm4("0001234567-24-500002", "AAPL", LocalDate.of(2024, 2, 5)));

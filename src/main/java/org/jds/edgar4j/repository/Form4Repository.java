@@ -48,6 +48,8 @@ public interface Form4Repository extends MongoRepository<Form4, String> {
 
     Page<Form4> findByTransactionDateBetween(LocalDate startDate, LocalDate endDate, Pageable pageable);
 
+    Page<Form4> findByFiledDateBetween(LocalDate startDate, LocalDate endDate, Pageable pageable);
+
     // Find by symbol and date range
     @Query("{ 'tradingSymbol': ?0, 'transactionDate': { $gte: ?1, $lte: ?2 } }")
     Page<Form4> findBySymbolAndDateRange(String tradingSymbol, LocalDate startDate, LocalDate endDate, Pageable pageable);

@@ -25,6 +25,7 @@ public class CacheConfig {
     public static final String CACHE_COMPANY_PROFILES = "companyProfiles";
     public static final String CACHE_FINANCIAL_METRICS = "financialMetrics";
     public static final String CACHE_SP500 = "sp500Constituents";
+    public static final String CACHE_SP500_TICKERS = "sp500Tickers";
     public static final String CACHE_INSIDER_PURCHASES = "insiderPurchases";
 
     @Bean
@@ -44,6 +45,7 @@ public class CacheConfig {
                         CACHE_COMPANY_PROFILES,
                         CACHE_FINANCIAL_METRICS,
                         CACHE_SP500,
+                        CACHE_SP500_TICKERS,
                         CACHE_INSIDER_PURCHASES)
                         .toArray(String[]::new));
     }

@@ -61,11 +61,19 @@ describe('buildPoliticalTradesQuery', () => {
     const query = new URLSearchParams(buildPoliticalTradesSyncQuery({
       assetType: 'stock',
       maxPages: 25,
+      chunkPages: 5,
+      pauseSeconds: 2,
+      disclosureDateFrom: '2026-05-29',
+      disclosureDateTo: '2026-05-31',
       force: true,
     }));
 
     expect(query.get('assetType')).toBe('stock');
     expect(query.get('maxPages')).toBe('25');
+    expect(query.get('chunkPages')).toBe('5');
+    expect(query.get('pauseSeconds')).toBe('2');
+    expect(query.get('disclosureDateFrom')).toBe('2026-05-29');
+    expect(query.get('disclosureDateTo')).toBe('2026-05-31');
     expect(query.get('force')).toBe('true');
   });
 });

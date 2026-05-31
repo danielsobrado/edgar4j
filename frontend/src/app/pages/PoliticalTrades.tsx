@@ -50,6 +50,10 @@ const TRANSACTION_OPTIONS = [
   { value: 'RECEIVE', label: 'Received' },
 ];
 
+const DEFAULT_SYNC_CHUNK_PAGES = 5;
+const DEFAULT_SYNC_PAUSE_SECONDS = 2;
+const HISTORICAL_SYNC_PAGES = 5000;
+
 const PARTY_OPTIONS = [
   { value: '', label: 'All Parties' },
   { value: 'Democrat', label: 'Democrat' },
@@ -234,6 +238,8 @@ export function PoliticalTradesPage() {
   const [syncResult, setSyncResult] = React.useState<PoliticalTradeSyncResponse | null>(null);
   const [syncError, setSyncError] = React.useState<string | null>(null);
   const [syncMaxPages, setSyncMaxPages] = React.useState(25);
+  const [syncChunkPages, setSyncChunkPages] = React.useState(DEFAULT_SYNC_CHUNK_PAGES);
+  const [syncPauseSeconds, setSyncPauseSeconds] = React.useState(DEFAULT_SYNC_PAUSE_SECONDS);
   const [forceSync, setForceSync] = React.useState(false);
   const [politicians, setPoliticians] = React.useState<string[]>([]);
   const [showCoverage, setShowCoverage] = React.useState(false);
@@ -256,13 +262,17 @@ export function PoliticalTradesPage() {
     }
   }, [filter]);
 
-  const syncTrades = React.useCallback(async () => {
+  const syncTrades = React.useCallback(async (disclosureDateFrom?: string, disclosureDateTo?: string) => {
     setSyncing(true);
     setSyncError(null);
     try {
       const response = await politicalTradesApi.sync({
         assetType: filter.assetType ?? DEFAULT_FILTER.assetType,
         maxPages: syncMaxPages,
+        chunkPages: syncChunkPages,
+        pauseSeconds: syncPauseSeconds,
+        disclosureDateFrom,
+        disclosureDateTo,
         force: forceSync,
       });
       setSyncResult(response);
@@ -274,7 +284,35 @@ export function PoliticalTradesPage() {
     } finally {
       setSyncing(false);
     }
-  }, [filter.assetType, filter.politician, forceSync, refresh, syncMaxPages]);
+  }, [filter.assetType, filter.politician, forceSync, refresh, syncChunkPages, syncMaxPages, syncPauseSeconds]);
+
+  const syncHistoricalTrades = React.useCallback(async () => {
+    const previousPages = syncMaxPages;
+    const previousForce = forceSync;
+    setSyncMaxPages(HISTORICAL_SYNC_PAGES);
+    setForceSync(true);
+    setSyncing(true);
+    setSyncError(null);
+    try {
+      const response = await politicalTradesApi.sync({
+        assetType: filter.assetType ?? DEFAULT_FILTER.assetType,
+        maxPages: HISTORICAL_SYNC_PAGES,
+        chunkPages: syncChunkPages,
+        pauseSeconds: syncPauseSeconds,
+        force: true,
+      });
+      setSyncResult(response);
+      await refresh();
+      setCoverageRefreshKey((current) => current + 1);
+      setPoliticians(await politicalTradesApi.politicians(filter.politician ?? ''));
+    } catch (err) {
+      setSyncError(err instanceof Error ? err.message : 'Political trade historical sync failed');
+      setSyncMaxPages(previousPages);
+      setForceSync(previousForce);
+    } finally {
+      setSyncing(false);
+    }
+  }, [filter.assetType, filter.politician, forceSync, refresh, syncChunkPages, syncMaxPages, syncPauseSeconds]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -366,9 +404,13 @@ export function PoliticalTradesPage() {
       {showCoverage && (
         <PoliticalCoverageHeatmap
           onSelectRange={(from, to) => updateFilter({ disclosureDateFrom: from, disclosureDateTo: to })}
-          onSync={() => void syncTrades()}
+          onSync={(from, to) => void syncTrades(from, to)}
           syncing={syncing}
           refreshKey={String(coverageRefreshKey)}
+          syncChunkPages={syncChunkPages}
+          syncPauseSeconds={syncPauseSeconds}
+          onSyncChunkPagesChange={setSyncChunkPages}
+          onSyncPauseSecondsChange={setSyncPauseSeconds}
         />
       )}
 
@@ -588,7 +630,7 @@ export function PoliticalTradesPage() {
                 id="political-sync-pages"
                 type="number"
                 min="1"
-                max="250"
+                max="5000"
                 value={syncMaxPages}
                 onChange={(event) => setSyncMaxPages(Number(event.target.value) || 25)}
                 className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -616,6 +658,15 @@ export function PoliticalTradesPage() {
             >
               <Search className={`h-4 w-4 ${syncing ? 'animate-pulse' : ''}`} />
               {syncing ? 'Syncing' : 'Sync Latest'}
+            </button>
+            <button
+              onClick={() => void syncHistoricalTrades()}
+              disabled={syncing}
+              title="Walk Capitol Trades pages backward with throttling until history is exhausted or 5000 pages are reached"
+              className="inline-flex items-center justify-center gap-2 rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+            >
+              <Download className={`h-4 w-4 ${syncing ? 'animate-pulse' : ''}`} />
+              Backfill History
             </button>
           </div>
         </div>

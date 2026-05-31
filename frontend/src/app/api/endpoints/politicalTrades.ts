@@ -44,6 +44,10 @@ export function buildPoliticalTradesSyncQuery(request: PoliticalTradeSyncRequest
 
   setString(params, 'assetType', request.assetType);
   setNumber(params, 'maxPages', request.maxPages);
+  setNumber(params, 'chunkPages', request.chunkPages);
+  setNumber(params, 'pauseSeconds', request.pauseSeconds);
+  setString(params, 'disclosureDateFrom', request.disclosureDateFrom);
+  setString(params, 'disclosureDateTo', request.disclosureDateTo);
 
   if (request.force) {
     params.set('force', 'true');

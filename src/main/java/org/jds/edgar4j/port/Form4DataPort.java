@@ -22,6 +22,8 @@ public interface Form4DataPort extends BaseDocumentDataPort<Form4> {
 
     Page<Form4> findByTransactionDateBetween(LocalDate startDate, LocalDate endDate, Pageable pageable);
 
+    Page<Form4> findByFiledDateBetween(LocalDate startDate, LocalDate endDate, Pageable pageable);
+
     Page<Form4> findBySymbolAndDateRange(String tradingSymbol, LocalDate startDate, LocalDate endDate, Pageable pageable);
 
     List<Form4> findByTradingSymbolAndTransactionDateBetween(String tradingSymbol, LocalDate startDate, LocalDate endDate);

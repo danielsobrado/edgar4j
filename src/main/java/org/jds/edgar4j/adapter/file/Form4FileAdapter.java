@@ -73,6 +73,11 @@ public class Form4FileAdapter extends AbstractFileDataPort<Form4> implements For
     }
 
     @Override
+    public Page<Form4> findByFiledDateBetween(LocalDate startDate, LocalDate endDate, Pageable pageable) {
+        return findMatching(value -> between(value.getFiledDate(), startDate, endDate), pageable);
+    }
+
+    @Override
     public Page<Form4> findBySymbolAndDateRange(
             String tradingSymbol,
             LocalDate startDate,

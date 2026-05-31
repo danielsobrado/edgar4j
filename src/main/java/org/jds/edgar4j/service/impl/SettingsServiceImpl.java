@@ -1,11 +1,15 @@
 package org.jds.edgar4j.service.impl;
 
 import java.net.URI;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
 
 import org.jds.edgar4j.config.TiingoEnvProperties;
 import org.jds.edgar4j.dto.request.SettingsRequest;
 import org.jds.edgar4j.dto.response.SettingsResponse;
+import org.jds.edgar4j.dto.response.UsaSpendingColumnPreferencesResponse;
 import org.jds.edgar4j.integration.SecUserAgentPolicy;
 import org.jds.edgar4j.model.AppSettings;
 import org.jds.edgar4j.port.AppSettingsDataPort;
@@ -115,6 +119,18 @@ public class SettingsServiceImpl implements SettingsService {
                 resolveRealtimeSyncPageSize(settings)));
 
         return toSettingsResponse(appSettingsRepository.save(settings));
+    }
+
+    @Override
+    public UsaSpendingColumnPreferencesResponse getUsaSpendingColumnPreferences() {
+        return toUsaSpendingColumnPreferencesResponse(getOrCreateDefaultSettings());
+    }
+
+    @Override
+    public UsaSpendingColumnPreferencesResponse updateUsaSpendingColumnPreferences(List<String> hiddenColumns) {
+        AppSettings settings = getOrCreateDefaultSettings();
+        settings.setUsaSpendingHiddenColumns(normalizeHiddenColumns(hiddenColumns));
+        return toUsaSpendingColumnPreferencesResponse(appSettingsRepository.save(settings));
     }
 
     @Override
@@ -228,6 +244,7 @@ public class SettingsServiceImpl implements SettingsService {
                 .realtimeSyncLookbackHours(resolveRealtimeSyncLookbackHours(settings))
                 .realtimeSyncMaxPages(resolveRealtimeSyncMaxPages(settings))
                 .realtimeSyncPageSize(resolveRealtimeSyncPageSize(settings))
+                .usaSpendingHiddenColumns(normalizeHiddenColumns(settings.getUsaSpendingHiddenColumns()))
                 .apiEndpoints(SettingsResponse.ApiEndpointsInfo.builder()
                     .baseSecUrl(edgar4JProperties.getUrls().getBaseSecUrl())
                     .submissionsUrl(edgar4JProperties.getUrls().getSubmissionsUrl())
@@ -237,6 +254,27 @@ public class SettingsServiceImpl implements SettingsService {
                 .mongoDbStatus(checkMongoDbConnection())
                 .elasticsearchStatus(checkElasticsearchConnection())
                 .build();
+    }
+
+    private UsaSpendingColumnPreferencesResponse toUsaSpendingColumnPreferencesResponse(AppSettings settings) {
+        return UsaSpendingColumnPreferencesResponse.builder()
+                .hiddenColumns(normalizeHiddenColumns(settings.getUsaSpendingHiddenColumns()))
+                .build();
+    }
+
+    private List<String> normalizeHiddenColumns(List<String> hiddenColumns) {
+        if (hiddenColumns == null || hiddenColumns.isEmpty()) {
+            return List.of();
+        }
+
+        LinkedHashSet<String> normalized = new LinkedHashSet<>();
+        for (String columnId : hiddenColumns) {
+            String trimmed = trimToNull(columnId);
+            if (trimmed != null) {
+                normalized.add(trimmed);
+            }
+        }
+        return new ArrayList<>(normalized);
     }
 
     private SettingsResponse.MarketDataProvidersResponse toMarketDataProvidersResponse(AppSettings settings) {

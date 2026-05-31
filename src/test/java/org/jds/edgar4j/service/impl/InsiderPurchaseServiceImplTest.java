@@ -81,7 +81,7 @@ class InsiderPurchaseServiceImplTest {
 
         when(form4Repository.findRecentAcquisitions(any(LocalDate.class)))
                 .thenReturn(List.of(multiTransactionForm, nonSp500Form, smallCapForm));
-        when(sp500Service.getAllTickers()).thenReturn(Set.of("AAPL", "MSFT"));
+        when(sp500Service.getAllTickers()).thenReturn(List.of("AAPL", "MSFT"));
         when(companyMarketDataService.getStoredMarketData("AAPL")).thenReturn(Optional.of(CompanyMarketData.builder()
                 .ticker("AAPL")
                 .currentPrice(125d)
@@ -124,7 +124,7 @@ class InsiderPurchaseServiceImplTest {
         fallbackForm.setTransactions(List.of());
 
         when(form4Repository.findRecentAcquisitions(any(LocalDate.class))).thenReturn(List.of(fallbackForm));
-        when(sp500Service.getAllTickers()).thenReturn(Set.of("MSFT"));
+        when(sp500Service.getAllTickers()).thenReturn(List.of("MSFT"));
         when(companyMarketDataService.getStoredMarketData("MSFT")).thenReturn(Optional.of(CompanyMarketData.builder()
                 .ticker("MSFT")
                 .currentPrice(44d)
@@ -164,7 +164,7 @@ class InsiderPurchaseServiceImplTest {
 
         when(form4Repository.findRecentAcquisitions(any(LocalDate.class)))
                 .thenReturn(List.of(aaplForm, msftForm, grantOnlyForm));
-        when(sp500Service.getAllTickers()).thenReturn(Set.of("AAPL", "MSFT"));
+        when(sp500Service.getAllTickers()).thenReturn(List.of("AAPL", "MSFT"));
         when(companyMarketDataService.getStoredMarketData("AAPL")).thenReturn(Optional.of(CompanyMarketData.builder()
                 .ticker("AAPL")
                 .currentPrice(120d)
@@ -194,7 +194,7 @@ class InsiderPurchaseServiceImplTest {
         form.setTransactions(List.of(createTransaction("P", "A", 10f, 25f, BASE_DATE.minusDays(1))));
 
         when(form4Repository.findRecentAcquisitions(any(LocalDate.class))).thenReturn(List.of(form));
-        when(sp500Service.getAllTickers()).thenReturn(Set.of());
+        when(sp500Service.getAllTickers()).thenReturn(List.of());
         when(companyMarketDataService.getStoredMarketData("OTHR")).thenReturn(Optional.empty());
 
         InsiderPurchaseResponse response = insiderPurchaseService.getRecentInsiderPurchases(
@@ -224,7 +224,7 @@ class InsiderPurchaseServiceImplTest {
         naForm.setTransactions(List.of(createTransaction("P", "A", 5f, 30f, BASE_DATE.minusDays(1))));
 
         when(form4Repository.findRecentAcquisitions(any(LocalDate.class))).thenReturn(List.of(noneForm, naForm));
-        when(sp500Service.getAllTickers()).thenReturn(Set.of());
+        when(sp500Service.getAllTickers()).thenReturn(List.of());
 
         PaginatedResponse<InsiderPurchaseResponse> result = insiderPurchaseService.getRecentInsiderPurchases(
                 30,
@@ -247,7 +247,7 @@ class InsiderPurchaseServiceImplTest {
         form.setTransactions(List.of(createTransaction("P", "A", 13217f, 37.831f, BASE_DATE.minusDays(1))));
 
         when(form4Repository.findRecentAcquisitions(any(LocalDate.class))).thenReturn(List.of(form));
-        when(sp500Service.getAllTickers()).thenReturn(Set.of("IP"));
+        when(sp500Service.getAllTickers()).thenReturn(List.of("IP"));
         when(companyMarketDataService.getStoredMarketData("IP")).thenReturn(Optional.of(CompanyMarketData.builder()
                 .ticker("IP")
                 .currentPrice(37.25d)
@@ -280,7 +280,7 @@ class InsiderPurchaseServiceImplTest {
                 createTransaction("P", "A", 5f, 35f, BASE_DATE.minusDays(2))));
 
         when(form4Repository.findRecentAcquisitions(any(LocalDate.class))).thenReturn(List.of(mixedDateForm));
-        when(sp500Service.getAllTickers()).thenReturn(Set.of());
+        when(sp500Service.getAllTickers()).thenReturn(List.of());
         when(companyMarketDataService.getStoredMarketData("NFLX")).thenReturn(Optional.of(CompanyMarketData.builder()
                 .ticker("NFLX")
                 .currentPrice(40d)
@@ -310,7 +310,7 @@ class InsiderPurchaseServiceImplTest {
                 form.setTransactions(List.of(createTransaction("P", "A", 10f, 100f, BASE_DATE.minusDays(1))));
 
                 when(form4Repository.findRecentAcquisitions(any(LocalDate.class))).thenReturn(List.of(form));
-                when(sp500Service.getAllTickers()).thenReturn(Set.of("AAPL"));
+                when(sp500Service.getAllTickers()).thenReturn(List.of("AAPL"));
                 when(companyMarketDataService.getStoredMarketData("AAPL")).thenReturn(Optional.of(CompanyMarketData.builder()
                                 .ticker("AAPL")
                                 .currentPrice(110d)

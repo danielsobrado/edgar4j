@@ -89,6 +89,15 @@ describe('RemoteEdgar', () => {
       filesDownloaded: 1,
       totalFiles: 1,
     });
+    vi.mocked(downloadsApi.downloadRemoteFilings).mockResolvedValue({
+      id: 'job-remote-1',
+      status: 'PENDING',
+      progress: 0,
+      type: 'REMOTE_FILINGS_SYNC',
+      startedAt: '2026-05-20T10:00:00Z',
+      filesDownloaded: 0,
+      totalFiles: 0,
+    });
   });
 
   it('renders remote explorer sections', () => {
@@ -190,5 +199,30 @@ describe('RemoteEdgar', () => {
     expect(await screen.findByText('Company')).toBeInTheDocument();
     expect(await screen.findByText('Acme Holdings')).toBeInTheDocument();
     expect(screen.getByText('0001234567')).toBeInTheDocument();
+  });
+
+  it('queues an all-history filing-date sync without requiring a preview search', async () => {
+    render(
+      <MemoryRouter initialEntries={['/remote-edgar']}>
+        <Routes>
+          <Route path="/remote-edgar" element={<RemoteEdgar />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    fireEvent.change(screen.getByDisplayValue('Last 1 month'), {
+      target: { value: 'ALL_HISTORY' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Sync All History' }));
+
+    await waitFor(() => {
+      expect(downloadsApi.downloadRemoteFilings).toHaveBeenCalledWith(expect.objectContaining({
+        formType: '13F',
+        dateFrom: '1994-01-01',
+        remoteFilingSyncMode: 'FILING_DATE',
+        chunkDays: 7,
+        pauseSeconds: 5,
+      }));
+    });
   });
 });
