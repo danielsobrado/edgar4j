@@ -14,6 +14,7 @@ import org.springframework.validation.annotation.Validated;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -111,7 +112,16 @@ public class DistributedWorkerProperties {
         private boolean enabled = true;
 
         @Min(1)
+        @Max(5)
         private int maxConcurrency = 4;
+
+        @NotNull
+        private Duration pollInterval = Duration.ofSeconds(2);
+
+        @AssertTrue(message = "server worker poll interval must be positive")
+        public boolean isPollIntervalValid() {
+            return isPositive(pollInterval);
+        }
     }
 
     @Data
