@@ -9,6 +9,7 @@ public final class WorkerErrorCodes {
     public static final String LEASE_INVALID = "WORKER_LEASE_INVALID";
     public static final String SOURCE_DISPATCH_UNAVAILABLE = "WORKER_SOURCE_DISPATCH_UNAVAILABLE";
     public static final String ARTIFACT_UPLOAD_FAILED = "WORKER_ARTIFACT_UPLOAD_FAILED";
+    public static final String SERVER_EXECUTION_FAILED = "WORKER_SERVER_EXECUTION_FAILED";
 
     private WorkerErrorCodes() {
     }
