@@ -11,6 +11,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.DirectoryStream;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -64,7 +65,11 @@ public class FileSystemArtifactStore implements ArtifactStorePort {
                 output.write(buffer, 0, read);
             }
         } catch (IOException | RuntimeException e) {
-            Files.deleteIfExists(target);
+            try {
+                Files.deleteIfExists(target);
+            } catch (IOException cleanupFailure) {
+                e.addSuppressed(cleanupFailure);
+            }
             throw e;
         }
 
@@ -74,6 +79,11 @@ public class FileSystemArtifactStore implements ArtifactStorePort {
     @Override
     public InputStream openStaged(String stagingId) throws IOException {
         return Files.newInputStream(stagingPath(stagingId));
+    }
+
+    @Override
+    public InputStream openVerified(String artifactId) throws IOException {
+        return Files.newInputStream(verifiedPath(artifactId));
     }
 
     @Override
@@ -95,11 +105,7 @@ public class FileSystemArtifactStore implements ArtifactStorePort {
         if (Files.exists(target)) {
             Files.deleteIfExists(staged);
         } else {
-            try {
-                Files.move(staged, target, StandardCopyOption.ATOMIC_MOVE);
-            } catch (AtomicMoveNotSupportedException e) {
-                Files.move(staged, target);
-            }
+            moveToVerified(staged, target);
         }
 
         return new VerifiedArtifact(sha256, sha256, sizeBytes, contentType, verifiedAt);
@@ -150,6 +156,20 @@ public class FileSystemArtifactStore implements ArtifactStorePort {
             }
         }
         return deleted;
+    }
+
+    private void moveToVerified(Path staged, Path target) throws IOException {
+        try {
+            Files.move(staged, target, StandardCopyOption.ATOMIC_MOVE);
+        } catch (FileAlreadyExistsException e) {
+            Files.deleteIfExists(staged);
+        } catch (AtomicMoveNotSupportedException e) {
+            try {
+                Files.move(staged, target);
+            } catch (FileAlreadyExistsException race) {
+                Files.deleteIfExists(staged);
+            }
+        }
     }
 
     private Path stagingPath(String stagingId) {
