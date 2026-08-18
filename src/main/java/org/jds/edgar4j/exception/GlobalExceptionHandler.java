@@ -1,7 +1,16 @@
 package org.jds.edgar4j.exception;
 
-import java.time.LocalDateTime;
+import static org.jds.edgar4j.constants.WorkerErrorCodes.ARTIFACT_UPLOAD_FAILED;
+import static org.jds.edgar4j.constants.WorkerErrorCodes.DISABLED;
+import static org.jds.edgar4j.constants.WorkerErrorCodes.LEASE_INVALID;
+import static org.jds.edgar4j.constants.WorkerErrorCodes.PROTOCOL_UNSUPPORTED;
+import static org.jds.edgar4j.constants.WorkerErrorCodes.SERVER_EXECUTION_FAILED;
+import static org.jds.edgar4j.constants.WorkerErrorCodes.SESSION_INVALID;
+import static org.jds.edgar4j.constants.WorkerErrorCodes.SOURCE_DISPATCH_UNAVAILABLE;
+import static org.jds.edgar4j.constants.WorkerErrorCodes.TASK_NOT_FOUND;
+
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -10,9 +19,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
-import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.ServerWebInputException;
 
@@ -61,6 +70,35 @@ public class GlobalExceptionHandler {
             log.warn("Political trade sync rejected [{}]: {}", ex.getErrorCode(), ex.getMessage());
         }
         return ResponseEntity.status(ex.getStatus())
+                .body(ApiResponse.error(ex.getMessage(), exchange.getRequest().getPath().value()));
+    }
+
+    @ExceptionHandler(WorkerHttpException.class)
+    public ResponseEntity<ApiResponse<Void>> handleWorkerHttpException(
+            WorkerHttpException ex, ServerWebExchange exchange) {
+        log.warn("Worker transport rejected [{}]: {}", ex.getErrorCode(), ex.getMessage());
+        return ResponseEntity.status(ex.getStatus())
+                .body(ApiResponse.error(ex.getMessage(), exchange.getRequest().getPath().value()));
+    }
+
+    @ExceptionHandler(WorkerArtifactException.class)
+    public ResponseEntity<ApiResponse<Void>> handleWorkerArtifactException(
+            WorkerArtifactException ex, ServerWebExchange exchange) {
+        log.warn("Worker artifact rejected [{}]: {}", ex.getErrorCode(), ex.getMessage());
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
+                .body(ApiResponse.error(ex.getMessage(), exchange.getRequest().getPath().value()));
+    }
+
+    @ExceptionHandler(WorkerCoordinatorException.class)
+    public ResponseEntity<ApiResponse<Void>> handleWorkerCoordinatorException(
+            WorkerCoordinatorException ex, ServerWebExchange exchange) {
+        HttpStatus status = workerCoordinatorStatus(ex.getErrorCode());
+        if (status.is5xxServerError()) {
+            log.warn("Worker coordinator failed [{}]: {}", ex.getErrorCode(), ex.getMessage(), ex);
+        } else {
+            log.warn("Worker coordinator rejected [{}]: {}", ex.getErrorCode(), ex.getMessage());
+        }
+        return ResponseEntity.status(status)
                 .body(ApiResponse.error(ex.getMessage(), exchange.getRequest().getPath().value()));
     }
 
@@ -159,7 +197,31 @@ public class GlobalExceptionHandler {
             Exception ex, ServerWebExchange exchange) {
         log.error("Unexpected error processing {}", exchange.getRequest().getPath().value(), ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error("An unexpected error occurred",
-                        exchange.getRequest().getPath().value()));
+                .body(ApiResponse.error("An unexpected error occurred", exchange.getRequest().getPath().value()));
+    }
+
+    private static HttpStatus workerCoordinatorStatus(String errorCode) {
+        if (SESSION_INVALID.equals(errorCode)) {
+            return HttpStatus.UNAUTHORIZED;
+        }
+        if (TASK_NOT_FOUND.equals(errorCode)) {
+            return HttpStatus.NOT_FOUND;
+        }
+        if (LEASE_INVALID.equals(errorCode)) {
+            return HttpStatus.CONFLICT;
+        }
+        if (PROTOCOL_UNSUPPORTED.equals(errorCode)) {
+            return HttpStatus.BAD_REQUEST;
+        }
+        if (SOURCE_DISPATCH_UNAVAILABLE.equals(errorCode)) {
+            return HttpStatus.TOO_MANY_REQUESTS;
+        }
+        if (DISABLED.equals(errorCode) || SERVER_EXECUTION_FAILED.equals(errorCode)) {
+            return HttpStatus.SERVICE_UNAVAILABLE;
+        }
+        if (ARTIFACT_UPLOAD_FAILED.equals(errorCode)) {
+            return HttpStatus.INTERNAL_SERVER_ERROR;
+        }
+        return HttpStatus.BAD_REQUEST;
     }
 }
