@@ -113,6 +113,31 @@ edgar4j:
     remote-sync:
         chunk-days: 7
         pause-seconds: 5
+    distributed-workers:
+        enabled: ${DISTRIBUTED_WORKERS_ENABLED:false}
+        coordinator:
+            lease-duration: ${DISTRIBUTED_WORKER_LEASE_DURATION:5m}
+            heartbeat-extension: ${DISTRIBUTED_WORKER_HEARTBEAT_EXTENSION:5m}
+            max-attempts: ${DISTRIBUTED_WORKER_MAX_ATTEMPTS:3}
+            retry-backoff: ${DISTRIBUTED_WORKER_RETRY_BACKOFF:30s}
+            max-lease-batch: ${DISTRIBUTED_WORKER_MAX_LEASE_BATCH:2}
+            idle-retry-min: ${DISTRIBUTED_WORKER_IDLE_RETRY_MIN:5s}
+            idle-retry-max: ${DISTRIBUTED_WORKER_IDLE_RETRY_MAX:60s}
+            session-duration: ${DISTRIBUTED_WORKER_SESSION_DURATION:30m}
+        artifact:
+            max-mobile-bytes: ${DISTRIBUTED_WORKER_MAX_MOBILE_BYTES:50MB}
+            staging-retention: ${DISTRIBUTED_WORKER_STAGING_RETENTION:1h}
+        server-worker:
+            enabled: ${DISTRIBUTED_SERVER_WORKER_ENABLED:true}
+            max-concurrency: ${DISTRIBUTED_SERVER_WORKER_MAX_CONCURRENCY:4}
+        source-policy:
+            allowed-hosts:
+                - www.sec.gov
+                - data.sec.gov
+                - efts.sec.gov
+            mobile-eligible-sources:
+                - SEC_EDGAR
+            max-redirects: ${DISTRIBUTED_WORKER_MAX_REDIRECTS:3}
     # Phase 3: Market Data Provider Configuration
     providers:
         alpha-vantage:
