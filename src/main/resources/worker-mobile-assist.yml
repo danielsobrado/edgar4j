@@ -1,0 +1,8 @@
+edgar4j:
+  distributed-workers:
+    mobile-assist:
+      enabled: true
+      recent-presence-window: 30s
+      initial-claim-window: 12s
+      leased-completion-window: 45s
+      poll-interval: 250ms
