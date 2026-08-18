@@ -103,7 +103,9 @@ public class WorkerTaskFileAdapter implements WorkerTaskDataPort {
             String failureMessage) {
         synchronized (mutationLock) {
             return findById(taskId)
-                    .filter(task -> task.hasActiveLease(sessionId, leaseTokenHash, now))
+                    .filter(task -> task.getStatus() == WorkerTaskStatus.LEASED
+                            || task.getStatus() == WorkerTaskStatus.VERIFYING)
+                    .filter(task -> hasValidLeaseCredentials(task, sessionId, leaseTokenHash, now))
                     .map(task -> requeueOrFail(task, now, notBefore, failureCode, failureMessage));
         }
     }
@@ -223,6 +225,24 @@ public class WorkerTaskFileAdapter implements WorkerTaskDataPort {
                 countStatus(tasks, WorkerTaskStatus.CANCELLED));
     }
 
+    @Override
+    public long countByStatus(WorkerTaskStatus status) {
+        return collection.count(task -> task.getStatus() == status);
+    }
+
+    @Override
+    public long countActiveLeasesBySessionId(String sessionId, Instant now) {
+        if (sessionId == null) {
+            return 0;
+        }
+        return collection.count(task ->
+                sessionId.equals(task.getLeaseOwnerSessionId())
+                        && (task.getStatus() == WorkerTaskStatus.LEASED
+                                || task.getStatus() == WorkerTaskStatus.VERIFYING)
+                        && task.getLeaseExpiresAt() != null
+                        && task.getLeaseExpiresAt().isAfter(now));
+    }
+
     private WorkerTask lease(WorkerTask task, LeaseCriteria criteria) {
         task.setStatus(WorkerTaskStatus.LEASED);
         task.setLeaseOwnerSessionId(criteria.sessionId());
@@ -260,7 +280,9 @@ public class WorkerTaskFileAdapter implements WorkerTaskDataPort {
                 || !criteria.allowedSources().contains(task.getSource())) {
             return false;
         }
-        if (criteria.capabilities() == null || !criteria.capabilities().containsAll(task.getRequiredCapabilities())) {
+        if (criteria.capabilities() == null
+                || (task.getRequiredCapabilities() != null
+                        && !criteria.capabilities().containsAll(task.getRequiredCapabilities()))) {
             return false;
         }
         long taskLimit = task.getMaxBytes() == null ? Long.MAX_VALUE : task.getMaxBytes();
