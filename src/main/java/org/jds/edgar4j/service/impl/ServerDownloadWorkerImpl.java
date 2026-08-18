@@ -3,6 +3,7 @@ package org.jds.edgar4j.service.impl;
 import static org.jds.edgar4j.constants.WorkerErrorCodes.LEASE_INVALID;
 import static org.jds.edgar4j.constants.WorkerErrorCodes.SERVER_EXECUTION_FAILED;
 import static org.jds.edgar4j.constants.WorkerErrorCodes.TASK_NOT_FOUND;
+import static org.jds.edgar4j.constants.WorkerProtocolConstants.MAX_DIAGNOSTIC_MESSAGE_LENGTH;
 import static org.jds.edgar4j.constants.WorkerProtocolConstants.SERVER_SESSION_PREFIX;
 
 import java.io.ByteArrayInputStream;
@@ -30,6 +31,7 @@ import org.jds.edgar4j.properties.DistributedWorkerProperties;
 import org.jds.edgar4j.service.ArtifactVerificationService;
 import org.jds.edgar4j.service.ServerDownloadWorker;
 import org.jds.edgar4j.service.WorkerMetrics;
+import org.jds.edgar4j.service.WorkerParentJobService;
 import org.jds.edgar4j.service.WorkerRetryPolicy;
 import org.jds.edgar4j.service.WorkerRetrySchedule;
 import org.jds.edgar4j.service.WorkerSourceFailureClassifier;
@@ -52,6 +54,7 @@ public class ServerDownloadWorkerImpl implements ServerDownloadWorker {
     private final WorkerSourceFailureClassifier failureClassifier;
     private final WorkerRetryPolicy retryPolicy;
     private final WorkerRetrySchedule retrySchedule;
+    private final WorkerParentJobService parentJobService;
     private final WorkerMetrics metrics;
     private final DistributedWorkerProperties properties;
     private final List<WorkerSourceFetcher> sourceFetchers;
@@ -67,6 +70,7 @@ public class ServerDownloadWorkerImpl implements ServerDownloadWorker {
             WorkerSourceFailureClassifier failureClassifier,
             WorkerRetryPolicy retryPolicy,
             WorkerRetrySchedule retrySchedule,
+            WorkerParentJobService parentJobService,
             WorkerMetrics metrics,
             DistributedWorkerProperties properties,
             List<WorkerSourceFetcher> sourceFetchers,
@@ -79,6 +83,7 @@ public class ServerDownloadWorkerImpl implements ServerDownloadWorker {
         this.failureClassifier = failureClassifier;
         this.retryPolicy = retryPolicy;
         this.retrySchedule = retrySchedule;
+        this.parentJobService = parentJobService;
         this.metrics = metrics;
         this.properties = properties;
         this.sourceFetchers = List.copyOf(sourceFetchers);
@@ -92,6 +97,9 @@ public class ServerDownloadWorkerImpl implements ServerDownloadWorker {
         }
         WorkerTask existing = taskDataPort.findById(taskId)
                 .orElseThrow(() -> new WorkerCoordinatorException("Worker task not found", TASK_NOT_FOUND));
+        if (cancelIfParentCancelled(existing)) {
+            return Optional.empty();
+        }
         if (existing.getStatus() == WorkerTaskStatus.COMPLETED) {
             return resolveCompletedArtifact(existing);
         }
@@ -102,6 +110,9 @@ public class ServerDownloadWorkerImpl implements ServerDownloadWorker {
         Lease lease = newLease(clock.instant());
         Optional<WorkerTask> leased = taskDataPort.leaseById(taskId, lease.criteria());
         if (leased.isEmpty()) {
+            return Optional.empty();
+        }
+        if (cancelIfParentCancelled(leased.get())) {
             return Optional.empty();
         }
         return Optional.of(executeLeased(leased.get(), lease.tokenHash()));
@@ -119,6 +130,9 @@ public class ServerDownloadWorkerImpl implements ServerDownloadWorker {
             Optional<WorkerTask> leased = taskDataPort.leaseNext(lease.criteria());
             if (leased.isEmpty()) {
                 break;
+            }
+            if (cancelIfParentCancelled(leased.get())) {
+                continue;
             }
             try {
                 executeLeased(leased.get(), lease.tokenHash());
@@ -154,6 +168,10 @@ public class ServerDownloadWorkerImpl implements ServerDownloadWorker {
             WorkerFailureCode failureCode = failureClassifier.classify(e);
             transitionFailure(task, leaseTokenHash, failureCode, e.getMessage());
             throw new WorkerCoordinatorException("Server worker source fetch failed", SERVER_EXECUTION_FAILED, e);
+        }
+
+        if (cancelIfParentCancelled(task)) {
+            throw new WorkerCoordinatorException("Parent download job was cancelled", SERVER_EXECUTION_FAILED);
         }
 
         StagedArtifact staged;
@@ -205,6 +223,7 @@ public class ServerDownloadWorkerImpl implements ServerDownloadWorker {
                             LEASE_INVALID));
             metrics.artifactAccepted(verified.sizeBytes());
             metrics.taskCompleted(completed.getSource());
+            parentJobService.refreshProgress(completed.getParentDownloadJobId());
             log.info("Server worker completed task {} with {} bytes", task.getId(), verified.sizeBytes());
             return verified;
         } catch (WorkerArtifactException e) {
@@ -260,6 +279,18 @@ public class ServerDownloadWorkerImpl implements ServerDownloadWorker {
                     now);
         }
         metrics.taskFailed(failureCode);
+        parentJobService.refreshProgress(task.getParentDownloadJobId());
+    }
+
+    private boolean cancelIfParentCancelled(WorkerTask task) {
+        String parentJobId = task.getParentDownloadJobId();
+        if (!parentJobService.isCancelled(parentJobId)) {
+            return false;
+        }
+        taskDataPort.cancelByParentDownloadJobId(parentJobId, clock.instant());
+        parentJobService.refreshProgress(parentJobId);
+        log.info("Cancelled worker task {} because parent job {} is cancelled", task.getId(), parentJobId);
+        return true;
     }
 
     private long taskLimit(WorkerTask task) {
@@ -286,7 +317,9 @@ public class ServerDownloadWorkerImpl implements ServerDownloadWorker {
             return null;
         }
         String value = message.replace('\n', ' ').replace('\r', ' ').trim();
-        return value.length() <= 512 ? value : value.substring(0, 512);
+        return value.length() <= MAX_DIAGNOSTIC_MESSAGE_LENGTH
+                ? value
+                : value.substring(0, MAX_DIAGNOSTIC_MESSAGE_LENGTH);
     }
 
     private record Lease(LeaseCriteria criteria, String tokenHash) {
