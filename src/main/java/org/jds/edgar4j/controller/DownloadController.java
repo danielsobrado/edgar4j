@@ -11,11 +11,13 @@ import org.jds.edgar4j.dto.response.DownloadJobResponse;
 import org.jds.edgar4j.dto.response.DownloadSummaryResponse;
 import org.jds.edgar4j.dto.response.UsaSpendingCoverageResponse;
 import org.jds.edgar4j.dto.response.UsaSpendingCsvPageResponse;
+import org.jds.edgar4j.service.DistributedWorkPlanner;
 import org.jds.edgar4j.service.DownloadJobService;
 import org.jds.edgar4j.util.PaginationUtils;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -24,7 +26,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.validation.annotation.Validated;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -42,6 +43,7 @@ public class DownloadController {
     private static final long MAX_REMOTE_FILING_SYNC_DAYS = 365L * 50L;
 
     private final DownloadJobService downloadJobService;
+    private final DistributedWorkPlanner distributedWorkPlanner;
 
     @PostMapping("/tickers")
     public ResponseEntity<ApiResponse<DownloadJobResponse>> downloadTickers(
@@ -83,8 +85,11 @@ public class DownloadController {
         if (request == null) {
             return ResponseEntity.badRequest().body(ApiResponse.error("Download request is required"));
         }
-        log.info("POST /api/downloads/remote-filings: formType={}, dateFrom={}, dateTo={}",
-                request.getFormType(), request.getDateFrom(), request.getDateTo());
+        log.info(
+                "POST /api/downloads/remote-filings: formType={}, dateFrom={}, dateTo={}",
+                request.getFormType(),
+                request.getDateFrom(),
+                request.getDateTo());
 
         if (request.getFormType() == null || request.getFormType().isBlank()) {
             return ResponseEntity.badRequest()
@@ -104,7 +109,6 @@ public class DownloadController {
         }
 
         request.setRemoteFilingSyncMode(resolveRemoteFilingSyncMode(request.getRemoteFilingSyncMode()));
-
         request.setType(DownloadRequest.DownloadType.REMOTE_FILINGS_SYNC);
         DownloadJobResponse job = downloadJobService.startDownload(request);
         return ResponseEntity.ok(ApiResponse.success(job, "Download job started"));
@@ -115,8 +119,10 @@ public class DownloadController {
         if (request == null) {
             return ResponseEntity.badRequest().body(ApiResponse.error("Download request is required"));
         }
-        log.info("POST /api/downloads/usaspending/awards: dateFrom={}, dateTo={}",
-                request.getDateFrom(), request.getDateTo());
+        log.info(
+                "POST /api/downloads/usaspending/awards: dateFrom={}, dateTo={}",
+                request.getDateFrom(),
+                request.getDateTo());
 
         if (request.getDateFrom() == null || request.getDateTo() == null) {
             return ResponseEntity.badRequest()
@@ -211,6 +217,7 @@ public class DownloadController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(ApiResponse.error("Unable to cancel job: not found or already in terminal state"));
         }
+        distributedWorkPlanner.cancelParent(id);
         return ResponseEntity.ok(ApiResponse.success(null, "Job cancelled"));
     }
 
