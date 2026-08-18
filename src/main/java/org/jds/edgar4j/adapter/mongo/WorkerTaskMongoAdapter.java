@@ -82,8 +82,7 @@ public class WorkerTaskMongoAdapter implements WorkerTaskDataPort {
     @Override
     public Optional<WorkerTask> leaseNext(LeaseCriteria criteria) {
         Objects.requireNonNull(criteria, "criteria");
-        if (criteria.allowedSources() == null || criteria.allowedSources().isEmpty()
-                || criteria.capabilities() == null || criteria.maxBytes() <= 0) {
+        if (!hasUsableCriteria(criteria)) {
             return Optional.empty();
         }
 
@@ -103,44 +102,27 @@ public class WorkerTaskMongoAdapter implements WorkerTaskDataPort {
                         Sort.Order.asc("createdAt")))
                 .limit(WorkerProtocolConstants.LEASE_CANDIDATE_SCAN_LIMIT);
 
-        List<WorkerTask> candidates = mongoTemplate.find(candidateQuery, WorkerTask.class);
-        for (WorkerTask candidate : candidates) {
-            if (candidate.getAttemptCount() >= candidate.getMaxAttempts()) {
+        for (WorkerTask candidate : mongoTemplate.find(candidateQuery, WorkerTask.class)) {
+            if (!isLeaseCandidate(candidate, criteria)) {
                 continue;
             }
-            if (candidate.getRequiredCapabilities() != null
-                    && !criteria.capabilities().containsAll(candidate.getRequiredCapabilities())) {
-                continue;
-            }
-
-            Query claimQuery = Query.query(new Criteria().andOperator(
-                    Criteria.where("_id").is(candidate.getId()),
-                    Criteria.where("status").is(WorkerTaskStatus.PENDING),
-                    Criteria.where("attemptCount").is(candidate.getAttemptCount()),
-                    new Criteria().orOperator(
-                            Criteria.where("notBefore").is(null),
-                            Criteria.where("notBefore").lte(criteria.now()))));
-            Update claim = new Update()
-                    .set("status", WorkerTaskStatus.LEASED)
-                    .set("leaseOwnerSessionId", criteria.sessionId())
-                    .set("leaseTokenHash", criteria.leaseTokenHash())
-                    .set("leaseExpiresAt", criteria.leaseExpiresAt())
-                    .set("updatedAt", criteria.now())
-                    .inc("attemptCount", 1)
-                    .unset("lastErrorCode")
-                    .unset("lastErrorMessage");
-
-            WorkerTask leased = mongoTemplate.findAndModify(
-                    claimQuery,
-                    claim,
-                    FindAndModifyOptions.options().returnNew(true),
-                    WorkerTask.class);
-            if (leased != null) {
-                return Optional.of(leased);
+            Optional<WorkerTask> leased = claimCandidate(candidate, criteria);
+            if (leased.isPresent()) {
+                return leased;
             }
         }
-
         return Optional.empty();
+    }
+
+    @Override
+    public Optional<WorkerTask> leaseById(String taskId, LeaseCriteria criteria) {
+        Objects.requireNonNull(criteria, "criteria");
+        if (!hasUsableCriteria(criteria)) {
+            return Optional.empty();
+        }
+        return findById(taskId)
+                .filter(task -> isLeaseCandidate(task, criteria))
+                .flatMap(task -> claimCandidate(task, criteria));
     }
 
     @Override
@@ -154,11 +136,7 @@ public class WorkerTaskMongoAdapter implements WorkerTaskDataPort {
         Update update = new Update()
                 .set("leaseExpiresAt", leaseExpiresAt)
                 .set("updatedAt", now);
-        return Optional.ofNullable(mongoTemplate.findAndModify(
-                query,
-                update,
-                FindAndModifyOptions.options().returnNew(true),
-                WorkerTask.class));
+        return findAndModify(query, update);
     }
 
     @Override
@@ -197,14 +175,13 @@ public class WorkerTaskMongoAdapter implements WorkerTaskDataPort {
                     Criteria.where("status").is(task.getStatus()),
                     Criteria.where("leaseTokenHash").is(task.getLeaseTokenHash()),
                     Criteria.where("leaseExpiresAt").lte(now)));
-            Optional<WorkerTask> transitioned = transitionToRetryOrFailure(
+            if (transitionToRetryOrFailure(
                     compareAndSet,
                     task,
                     now,
                     retryNotBefore,
                     WorkerFailureCode.LEASE_EXPIRED,
-                    "Worker lease expired");
-            if (transitioned.isPresent()) {
+                    "Worker lease expired").isPresent()) {
                 updated++;
             }
         }
@@ -221,11 +198,7 @@ public class WorkerTaskMongoAdapter implements WorkerTaskDataPort {
         Update update = new Update()
                 .set("status", WorkerTaskStatus.VERIFYING)
                 .set("updatedAt", now);
-        return Optional.ofNullable(mongoTemplate.findAndModify(
-                query,
-                update,
-                FindAndModifyOptions.options().returnNew(true),
-                WorkerTask.class));
+        return findAndModify(query, update);
     }
 
     @Override
@@ -244,11 +217,7 @@ public class WorkerTaskMongoAdapter implements WorkerTaskDataPort {
                 .unset("leaseOwnerSessionId")
                 .unset("leaseTokenHash")
                 .unset("leaseExpiresAt");
-        return Optional.ofNullable(mongoTemplate.findAndModify(
-                query,
-                update,
-                FindAndModifyOptions.options().returnNew(true),
-                WorkerTask.class));
+        return findAndModify(query, update);
     }
 
     @Override
@@ -266,12 +235,7 @@ public class WorkerTaskMongoAdapter implements WorkerTaskDataPort {
                 now,
                 WorkerTaskStatus.LEASED,
                 WorkerTaskStatus.VERIFYING);
-        Update update = terminalFailureUpdate(failureCode, failureMessage, now);
-        return Optional.ofNullable(mongoTemplate.findAndModify(
-                query,
-                update,
-                FindAndModifyOptions.options().returnNew(true),
-                WorkerTask.class));
+        return findAndModify(query, terminalFailureUpdate(failureCode, failureMessage, now));
     }
 
     @Override
@@ -320,6 +284,26 @@ public class WorkerTaskMongoAdapter implements WorkerTaskDataPort {
         return mongoTemplate.count(query, WorkerTask.class);
     }
 
+    private Optional<WorkerTask> claimCandidate(WorkerTask candidate, LeaseCriteria criteria) {
+        Query claimQuery = Query.query(new Criteria().andOperator(
+                Criteria.where("_id").is(candidate.getId()),
+                Criteria.where("status").is(WorkerTaskStatus.PENDING),
+                Criteria.where("attemptCount").is(candidate.getAttemptCount()),
+                new Criteria().orOperator(
+                        Criteria.where("notBefore").is(null),
+                        Criteria.where("notBefore").lte(criteria.now()))));
+        Update claim = new Update()
+                .set("status", WorkerTaskStatus.LEASED)
+                .set("leaseOwnerSessionId", criteria.sessionId())
+                .set("leaseTokenHash", criteria.leaseTokenHash())
+                .set("leaseExpiresAt", criteria.leaseExpiresAt())
+                .set("updatedAt", criteria.now())
+                .inc("attemptCount", 1)
+                .unset("lastErrorCode")
+                .unset("lastErrorMessage");
+        return findAndModify(claimQuery, claim);
+    }
+
     private Optional<WorkerTask> transitionToRetryOrFailure(
             Query query,
             WorkerTask task,
@@ -342,12 +326,38 @@ public class WorkerTaskMongoAdapter implements WorkerTaskDataPort {
                     .unset("leaseTokenHash")
                     .unset("leaseExpiresAt");
         }
+        return findAndModify(query, update);
+    }
 
+    private Optional<WorkerTask> findAndModify(Query query, Update update) {
         return Optional.ofNullable(mongoTemplate.findAndModify(
                 query,
                 update,
                 FindAndModifyOptions.options().returnNew(true),
                 WorkerTask.class));
+    }
+
+    private static boolean hasUsableCriteria(LeaseCriteria criteria) {
+        return criteria.allowedSources() != null
+                && !criteria.allowedSources().isEmpty()
+                && criteria.capabilities() != null
+                && criteria.maxBytes() > 0;
+    }
+
+    private static boolean isLeaseCandidate(WorkerTask task, LeaseCriteria criteria) {
+        if (!task.isEligibleForLease(criteria.now())) {
+            return false;
+        }
+        if (task.getSource() == null || !criteria.allowedSources().contains(task.getSource())) {
+            return false;
+        }
+        if (task.getRequiredCapabilities() != null
+                && !criteria.capabilities().containsAll(task.getRequiredCapabilities())) {
+            return false;
+        }
+        long taskLimit = task.getMaxBytes() == null ? Long.MAX_VALUE : task.getMaxBytes();
+        long expectedSize = task.getExpectedSizeBytes() == null ? 0L : task.getExpectedSizeBytes();
+        return taskLimit <= criteria.maxBytes() && expectedSize <= criteria.maxBytes();
     }
 
     private static Query activeLeaseQuery(
