@@ -36,10 +36,15 @@ public class DownloadTickersServiceImpl implements DownloadTickersService {
 
     @Override
     public int downloadTickers() {
+        return downloadTickers(null);
+    }
+
+    @Override
+    public int downloadTickers(String parentDownloadJobId) {
         log.info("Download tickers");
 
         String jsonResponse = acquire(
-                tickerResourceAcquisitionService::acquireCompanyTickers,
+                () -> tickerResourceAcquisitionService.acquireCompanyTickers(parentDownloadJobId),
                 secApiClient::fetchCompanyTickers,
                 "company tickers");
         log.debug("Received tickers response length: {} characters", jsonResponse.length());
@@ -54,10 +59,15 @@ public class DownloadTickersServiceImpl implements DownloadTickersService {
 
     @Override
     public int downloadTickersExchanges() {
+        return downloadTickersExchanges(null);
+    }
+
+    @Override
+    public int downloadTickersExchanges(String parentDownloadJobId) {
         log.info("Download tickers with exchanges");
 
         String jsonResponse = acquire(
-                tickerResourceAcquisitionService::acquireCompanyTickersExchanges,
+                () -> tickerResourceAcquisitionService.acquireCompanyTickersExchanges(parentDownloadJobId),
                 secApiClient::fetchCompanyTickersExchanges,
                 "company tickers with exchanges");
         log.debug("Received tickers exchanges response length: {} characters", jsonResponse.length());
@@ -72,10 +82,15 @@ public class DownloadTickersServiceImpl implements DownloadTickersService {
 
     @Override
     public int downloadTickersMFs() {
+        return downloadTickersMFs(null);
+    }
+
+    @Override
+    public int downloadTickersMFs(String parentDownloadJobId) {
         log.info("Download mutual fund tickers");
 
         String jsonResponse = acquire(
-                tickerResourceAcquisitionService::acquireCompanyTickersMutualFunds,
+                () -> tickerResourceAcquisitionService.acquireCompanyTickersMutualFunds(parentDownloadJobId),
                 secApiClient::fetchCompanyTickersMutualFunds,
                 "mutual fund tickers");
         log.debug("Received mutual fund tickers response length: {} characters", jsonResponse.length());
