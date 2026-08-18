@@ -45,25 +45,25 @@ public class TickerResourceAcquisitionServiceImpl implements TickerResourceAcqui
     }
 
     @Override
-    public String acquireCompanyTickers() {
-        return acquire(COMPANY_TICKERS, secApiConfig.getCompanyTickersUrl());
+    public String acquireCompanyTickers(String parentDownloadJobId) {
+        return acquire(parentDownloadJobId, COMPANY_TICKERS, secApiConfig.getCompanyTickersUrl());
     }
 
     @Override
-    public String acquireCompanyTickersExchanges() {
-        return acquire(COMPANY_TICKERS_EXCHANGES, secApiConfig.getCompanyTickersExchangesUrl());
+    public String acquireCompanyTickersExchanges(String parentDownloadJobId) {
+        return acquire(parentDownloadJobId, COMPANY_TICKERS_EXCHANGES, secApiConfig.getCompanyTickersExchangesUrl());
     }
 
     @Override
-    public String acquireCompanyTickersMutualFunds() {
-        return acquire(COMPANY_TICKERS_MUTUAL_FUNDS, secApiConfig.getCompanyTickersMFsUrl());
+    public String acquireCompanyTickersMutualFunds(String parentDownloadJobId) {
+        return acquire(parentDownloadJobId, COMPANY_TICKERS_MUTUAL_FUNDS, secApiConfig.getCompanyTickersMFsUrl());
     }
 
-    private String acquire(String resourcePrefix, String sourceUrl) {
+    private String acquire(String parentDownloadJobId, String resourcePrefix, String sourceUrl) {
         String freshnessKey = LocalDate.ofInstant(clock.instant(), ZoneOffset.UTC).toString();
         long maxBytes = properties.getArtifact().getMaxMobileBytes().toBytes();
         DownloadTaskSpec task = new DownloadTaskSpec(
-                null,
+                parentDownloadJobId,
                 resourcePrefix + freshnessKey,
                 WorkerSource.SEC_EDGAR,
                 sourceUrl,
