@@ -14,6 +14,7 @@ import org.jds.edgar4j.model.WorkerTaskType;
 import org.jds.edgar4j.port.WorkerTaskDataPort;
 import org.jds.edgar4j.properties.DistributedWorkerProperties;
 import org.jds.edgar4j.service.DistributedWorkPlanner;
+import org.jds.edgar4j.service.WorkerParentJobService;
 import org.jds.edgar4j.service.WorkerSourceResourcePolicy;
 import org.springframework.stereotype.Service;
 
@@ -22,16 +23,19 @@ public class DistributedWorkPlannerImpl implements DistributedWorkPlanner {
 
     private final WorkerTaskDataPort taskDataPort;
     private final WorkerSourceResourcePolicy sourceResourcePolicy;
+    private final WorkerParentJobService parentJobService;
     private final DistributedWorkerProperties properties;
     private final Clock clock;
 
     public DistributedWorkPlannerImpl(
             WorkerTaskDataPort taskDataPort,
             WorkerSourceResourcePolicy sourceResourcePolicy,
+            WorkerParentJobService parentJobService,
             DistributedWorkerProperties properties,
             Clock clock) {
         this.taskDataPort = taskDataPort;
         this.sourceResourcePolicy = sourceResourcePolicy;
+        this.parentJobService = parentJobService;
         this.properties = properties;
         this.clock = clock;
     }
@@ -62,7 +66,9 @@ public class DistributedWorkPlannerImpl implements DistributedWorkPlanner {
                 .updatedAt(now)
                 .build();
         sourceResourcePolicy.validate(task);
-        return taskDataPort.createIfAbsent(task);
+        WorkerTask saved = taskDataPort.createIfAbsent(task);
+        parentJobService.refreshProgress(saved.getParentDownloadJobId());
+        return saved;
     }
 
     @Override
