@@ -120,10 +120,12 @@ edgar4j:
             heartbeat-extension: ${DISTRIBUTED_WORKER_HEARTBEAT_EXTENSION:5m}
             max-attempts: ${DISTRIBUTED_WORKER_MAX_ATTEMPTS:3}
             retry-backoff: ${DISTRIBUTED_WORKER_RETRY_BACKOFF:30s}
+            retry-backoff-max: ${DISTRIBUTED_WORKER_RETRY_BACKOFF_MAX:15m}
             max-lease-batch: ${DISTRIBUTED_WORKER_MAX_LEASE_BATCH:2}
             idle-retry-min: ${DISTRIBUTED_WORKER_IDLE_RETRY_MIN:5s}
             idle-retry-max: ${DISTRIBUTED_WORKER_IDLE_RETRY_MAX:60s}
             session-duration: ${DISTRIBUTED_WORKER_SESSION_DURATION:30m}
+            maintenance-interval: ${DISTRIBUTED_WORKER_MAINTENANCE_INTERVAL:30s}
         artifact:
             max-mobile-bytes: ${DISTRIBUTED_WORKER_MAX_MOBILE_BYTES:50MB}
             staging-retention: ${DISTRIBUTED_WORKER_STAGING_RETENTION:1h}
