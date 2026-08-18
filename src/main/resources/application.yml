@@ -132,6 +132,7 @@ edgar4j:
         server-worker:
             enabled: ${DISTRIBUTED_SERVER_WORKER_ENABLED:true}
             max-concurrency: ${DISTRIBUTED_SERVER_WORKER_MAX_CONCURRENCY:4}
+            poll-interval: ${DISTRIBUTED_SERVER_WORKER_POLL_INTERVAL:2s}
         source-policy:
             allowed-hosts:
                 - www.sec.gov
