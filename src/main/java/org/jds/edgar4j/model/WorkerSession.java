@@ -5,6 +5,7 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Version;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import lombok.AllArgsConstructor;
@@ -21,6 +22,9 @@ public class WorkerSession {
 
     @Id
     private String id;
+
+    @Version
+    private Long version;
 
     private String principalId;
     private String tokenHash;
