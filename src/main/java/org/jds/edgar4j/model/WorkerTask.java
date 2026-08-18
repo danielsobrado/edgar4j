@@ -6,8 +6,6 @@ import java.util.Objects;
 import java.util.Set;
 
 import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.index.CompoundIndex;
-import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import lombok.AllArgsConstructor;
@@ -20,19 +18,13 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "worker_tasks")
-@CompoundIndex(
-        name = "worker_task_lease_idx",
-        def = "{'status': 1, 'notBefore': 1, 'priority': -1, 'createdAt': 1}")
 public class WorkerTask {
 
     @Id
     private String id;
 
     private String parentDownloadJobId;
-
-    @Indexed(unique = true)
     private String logicalKey;
-
     private String resourceId;
     private WorkerTaskType type;
     private WorkerSource source;
