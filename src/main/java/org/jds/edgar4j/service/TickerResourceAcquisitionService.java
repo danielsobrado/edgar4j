@@ -4,9 +4,21 @@ public interface TickerResourceAcquisitionService {
 
     boolean isDistributedAcquisitionEnabled();
 
-    String acquireCompanyTickers();
+    default String acquireCompanyTickers() {
+        return acquireCompanyTickers(null);
+    }
 
-    String acquireCompanyTickersExchanges();
+    String acquireCompanyTickers(String parentDownloadJobId);
 
-    String acquireCompanyTickersMutualFunds();
+    default String acquireCompanyTickersExchanges() {
+        return acquireCompanyTickersExchanges(null);
+    }
+
+    String acquireCompanyTickersExchanges(String parentDownloadJobId);
+
+    default String acquireCompanyTickersMutualFunds() {
+        return acquireCompanyTickersMutualFunds(null);
+    }
+
+    String acquireCompanyTickersMutualFunds(String parentDownloadJobId);
 }
