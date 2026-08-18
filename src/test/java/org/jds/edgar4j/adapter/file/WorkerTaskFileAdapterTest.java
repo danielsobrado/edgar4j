@@ -84,6 +84,19 @@ class WorkerTaskFileAdapterTest {
                 leased.getLeaseExpiresAt().plusSeconds(31)));
     }
 
+    @Test
+    void persistedTaskSurvivesStorageEngineRestart() {
+        WorkerTaskFileAdapter firstAdapter = newAdapter();
+        WorkerTask saved = firstAdapter.createIfAbsent(task("logical-restart"));
+
+        WorkerTaskFileAdapter restartedAdapter = newAdapter();
+        WorkerTask recovered = restartedAdapter.findById(saved.getId()).orElseThrow();
+
+        assertEquals(saved.getLogicalKey(), recovered.getLogicalKey());
+        assertEquals(WorkerTaskStatus.PENDING, recovered.getStatus());
+        assertEquals(1, restartedAdapter.countByStatus(WorkerTaskStatus.PENDING));
+    }
+
     private WorkerTaskFileAdapter newAdapter() {
         FileStorageProperties properties = new FileStorageProperties();
         properties.setBasePath(tempDir.toString());
