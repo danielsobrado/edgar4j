@@ -170,7 +170,13 @@ public class WorkerTaskMongoAdapter implements WorkerTaskDataPort {
             Instant notBefore,
             WorkerFailureCode failureCode,
             String failureMessage) {
-        Query query = activeLeaseQuery(taskId, sessionId, leaseTokenHash, now, WorkerTaskStatus.LEASED);
+        Query query = activeLeaseQuery(
+                taskId,
+                sessionId,
+                leaseTokenHash,
+                now,
+                WorkerTaskStatus.LEASED,
+                WorkerTaskStatus.VERIFYING);
         WorkerTask task = mongoTemplate.findOne(query, WorkerTask.class);
         if (task == null) {
             return Optional.empty();
@@ -300,6 +306,20 @@ public class WorkerTaskMongoAdapter implements WorkerTaskDataPort {
                 count(parentDownloadJobId, WorkerTaskStatus.CANCELLED));
     }
 
+    @Override
+    public long countByStatus(WorkerTaskStatus status) {
+        return mongoTemplate.count(Query.query(Criteria.where("status").is(status)), WorkerTask.class);
+    }
+
+    @Override
+    public long countActiveLeasesBySessionId(String sessionId, Instant now) {
+        Query query = Query.query(new Criteria().andOperator(
+                Criteria.where("leaseOwnerSessionId").is(sessionId),
+                Criteria.where("status").in(WorkerTaskStatus.LEASED, WorkerTaskStatus.VERIFYING),
+                Criteria.where("leaseExpiresAt").gt(now)));
+        return mongoTemplate.count(query, WorkerTask.class);
+    }
+
     private Optional<WorkerTask> transitionToRetryOrFailure(
             Query query,
             WorkerTask task,
@@ -338,7 +358,7 @@ public class WorkerTaskMongoAdapter implements WorkerTaskDataPort {
             WorkerTaskStatus... statuses) {
         return Query.query(new Criteria().andOperator(
                 Criteria.where("_id").is(taskId),
-                Criteria.where("status").in((Object[]) statuses),
+                Criteria.where("status").in(List.of(statuses)),
                 Criteria.where("leaseOwnerSessionId").is(sessionId),
                 Criteria.where("leaseTokenHash").is(leaseTokenHash),
                 Criteria.where("leaseExpiresAt").gt(now)));
