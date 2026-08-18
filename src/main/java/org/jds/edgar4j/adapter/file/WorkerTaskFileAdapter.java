@@ -75,6 +75,16 @@ public class WorkerTaskFileAdapter implements WorkerTaskDataPort {
     }
 
     @Override
+    public Optional<WorkerTask> leaseById(String taskId, LeaseCriteria criteria) {
+        Objects.requireNonNull(criteria, "criteria");
+        synchronized (mutationLock) {
+            return findById(taskId)
+                    .filter(task -> isLeaseCandidate(task, criteria))
+                    .map(task -> lease(task, criteria));
+        }
+    }
+
+    @Override
     public Optional<WorkerTask> extendLease(
             String taskId,
             String sessionId,
