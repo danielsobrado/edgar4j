@@ -11,7 +11,14 @@ import org.springframework.stereotype.Service;
 public interface DownloadTickersService {
 
     int downloadTickers();
+
+    int downloadTickers(String parentDownloadJobId);
+
     int downloadTickersExchanges();
+
+    int downloadTickersExchanges(String parentDownloadJobId);
+
     int downloadTickersMFs();
 
+    int downloadTickersMFs(String parentDownloadJobId);
 }
