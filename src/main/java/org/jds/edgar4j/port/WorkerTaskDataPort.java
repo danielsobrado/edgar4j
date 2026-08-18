@@ -20,6 +20,8 @@ public interface WorkerTaskDataPort {
 
     Optional<WorkerTask> leaseNext(LeaseCriteria criteria);
 
+    Optional<WorkerTask> leaseById(String taskId, LeaseCriteria criteria);
+
     Optional<WorkerTask> extendLease(
             String taskId,
             String sessionId,
