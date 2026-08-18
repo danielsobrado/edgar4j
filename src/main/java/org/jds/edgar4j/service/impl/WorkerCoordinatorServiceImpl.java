@@ -32,7 +32,6 @@ import org.jds.edgar4j.dto.worker.WorkerSessionResponse;
 import org.jds.edgar4j.dto.worker.WorkerTaskResponse;
 import org.jds.edgar4j.exception.WorkerArtifactException;
 import org.jds.edgar4j.exception.WorkerCoordinatorException;
-import org.jds.edgar4j.model.WorkerCapability;
 import org.jds.edgar4j.model.WorkerFailureCode;
 import org.jds.edgar4j.model.WorkerPlatform;
 import org.jds.edgar4j.model.WorkerSession;
@@ -150,13 +149,13 @@ public class WorkerCoordinatorServiceImpl implements WorkerCoordinatorService {
         int leaseCount = (int) Math.min(remainingConcurrency, requested);
         if (leaseCount <= 0) {
             touchSession(authenticated, now);
-            return new WorkerLeaseResponse(List.of(), retryAfterSeconds(properties.getCoordinator().getIdleRetryMin()));
+            return idleLeaseResponse();
         }
 
         long maxBytes = resolveWorkerMaxBytes(session, request);
         if (maxBytes <= 0) {
             touchSession(authenticated, now);
-            return new WorkerLeaseResponse(List.of(), retryAfterSeconds(properties.getCoordinator().getIdleRetryMin()));
+            return idleLeaseResponse();
         }
 
         Set<WorkerSource> allowedSources = allowedSources(session);
@@ -181,19 +180,29 @@ public class WorkerCoordinatorServiceImpl implements WorkerCoordinatorService {
             WorkerTask task = leased.get();
             try {
                 sourceResourcePolicy.validate(task);
-                if (session.getPlatform() != WorkerPlatform.SERVER) {
+            } catch (WorkerCoordinatorException e) {
+                taskDataPort.markFailed(
+                        task.getId(),
+                        sessionId,
+                        leaseToken.hash(),
+                        WorkerFailureCode.POLICY_CHANGED,
+                        sanitizeDiagnostic(e.getMessage()),
+                        now);
+                metrics.taskFailed(WorkerFailureCode.POLICY_CHANGED);
+                log.warn("Rejected distributed worker task {} by source policy: {}", task.getId(), e.getMessage());
+                continue;
+            }
+
+            if (session.getPlatform() != WorkerPlatform.SERVER) {
+                try {
                     sourceDispatchPolicy.reserveRemoteDispatch(task.getSource());
+                } catch (RuntimeException e) {
+                    requeueDispatchFailure(task, sessionId, leaseToken.hash(), now);
+                    throw new WorkerCoordinatorException(
+                            "Unable to reserve source dispatch capacity",
+                            SOURCE_DISPATCH_UNAVAILABLE,
+                            e);
                 }
-            } catch (RuntimeException e) {
-                requeueDispatchFailure(task, sessionId, leaseToken.hash(), now);
-                if (e instanceof WorkerCoordinatorException) {
-                    log.warn("Rejected distributed worker task {} by source policy: {}", task.getId(), e.getMessage());
-                    continue;
-                }
-                throw new WorkerCoordinatorException(
-                        "Unable to reserve source dispatch capacity",
-                        SOURCE_DISPATCH_UNAVAILABLE,
-                        e);
             }
 
             leasedTasks.add(toResponse(task, leaseToken.value()));
@@ -201,10 +210,9 @@ public class WorkerCoordinatorServiceImpl implements WorkerCoordinatorService {
         }
 
         touchSession(authenticated, now);
-        int retryAfter = leasedTasks.isEmpty()
-                ? retryAfterSeconds(properties.getCoordinator().getIdleRetryMin())
-                : 0;
-        return new WorkerLeaseResponse(List.copyOf(leasedTasks), retryAfter);
+        return leasedTasks.isEmpty()
+                ? idleLeaseResponse()
+                : new WorkerLeaseResponse(List.copyOf(leasedTasks), 0);
     }
 
     @Override
@@ -246,13 +254,12 @@ public class WorkerCoordinatorServiceImpl implements WorkerCoordinatorService {
 
         boolean transitioned;
         if (retryPolicy.isRetryable(request.code())) {
-            Instant notBefore = retryNotBefore(taskId, now);
             transitioned = taskDataPort.requeueLease(
                     taskId,
                     sessionId,
                     leaseTokenHash,
                     now,
-                    notBefore,
+                    retryNotBefore(taskId, now),
                     request.code(),
                     message)
                     .isPresent();
@@ -311,12 +318,12 @@ public class WorkerCoordinatorServiceImpl implements WorkerCoordinatorService {
             String contentType,
             InputStream input) {
         ensureEnabled();
-        Instant now = clock.instant();
-        AuthenticatedSession authenticated = authenticate(sessionId, sessionToken, now);
+        Instant authenticationTime = clock.instant();
+        AuthenticatedSession authenticated = authenticate(sessionId, sessionToken, authenticationTime);
         String leaseTokenHash = tokenService.hash(leaseToken);
         WorkerTask task = taskDataPort.findById(taskId)
                 .orElseThrow(() -> new WorkerCoordinatorException("Worker task not found", TASK_NOT_FOUND));
-        if (!task.hasActiveLease(sessionId, leaseTokenHash, now)) {
+        if (!task.hasActiveLease(sessionId, leaseTokenHash, authenticationTime)) {
             throw new WorkerCoordinatorException("Worker lease is no longer active", LEASE_INVALID);
         }
 
@@ -324,13 +331,26 @@ public class WorkerCoordinatorServiceImpl implements WorkerCoordinatorService {
         try {
             stagedArtifact = artifactStore.stage(taskId, input, artifactUploadLimit(task));
         } catch (IOException e) {
-            requeueUploadFailure(task, sessionId, leaseTokenHash, now);
+            Instant failureTime = clock.instant();
+            requeueUploadFailure(task, sessionId, leaseTokenHash, failureTime);
             throw new WorkerCoordinatorException("Failed to stage worker artifact", ARTIFACT_UPLOAD_FAILED, e);
         }
 
-        Instant verificationExpiry = now.plus(properties.getCoordinator().getHeartbeatExtension());
-        if (taskDataPort.extendLease(taskId, sessionId, leaseTokenHash, now, verificationExpiry).isEmpty()
-                || taskDataPort.markVerifying(taskId, sessionId, leaseTokenHash, now).isEmpty()) {
+        Instant transitionTime = clock.instant();
+        Instant verificationExpiry = transitionTime.plus(properties.getCoordinator().getHeartbeatExtension());
+        if (taskDataPort.extendLease(
+                        taskId,
+                        sessionId,
+                        leaseTokenHash,
+                        transitionTime,
+                        verificationExpiry)
+                        .isEmpty()
+                || taskDataPort.markVerifying(
+                        taskId,
+                        sessionId,
+                        leaseTokenHash,
+                        transitionTime)
+                        .isEmpty()) {
             deleteStagedQuietly(stagedArtifact.stagingId());
             throw new WorkerCoordinatorException("Worker lease expired before verification", LEASE_INVALID);
         }
@@ -341,24 +361,26 @@ public class WorkerCoordinatorServiceImpl implements WorkerCoordinatorService {
                     stagedArtifact,
                     claimedSha256,
                     contentType,
-                    now);
+                    transitionTime);
+            Instant completionTime = clock.instant();
             WorkerTask completed = taskDataPort.markCompleted(
                     taskId,
                     sessionId,
                     leaseTokenHash,
                     verified.artifactId(),
-                    now)
+                    completionTime)
                     .orElseThrow(() -> new WorkerCoordinatorException(
                             "Worker lease expired before completion",
                             LEASE_INVALID));
             metrics.artifactAccepted(verified.sizeBytes());
             metrics.taskCompleted(completed.getSource());
-            touchSession(authenticated, now);
+            touchSession(authenticated, completionTime);
             log.info("Verified worker artifact for task {} with {} bytes", taskId, verified.sizeBytes());
             return verified;
         } catch (WorkerArtifactException e) {
+            Instant failureTime = clock.instant();
             metrics.artifactRejected(e.getFailureCode());
-            transitionVerificationFailure(taskId, sessionId, leaseTokenHash, e, now);
+            transitionVerificationFailure(taskId, sessionId, leaseTokenHash, e, failureTime);
             throw e;
         }
     }
@@ -445,6 +467,12 @@ public class WorkerCoordinatorServiceImpl implements WorkerCoordinatorService {
         return Set.copyOf(properties.getSourcePolicy().getMobileEligibleSources());
     }
 
+    private WorkerLeaseResponse idleLeaseResponse() {
+        return new WorkerLeaseResponse(
+                List.of(),
+                retryAfterSeconds(properties.getCoordinator().getIdleRetryMin()));
+    }
+
     private void requeueDispatchFailure(
             WorkerTask task,
             String sessionId,
@@ -511,13 +539,16 @@ public class WorkerCoordinatorServiceImpl implements WorkerCoordinatorService {
 
     private Instant retryNotBefore(WorkerTask task, Instant now) {
         Duration base = properties.getCoordinator().getRetryBackoff();
-        int exponent = Math.max(0, Math.min(task.getAttemptCount() - 1, 6));
-        long multiplier = 1L << exponent;
+        Duration maximum = properties.getCoordinator().getRetryBackoffMax();
+        int exponent = Math.max(0, Math.min(task.getAttemptCount() - 1, 30));
         Duration delay;
         try {
-            delay = base.multipliedBy(multiplier);
+            delay = base.multipliedBy(1L << exponent);
         } catch (ArithmeticException e) {
-            delay = base.multipliedBy(64);
+            delay = maximum;
+        }
+        if (delay.compareTo(maximum) > 0) {
+            delay = maximum;
         }
         return now.plus(delay);
     }
