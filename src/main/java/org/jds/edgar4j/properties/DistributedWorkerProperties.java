@@ -57,6 +57,9 @@ public class DistributedWorkerProperties {
         @NotNull
         private Duration retryBackoff = Duration.ofSeconds(30);
 
+        @NotNull
+        private Duration retryBackoffMax = Duration.ofMinutes(15);
+
         @Min(1)
         private int maxLeaseBatch = 2;
 
@@ -69,14 +72,20 @@ public class DistributedWorkerProperties {
         @NotNull
         private Duration sessionDuration = Duration.ofMinutes(30);
 
+        @NotNull
+        private Duration maintenanceInterval = Duration.ofSeconds(30);
+
         @AssertTrue(message = "distributed worker coordinator durations must be positive and ordered")
         public boolean isDurationConfigurationValid() {
             return isPositive(leaseDuration)
                     && isPositive(heartbeatExtension)
                     && isPositive(retryBackoff)
+                    && isPositive(retryBackoffMax)
                     && isPositive(idleRetryMin)
                     && isPositive(idleRetryMax)
                     && isPositive(sessionDuration)
+                    && isPositive(maintenanceInterval)
+                    && !retryBackoffMax.minus(retryBackoff).isNegative()
                     && !idleRetryMax.minus(idleRetryMin).isNegative();
         }
     }
