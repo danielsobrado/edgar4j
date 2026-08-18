@@ -11,6 +11,8 @@ public interface ArtifactStorePort {
 
     InputStream openStaged(String stagingId) throws IOException;
 
+    InputStream openVerified(String artifactId) throws IOException;
+
     VerifiedArtifact promote(
             String stagingId,
             String sha256,
