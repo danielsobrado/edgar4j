@@ -1,7 +1,7 @@
 package org.jds.edgar4j.service.impl;
 
-import java.time.LocalDateTime;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -14,6 +14,7 @@ import org.jds.edgar4j.dto.request.RemoteFilingSearchRequest;
 import org.jds.edgar4j.model.DownloadJob;
 import org.jds.edgar4j.model.DownloadJob.JobStatus;
 import org.jds.edgar4j.port.DownloadJobDataPort;
+import org.jds.edgar4j.properties.Edgar4JProperties;
 import org.jds.edgar4j.service.DownloadBulkDataService;
 import org.jds.edgar4j.service.DownloadBulkDataService.BulkDownloadResult;
 import org.jds.edgar4j.service.DownloadSubmissionsService;
@@ -21,7 +22,6 @@ import org.jds.edgar4j.service.DownloadTickersService;
 import org.jds.edgar4j.service.RemoteEdgarService;
 import org.jds.edgar4j.service.UsaSpendingDownloadService;
 import org.jds.edgar4j.service.UsaSpendingDownloadService.UsaSpendingDownloadResult;
-import org.jds.edgar4j.properties.Edgar4JProperties;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -33,6 +33,10 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class DownloadJobExecutor {
 
+    private static final int MAX_CHUNK_DAYS = 366;
+    private static final int MAX_PAUSE_SECONDS = 3_600;
+    private static final int MIN_PAUSE_SECONDS = 0;
+
     private final DownloadJobDataPort downloadJobRepository;
     private final DownloadTickersService downloadTickersService;
     private final DownloadSubmissionsService downloadSubmissionsService;
@@ -40,10 +44,6 @@ public class DownloadJobExecutor {
     private final Edgar4JProperties edgar4JProperties;
     private final RemoteEdgarService remoteEdgarService;
     private final UsaSpendingDownloadService usaSpendingDownloadService;
-
-    private static final int MAX_CHUNK_DAYS = 366;
-    private static final int MAX_PAUSE_SECONDS = 3_600;
-    private static final int MIN_PAUSE_SECONDS = 0;
 
     @Async("downloadExecutor")
     public void executeDownloadAsync(String jobId, DownloadRequest request) {
@@ -68,14 +68,14 @@ public class DownloadJobExecutor {
 
             switch (request.getType()) {
                 case TICKERS_ALL:
-                    filesDownloaded = downloadTickersService.downloadTickers();
+                    filesDownloaded = downloadTickersService.downloadTickers(jobId);
                     break;
                 case TICKERS_NYSE:
                 case TICKERS_NASDAQ:
-                    filesDownloaded = downloadTickersService.downloadTickersExchanges();
+                    filesDownloaded = downloadTickersService.downloadTickersExchanges(jobId);
                     break;
                 case TICKERS_MF:
-                    filesDownloaded = downloadTickersService.downloadTickersMFs();
+                    filesDownloaded = downloadTickersService.downloadTickersMFs(jobId);
                     break;
                 case SUBMISSIONS:
                     if (request.getCik() == null || request.getCik().isBlank()) {
@@ -92,8 +92,7 @@ public class DownloadJobExecutor {
                 case USA_SPENDING_AWARDS:
                     UsaSpendingDownloadResult result = usaSpendingDownloadService.downloadAwardCsvZip(
                             request.getDateFrom(),
-                            request.getDateTo()
-                    );
+                            request.getDateTo());
                     markCompleted(jobId, 1, result);
                     return;
                 case BULK_SUBMISSIONS:
@@ -108,11 +107,11 @@ public class DownloadJobExecutor {
                     log.warn("Unsupported download type: {}", request.getType());
             }
 
-            markCompleted(jobId, filesDownloaded);
+            if (!isCancelled(jobId)) {
+                markCompleted(jobId, filesDownloaded);
+            }
         } catch (Throwable e) {
-            // Catch Throwable, not just Exception: a fatal error such as
-            // OutOfMemoryError would otherwise leave the job stuck at IN_PROGRESS
-            // forever because the async thread dies without updating status.
+            // A fatal asynchronous failure must not leave the persisted job stuck in progress.
             log.error("Download job failed: {}", jobId, e);
             markFailed(jobId, e.getMessage());
         }
@@ -150,10 +149,8 @@ public class DownloadJobExecutor {
                 return importedFilingRecords;
             }
 
-            if (i < chunks.size() - 1) {
-                if (!sleepInterruptibly(pauseMs, jobId)) {
-                    throw new IllegalStateException("Remote filing sync was interrupted during pause");
-                }
+            if (i < chunks.size() - 1 && !sleepInterruptibly(pauseMs, jobId)) {
+                throw new IllegalStateException("Remote filing sync was interrupted during pause");
             }
         }
 
@@ -180,24 +177,24 @@ public class DownloadJobExecutor {
         long importedFilingRecords = 0;
         for (String cik : companyCiks) {
             if (isCancelled(jobId)) {
-                log.info("Stopping cancelled remote filing sync job {} during chunk {} to {}", jobId, range.start(), range.end());
+                log.info(
+                        "Stopping cancelled remote filing sync job {} during chunk {} to {}",
+                        jobId,
+                        range.start(),
+                        range.end());
                 return new SyncRangeResult(importedFilingRecords, companyCiks);
             }
             importedFilingRecords += switch (syncMode) {
-                case FILING_DATE ->
-                        downloadSubmissionsService.downloadSubmissions(
-                                cik,
-                                request.getFormType(),
-                                range.start(),
-                                range.end());
+                case FILING_DATE -> downloadSubmissionsService.downloadSubmissions(
+                        cik,
+                        request.getFormType(),
+                        range.start(),
+                        range.end());
                 default -> downloadSubmissionsService.downloadSubmissions(cik);
             };
         }
 
         return new SyncRangeResult(importedFilingRecords, companyCiks);
-    }
-
-    private record SyncRangeResult(long filesDownloaded, List<String> companyCiks) {
     }
 
     private List<DateRange> splitIntoChunks(LocalDate from, LocalDate to, int chunkDays) {
@@ -265,9 +262,6 @@ public class DownloadJobExecutor {
             return new Edgar4JProperties.RemoteSync();
         }
         return remoteSync;
-    }
-
-    private record DateRange(LocalDate start, LocalDate end) {
     }
 
     private void updateProgress(String jobId, int progress, long filesDownloaded, long totalFiles) {
@@ -339,5 +333,10 @@ public class DownloadJobExecutor {
         job.setCompletedAt(LocalDateTime.now());
         downloadJobRepository.save(job);
     }
-}
 
+    private record SyncRangeResult(long filesDownloaded, List<String> companyCiks) {
+    }
+
+    private record DateRange(LocalDate start, LocalDate end) {
+    }
+}
