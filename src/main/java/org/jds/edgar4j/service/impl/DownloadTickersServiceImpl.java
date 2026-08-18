@@ -1,17 +1,19 @@
 package org.jds.edgar4j.service.impl;
 
-import java.util.List;
 import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Locale;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
-import org.jds.edgar4j.model.Ticker;
 import org.jds.edgar4j.integration.SecApiClient;
 import org.jds.edgar4j.integration.SecResponseParser;
+import org.jds.edgar4j.model.Ticker;
 import org.jds.edgar4j.port.TickerDataPort;
 import org.jds.edgar4j.service.DownloadTickersService;
+import org.jds.edgar4j.service.TickerResourceAcquisitionService;
 import org.springframework.stereotype.Service;
 
 import lombok.RequiredArgsConstructor;
@@ -30,12 +32,16 @@ public class DownloadTickersServiceImpl implements DownloadTickersService {
     private final SecApiClient secApiClient;
     private final SecResponseParser responseParser;
     private final TickerDataPort tickerRepository;
+    private final TickerResourceAcquisitionService tickerResourceAcquisitionService;
 
     @Override
     public int downloadTickers() {
         log.info("Download tickers");
 
-        String jsonResponse = secApiClient.fetchCompanyTickers();
+        String jsonResponse = acquire(
+                tickerResourceAcquisitionService::acquireCompanyTickers,
+                secApiClient::fetchCompanyTickers,
+                "company tickers");
         log.debug("Received tickers response length: {} characters", jsonResponse.length());
 
         List<Ticker> tickers = responseParser.parseTickersJson(jsonResponse);
@@ -50,7 +56,10 @@ public class DownloadTickersServiceImpl implements DownloadTickersService {
     public int downloadTickersExchanges() {
         log.info("Download tickers with exchanges");
 
-        String jsonResponse = secApiClient.fetchCompanyTickersExchanges();
+        String jsonResponse = acquire(
+                tickerResourceAcquisitionService::acquireCompanyTickersExchanges,
+                secApiClient::fetchCompanyTickersExchanges,
+                "company tickers with exchanges");
         log.debug("Received tickers exchanges response length: {} characters", jsonResponse.length());
 
         List<Ticker> tickers = responseParser.parseTickersExchangeJson(jsonResponse);
@@ -65,7 +74,10 @@ public class DownloadTickersServiceImpl implements DownloadTickersService {
     public int downloadTickersMFs() {
         log.info("Download mutual fund tickers");
 
-        String jsonResponse = secApiClient.fetchCompanyTickersMutualFunds();
+        String jsonResponse = acquire(
+                tickerResourceAcquisitionService::acquireCompanyTickersMutualFunds,
+                secApiClient::fetchCompanyTickersMutualFunds,
+                "mutual fund tickers");
         log.debug("Received mutual fund tickers response length: {} characters", jsonResponse.length());
 
         List<Ticker> tickers = responseParser.parseTickersJson(jsonResponse);
@@ -74,6 +86,22 @@ public class DownloadTickersServiceImpl implements DownloadTickersService {
         saveTickers(tickers);
         log.info("Saved {} mutual fund tickers", tickers.size());
         return tickers.size();
+    }
+
+    private String acquire(
+            Supplier<String> distributedAcquisition,
+            Supplier<String> directAcquisition,
+            String resourceName) {
+        if (!tickerResourceAcquisitionService.isDistributedAcquisitionEnabled()) {
+            return directAcquisition.get();
+        }
+
+        try {
+            return distributedAcquisition.get();
+        } catch (RuntimeException e) {
+            log.warn("Distributed acquisition failed for {}; using direct SEC fallback", resourceName, e);
+            return directAcquisition.get();
+        }
     }
 
     private void saveTickers(List<Ticker> tickers) {
@@ -89,10 +117,10 @@ public class DownloadTickersServiceImpl implements DownloadTickersService {
             Map<String, String> existingIdsByCode = tickerRepository.findByCodeIn(codes).stream()
                     .filter(existing -> existing.getCode() != null && !existing.getCode().isBlank())
                     .collect(Collectors.toMap(
-                        existing -> normalizeTickerCode(existing.getCode()),
-                        Ticker::getId,
-                        (left, right) -> left,
-                        LinkedHashMap::new));
+                            existing -> normalizeTickerCode(existing.getCode()),
+                            Ticker::getId,
+                            (left, right) -> left,
+                            LinkedHashMap::new));
 
             for (Ticker ticker : tickers) {
                 String normalizedCode = normalizeTickerCode(ticker.getCode());
@@ -120,4 +148,3 @@ public class DownloadTickersServiceImpl implements DownloadTickersService {
         return normalized.isBlank() ? null : normalized;
     }
 }
-
