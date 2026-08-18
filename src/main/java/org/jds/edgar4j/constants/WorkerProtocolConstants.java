@@ -9,6 +9,7 @@ public final class WorkerProtocolConstants {
     public static final int MAX_RESOURCE_ID_LENGTH = 512;
     public static final int TOKEN_BYTES = 32;
     public static final int LEASE_CANDIDATE_SCAN_LIMIT = 64;
+    public static final String SERVER_SESSION_PREFIX = "server-";
 
     private WorkerProtocolConstants() {
     }
