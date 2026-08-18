@@ -8,6 +8,7 @@ import org.jds.edgar4j.model.WorkerCapability;
 import org.jds.edgar4j.model.WorkerFailureCode;
 import org.jds.edgar4j.model.WorkerSource;
 import org.jds.edgar4j.model.WorkerTask;
+import org.jds.edgar4j.model.WorkerTaskStatus;
 
 public interface WorkerTaskDataPort {
 
@@ -61,6 +62,10 @@ public interface WorkerTaskDataPort {
     int cancelByParentDownloadJobId(String parentDownloadJobId, Instant now);
 
     WorkerTaskCounts countByParentDownloadJobId(String parentDownloadJobId);
+
+    long countByStatus(WorkerTaskStatus status);
+
+    long countActiveLeasesBySessionId(String sessionId, Instant now);
 
     record LeaseCriteria(
             String sessionId,
