@@ -48,8 +48,6 @@ public class WorkerParentJobServiceImpl implements WorkerParentJobService {
             return;
         }
 
-        job.setTotalFiles(total);
-        job.setFilesDownloaded(counts.completed());
         job.setProgress((int) Math.min(100L, counts.completed() * 100L / total));
         downloadJobDataPort.save(job);
     }
