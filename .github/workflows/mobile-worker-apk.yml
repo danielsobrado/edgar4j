@@ -1,0 +1,78 @@
+name: Mobile Worker APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: APK build type
+        required: true
+        default: debug
+        type: choice
+        options:
+          - debug
+          - release
+  push:
+    branches:
+      - main
+    paths:
+      - "mobile-worker-android/**"
+      - ".github/workflows/mobile-worker-apk.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile-worker-android
+    env:
+      BUILD_TYPE: ${{ github.event.inputs.build_type || 'debug' }}
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      ANDROID_VERSION_CODE: ${{ github.run_number }}
+      ANDROID_VERSION_NAME: 0.1.${{ github.run_number }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: sdkmanager "platforms;android-36" "build-tools;35.0.0"
+
+      - name: Set up Gradle 9.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.1.0"
+
+      - name: Prepare release signing
+        if: env.BUILD_TYPE == 'release'
+        run: |
+          test -n "$ANDROID_KEYSTORE_BASE64"
+          test -n "$ANDROID_KEYSTORE_PASSWORD"
+          test -n "$ANDROID_KEY_ALIAS"
+          test -n "$ANDROID_KEY_PASSWORD"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > keystore.jks
+          echo "ANDROID_KEYSTORE_PATH=$PWD/keystore.jks" >> "$GITHUB_ENV"
+
+      - name: Build and test APK
+        run: bash scripts/build-apk.sh "$BUILD_TYPE"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: edgar4j-mobile-worker-${{ env.BUILD_TYPE }}
+          path: mobile-worker-android/app/build/outputs/apk/**/*.apk
+          if-no-files-found: error
