@@ -17,6 +17,7 @@ class MainActivity : Activity() {
     private lateinit var scheduler: WorkerScheduler
 
     private lateinit var serverUrl: EditText
+    private lateinit var secUserAgent: EditText
     private lateinit var username: EditText
     private lateinit var password: EditText
     private lateinit var enabled: Switch
@@ -37,9 +38,7 @@ class MainActivity : Activity() {
         findViewById<Button>(R.id.save).setOnClickListener { save(runNow = false) }
         findViewById<Button>(R.id.runNow).setOnClickListener { save(runNow = true) }
 
-        scope.launch {
-            populate(preferences.current())
-        }
+        scope.launch { populate(preferences.current()) }
     }
 
     override fun onDestroy() {
@@ -49,6 +48,7 @@ class MainActivity : Activity() {
 
     private fun bindViews() {
         serverUrl = findViewById(R.id.serverUrl)
+        secUserAgent = findViewById(R.id.secUserAgent)
         username = findViewById(R.id.username)
         password = findViewById(R.id.password)
         enabled = findViewById(R.id.enabled)
@@ -62,6 +62,7 @@ class MainActivity : Activity() {
 
     private fun populate(settings: WorkerSettings) {
         serverUrl.setText(settings.serverUrl)
+        secUserAgent.setText(settings.secUserAgent)
         username.setText(settings.username)
         enabled.isChecked = settings.enabled
         wifiOnly.isChecked = settings.wifiOnly
@@ -94,6 +95,7 @@ class MainActivity : Activity() {
 
     private fun readSettings(): WorkerSettings = WorkerSettings(
         serverUrl = serverUrl.text.toString().trim(),
+        secUserAgent = secUserAgent.text.toString().trim(),
         username = username.text.toString().trim(),
         enabled = enabled.isChecked,
         wifiOnly = wifiOnly.isChecked,
