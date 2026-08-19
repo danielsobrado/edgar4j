@@ -70,7 +70,9 @@ class EdgarDownloadWorker(
         val heartbeat = startHeartbeat(api, session, task)
         try {
             val maxBytes = settings.maxArtifactMb * 1024L * 1024L
-            artifact = withContext(Dispatchers.IO) { downloader.download(task, maxBytes) }
+            artifact = withContext(Dispatchers.IO) {
+                downloader.download(task, maxBytes, settings.secUserAgent)
+            }
             withContext(Dispatchers.IO) { api.upload(session, task, artifact) }
             Log.i(TAG, "Completed worker task ${task.id} (${artifact.sizeBytes} bytes)")
         } catch (e: WorkerTaskException) {
