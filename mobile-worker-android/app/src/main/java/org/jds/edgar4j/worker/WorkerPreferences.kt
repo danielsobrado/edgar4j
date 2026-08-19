@@ -14,6 +14,7 @@ private val Context.workerDataStore by preferencesDataStore(name = "worker_setti
 
 data class WorkerSettings(
     val serverUrl: String = "",
+    val secUserAgent: String = "",
     val username: String = "",
     val enabled: Boolean = false,
     val wifiOnly: Boolean = true,
@@ -29,6 +30,7 @@ class WorkerPreferences(context: Context) {
     val settings: Flow<WorkerSettings> = appContext.workerDataStore.data.map { preferences ->
         WorkerSettings(
             serverUrl = preferences[SERVER_URL] ?: "",
+            secUserAgent = preferences[SEC_USER_AGENT] ?: "",
             username = preferences[USERNAME] ?: "",
             enabled = preferences[ENABLED] ?: false,
             wifiOnly = preferences[WIFI_ONLY] ?: true,
@@ -46,6 +48,7 @@ class WorkerPreferences(context: Context) {
         validate(settings)
         appContext.workerDataStore.edit { preferences ->
             preferences[SERVER_URL] = settings.serverUrl.trimEnd('/')
+            preferences[SEC_USER_AGENT] = settings.secUserAgent.trim()
             preferences[USERNAME] = settings.username.trim()
             preferences[ENABLED] = settings.enabled
             preferences[WIFI_ONLY] = settings.wifiOnly
@@ -60,6 +63,7 @@ class WorkerPreferences(context: Context) {
 
     companion object {
         private val SERVER_URL = stringPreferencesKey("server_url")
+        private val SEC_USER_AGENT = stringPreferencesKey("sec_user_agent")
         private val USERNAME = stringPreferencesKey("username")
         private val ENABLED = booleanPreferencesKey("enabled")
         private val WIFI_ONLY = booleanPreferencesKey("wifi_only")
@@ -73,6 +77,9 @@ class WorkerPreferences(context: Context) {
             require(url.host?.isNotBlank() == true) { "Server URL must include a host" }
             require(url.scheme == "https" || (BuildConfig.DEBUG && url.scheme == "http")) {
                 "Release builds require HTTPS"
+            }
+            require(settings.secUserAgent.isNotBlank()) {
+                "SEC User-Agent with a contact identity is required"
             }
             require(settings.minimumBatteryPercent in 0..100) {
                 "Minimum battery must be between 0 and 100"
