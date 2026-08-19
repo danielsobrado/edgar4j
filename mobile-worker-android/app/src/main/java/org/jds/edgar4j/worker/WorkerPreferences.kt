@@ -42,7 +42,7 @@ class WorkerPreferences(context: Context) {
 
     suspend fun current(): WorkerSettings = settings.first()
 
-    suspend fun save(settings: WorkerSettings, password: String) {
+    suspend fun save(settings: WorkerSettings, newPassword: String?) {
         validate(settings)
         appContext.workerDataStore.edit { preferences ->
             preferences[SERVER_URL] = settings.serverUrl.trimEnd('/')
@@ -53,7 +53,7 @@ class WorkerPreferences(context: Context) {
             preferences[MINIMUM_BATTERY] = settings.minimumBatteryPercent
             preferences[MAX_ARTIFACT_MB] = settings.maxArtifactMb
         }
-        secretStore.putPassword(password)
+        newPassword?.let(secretStore::putPassword)
     }
 
     fun password(): String = secretStore.getPassword()
