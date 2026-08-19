@@ -18,6 +18,8 @@ object WorkerConstants {
     const val MIN_ARTIFACT_MB = 1
     const val STORAGE_RESERVE_BYTES = 64L * 1024L * 1024L
     const val HEARTBEAT_INTERVAL_MS = 60_000L
+    const val MIN_IDLE_RETRY_SECONDS = 5
+    const val MAX_IDLE_RETRY_SECONDS = 60
     const val MAX_RUN_MS = 8L * 60L * 1000L
     const val CONNECT_TIMEOUT_MS = 30_000
     const val READ_TIMEOUT_MS = 60_000
