@@ -1,0 +1,16 @@
+<resources>
+    <string name="app_name">Edgar4j Worker</string>
+    <string name="title_worker">Edgar4j Mobile Worker</string>
+    <string name="server_url">Server URL</string>
+    <string name="username">HTTP Basic username</string>
+    <string name="password">HTTP Basic password</string>
+    <string name="enabled">Enable background worker</string>
+    <string name="wifi_only">Wi-Fi / unmetered only</string>
+    <string name="charging_only">Charging only</string>
+    <string name="minimum_battery">Minimum battery %%</string>
+    <string name="max_artifact_mb">Maximum artifact MB</string>
+    <string name="save">Save</string>
+    <string name="run_now">Run now</string>
+    <string name="status_idle">Idle</string>
+    <string name="status_saved">Settings saved</string>
+</resources>
