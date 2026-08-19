@@ -4,6 +4,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.SocketTimeoutException
+import java.net.URI
 import java.net.URL
 import java.security.MessageDigest
 import javax.net.ssl.HttpsURLConnection
@@ -111,15 +112,25 @@ class SourceDownloader(private val stagingDirectory: File) {
 
     companion object {
         private const val BUFFER_SIZE = 64 * 1024
+        private const val HTTPS_PORT = 443
 
         fun validateSource(rawUrl: String) {
-            val url = runCatching { URL(rawUrl) }
+            val uri = runCatching { URI(rawUrl) }
                 .getOrElse { throw WorkerTaskException("SOURCE_REJECTED", "Invalid source URL") }
-            if (url.protocol != "https") {
+            if (!uri.scheme.equals("https", ignoreCase = true)) {
                 throw WorkerTaskException("SOURCE_REJECTED", "Source URL must use HTTPS")
             }
-            if (url.host.lowercase() !in WorkerConstants.ALLOWED_SOURCE_HOSTS) {
+            if (uri.host.isNullOrBlank() || uri.host.lowercase() !in WorkerConstants.ALLOWED_SOURCE_HOSTS) {
                 throw WorkerTaskException("SOURCE_REJECTED", "Source host is not allowlisted")
+            }
+            if (uri.port != -1 && uri.port != HTTPS_PORT) {
+                throw WorkerTaskException("SOURCE_REJECTED", "Source URL must use the standard HTTPS port")
+            }
+            if (uri.userInfo != null) {
+                throw WorkerTaskException("SOURCE_REJECTED", "Source URL cannot contain user information")
+            }
+            if (uri.fragment != null) {
+                throw WorkerTaskException("SOURCE_REJECTED", "Source URL cannot contain a fragment")
             }
         }
     }
