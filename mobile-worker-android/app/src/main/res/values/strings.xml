@@ -2,8 +2,9 @@
     <string name="app_name">Edgar4j Worker</string>
     <string name="title_worker">Edgar4j Mobile Worker</string>
     <string name="server_url">Server URL</string>
+    <string name="sec_user_agent">SEC User-Agent (name/email)</string>
     <string name="username">HTTP Basic username</string>
-    <string name="password">HTTP Basic password</string>
+    <string name="password">HTTP Basic password (leave blank to keep)</string>
     <string name="enabled">Enable background worker</string>
     <string name="wifi_only">Wi-Fi / unmetered only</string>
     <string name="charging_only">Charging only</string>
