@@ -5,7 +5,6 @@ import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -23,6 +22,13 @@ class EdgarDownloadWorker(
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         val settings = preferences.current()
         if (!settings.enabled) return@withContext Result.success()
+
+        try {
+            WorkerPreferences.validate(settings)
+        } catch (e: IllegalArgumentException) {
+            Log.e(TAG, "Worker settings are invalid: ${e.message}")
+            return@withContext Result.failure()
+        }
 
         val initialState = stateReader.read()
         if (!stateReader.isEligible(settings, initialState)) {
@@ -50,7 +56,18 @@ class EdgarDownloadWorker(
                     return@withContext Result.retry()
                 }
 
-                val task = lease.tasks.firstOrNull() ?: break
+                val task = lease.tasks.firstOrNull()
+                if (task == null) {
+                    val retrySeconds = lease.retryAfterSeconds.coerceIn(
+                        WorkerConstants.MIN_IDLE_RETRY_SECONDS,
+                        WorkerConstants.MAX_IDLE_RETRY_SECONDS,
+                    )
+                    val retryMs = retrySeconds * 1_000L
+                    if (System.currentTimeMillis() + retryMs >= deadline) break
+                    delay(retryMs)
+                    continue
+                }
+
                 processTask(api, session, task, settings)
             }
             Result.success()
@@ -67,7 +84,14 @@ class EdgarDownloadWorker(
         settings: WorkerSettings,
     ) = coroutineScope {
         var artifact: DownloadedArtifact? = null
-        val heartbeat = startHeartbeat(api, session, task)
+        val heartbeat = launch(Dispatchers.IO) {
+            while (isActive) {
+                delay(WorkerConstants.HEARTBEAT_INTERVAL_MS)
+                runCatching { api.heartbeat(session, task) }
+                    .onFailure { Log.w(TAG, "Heartbeat failed for task ${task.id}") }
+            }
+        }
+
         try {
             val maxBytes = settings.maxArtifactMb * 1024L * 1024L
             artifact = withContext(Dispatchers.IO) {
@@ -99,18 +123,6 @@ class EdgarDownloadWorker(
         } finally {
             heartbeat.cancel()
             artifact?.file?.delete()
-        }
-    }
-
-    private fun startHeartbeat(
-        api: WorkerApiClient,
-        session: WorkerSession,
-        task: WorkerTask,
-    ): Job = kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
-        while (isActive) {
-            delay(WorkerConstants.HEARTBEAT_INTERVAL_MS)
-            runCatching { api.heartbeat(session, task) }
-                .onFailure { Log.w(TAG, "Heartbeat failed for task ${task.id}") }
         }
     }
 
