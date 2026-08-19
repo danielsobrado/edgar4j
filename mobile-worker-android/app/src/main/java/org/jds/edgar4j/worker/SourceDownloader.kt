@@ -9,8 +9,13 @@ import java.security.MessageDigest
 import javax.net.ssl.HttpsURLConnection
 
 class SourceDownloader(private val stagingDirectory: File) {
-    fun download(task: WorkerTask, configuredMaxBytes: Long): DownloadedArtifact {
+    fun download(
+        task: WorkerTask,
+        configuredMaxBytes: Long,
+        secUserAgent: String,
+    ): DownloadedArtifact {
         validateSource(task.sourceUrl)
+        require(secUserAgent.isNotBlank()) { "SEC User-Agent is required" }
         stagingDirectory.mkdirs()
         val target = File.createTempFile("task-${task.id}-", ".part", stagingDirectory)
         val maxBytes = minOf(task.maxBytes, configuredMaxBytes)
@@ -23,7 +28,7 @@ class SourceDownloader(private val stagingDirectory: File) {
                 connectTimeout = WorkerConstants.CONNECT_TIMEOUT_MS
                 readTimeout = WorkerConstants.READ_TIMEOUT_MS
                 setRequestProperty("Accept-Encoding", "identity")
-                setRequestProperty("User-Agent", "Edgar4j-Mobile-Worker/${BuildConfig.VERSION_NAME}")
+                setRequestProperty("User-Agent", secUserAgent)
             }
 
             try {
@@ -74,7 +79,9 @@ class SourceDownloader(private val stagingDirectory: File) {
                     throw WorkerTaskException("CONTENT_INVALID", "Source returned an empty artifact")
                 }
 
-                val sha256 = digest.digest().joinToString("") { "%02x".format(it) }
+                val sha256 = digest.digest().joinToString("") { byte ->
+                    "%02x".format(byte.toInt() and 0xff)
+                }
                 if (!task.expectedSha256.isNullOrBlank() &&
                     !task.expectedSha256.equals(sha256, ignoreCase = true)
                 ) {
