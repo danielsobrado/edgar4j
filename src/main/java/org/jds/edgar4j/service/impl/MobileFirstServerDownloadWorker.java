@@ -5,6 +5,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 
+import org.jds.edgar4j.model.WorkerCapability;
 import org.jds.edgar4j.model.WorkerTask;
 import org.jds.edgar4j.model.WorkerTaskStatus;
 import org.jds.edgar4j.port.ArtifactStorePort;
@@ -47,7 +48,12 @@ public class MobileFirstServerDownloadWorker implements ServerDownloadWorker {
 
     @Override
     public Optional<VerifiedArtifact> execute(String taskId) {
-        if (!properties.isEnabled() || !hasRecentMobileWorker()) {
+        if (!properties.isEnabled()) {
+            return delegate.execute(taskId);
+        }
+
+        WorkerTask initialTask = taskDataPort.findById(taskId).orElse(null);
+        if (requiresTrustedSource(initialTask) || !hasRecentMobileWorker()) {
             return delegate.execute(taskId);
         }
 
@@ -110,6 +116,12 @@ public class MobileFirstServerDownloadWorker implements ServerDownloadWorker {
             return Optional.empty();
         }
         return artifactStore.findVerified(task.getArtifactId());
+    }
+
+    private static boolean requiresTrustedSource(WorkerTask task) {
+        return task != null
+                && task.getRequiredCapabilities() != null
+                && task.getRequiredCapabilities().contains(WorkerCapability.TRUSTED_SOURCE);
     }
 
     private boolean hasRecentMobileWorker() {
