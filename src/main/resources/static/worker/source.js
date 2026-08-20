@@ -22,6 +22,12 @@ export function validateTask(task, policy) {
   if (url.protocol !== 'https:' || !ALLOWED_SEC_HOSTS.has(url.hostname.toLowerCase())) {
     throw new WorkerTaskFailure('SOURCE_REJECTED', 'Source URL is outside the SEC allowlist');
   }
+  if (url.port && url.port !== '443') {
+    throw new WorkerTaskFailure('SOURCE_REJECTED', 'Source URL must use the standard HTTPS port');
+  }
+  if (url.username || url.password || url.hash) {
+    throw new WorkerTaskFailure('SOURCE_REJECTED', 'Source URL contains forbidden components');
+  }
   if (task.maxBytes <= 0 || task.maxBytes > policy.maxArtifactBytes) {
     throw new WorkerTaskFailure('INSUFFICIENT_STORAGE', 'Task exceeds the local artifact policy');
   }
@@ -39,11 +45,17 @@ export async function downloadTask(task, policy, controller) {
       signal: controller.signal,
     });
 
-    if (response.status === 404) {
+    if (response.status === 404 || response.status === 410) {
       throw new WorkerTaskFailure('SOURCE_NOT_FOUND', 'Source artifact was not found');
     }
-    if (response.status === 429) {
-      throw new WorkerTaskFailure('SOURCE_RATE_LIMITED', 'Source rate limited the worker');
+    if (response.status === 408 || response.status === 504) {
+      throw new WorkerTaskFailure('SOURCE_TIMEOUT', `Source returned HTTP ${response.status}`);
+    }
+    if (response.status === 403 || response.status === 429) {
+      throw new WorkerTaskFailure('SOURCE_RATE_LIMITED', `Source returned HTTP ${response.status}`);
+    }
+    if (response.status >= 500) {
+      throw new WorkerTaskFailure('NETWORK_UNAVAILABLE', `Source returned HTTP ${response.status}`);
     }
     if (!response.ok) {
       throw new WorkerTaskFailure('SOURCE_REJECTED', `Source returned HTTP ${response.status}`);
