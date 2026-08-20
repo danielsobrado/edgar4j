@@ -6,6 +6,7 @@ import static org.jds.edgar4j.constants.WorkerStorageConstants.SHA256_PATTERN;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.EnumSet;
+import java.util.Locale;
 import java.util.Objects;
 
 import org.jds.edgar4j.model.WorkerCapability;
@@ -100,7 +101,8 @@ public class DistributedWorkPlannerImpl implements DistributedWorkPlanner {
             throw new IllegalArgumentException("Expected resource size exceeds task limit");
         }
         String expectedSha256 = normalize(specification.expectedSha256());
-        if (expectedSha256 != null && !SHA256_PATTERN.matcher(expectedSha256.toLowerCase()).matches()) {
+        if (expectedSha256 != null
+                && !SHA256_PATTERN.matcher(expectedSha256.toLowerCase(Locale.ROOT)).matches()) {
             throw new IllegalArgumentException("Expected worker SHA-256 is invalid");
         }
     }
