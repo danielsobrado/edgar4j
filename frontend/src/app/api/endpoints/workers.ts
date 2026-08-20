@@ -1,5 +1,4 @@
-import apiClient from '../client';
-import type { ApiResponse } from '../types';
+import { apiClient } from '../client';
 import type {
   WorkerArtifactResponse,
   WorkerFailureCode,
@@ -28,36 +27,45 @@ function authHeaders(credentials: WorkerCredentials) {
 }
 
 export const workersApi = {
-  openSession: async (request: WorkerSessionRequest): Promise<WorkerSessionResponse> => {
-    const response = await apiClient.post<ApiResponse<WorkerSessionResponse>>('/workers/session', request);
-    return response.data.data!;
+  openSession: (request: WorkerSessionRequest): Promise<WorkerSessionResponse> => {
+    return apiClient.post<WorkerSessionResponse>('/workers/session', request);
   },
 
-  lease: async (
+  lease: (
     credentials: WorkerCredentials,
     request: WorkerLeaseRequest,
   ): Promise<WorkerLeaseResponse> => {
-    const response = await apiClient.post<ApiResponse<WorkerLeaseResponse>>('/workers/tasks/lease', request, {
+    return apiClient.post<WorkerLeaseResponse>('/workers/tasks/lease', request, {
       headers: authHeaders(credentials),
     });
-    return response.data.data!;
   },
 
-  heartbeat: async (
+  heartbeat: (
     credentials: WorkerCredentials,
     taskId: string,
     leaseToken: string,
     runtime: WorkerLeaseRequest['runtime'],
   ): Promise<WorkerHeartbeatResponse> => {
-    const response = await apiClient.post<ApiResponse<WorkerHeartbeatResponse>>(
+    return apiClient.post<WorkerHeartbeatResponse>(
       `/workers/tasks/${encodeURIComponent(taskId)}/heartbeat`,
       { leaseToken, runtime },
       { headers: authHeaders(credentials) },
     );
-    return response.data.data!;
   },
 
-  uploadArtifact: async (
+  reserveSource: (
+    credentials: WorkerCredentials,
+    taskId: string,
+    leaseToken: string,
+  ): Promise<void> => {
+    return apiClient.post<void>(
+      `/workers/tasks/${encodeURIComponent(taskId)}/source-permit`,
+      { leaseToken },
+      { headers: authHeaders(credentials) },
+    );
+  },
+
+  uploadArtifact: (
     credentials: WorkerCredentials,
     taskId: string,
     leaseToken: string,
@@ -65,7 +73,7 @@ export const workersApi = {
     contentType: string,
     bytes: ArrayBuffer,
   ): Promise<WorkerArtifactResponse> => {
-    const response = await apiClient.put<ApiResponse<WorkerArtifactResponse>>(
+    return apiClient.put<WorkerArtifactResponse>(
       `/workers/tasks/${encodeURIComponent(taskId)}/artifact`,
       bytes,
       {
@@ -78,7 +86,6 @@ export const workersApi = {
         timeout: 120_000,
       },
     );
-    return response.data.data!;
   },
 
   reportFailure: async (
@@ -88,7 +95,7 @@ export const workersApi = {
     code: WorkerFailureCode,
     message?: string,
   ): Promise<void> => {
-    await apiClient.post(
+    await apiClient.post<void>(
       `/workers/tasks/${encodeURIComponent(taskId)}/failure`,
       { leaseToken, code, message },
       { headers: authHeaders(credentials) },
@@ -100,7 +107,7 @@ export const workersApi = {
     taskId: string,
     leaseToken: string,
   ): Promise<void> => {
-    await apiClient.post(
+    await apiClient.post<void>(
       `/workers/tasks/${encodeURIComponent(taskId)}/abandon`,
       { leaseToken },
       { headers: authHeaders(credentials) },
@@ -108,6 +115,6 @@ export const workersApi = {
   },
 
   revokeSession: async (credentials: WorkerCredentials): Promise<void> => {
-    await apiClient.delete('/workers/session', { headers: authHeaders(credentials) });
+    await apiClient.delete<void>('/workers/session', { headers: authHeaders(credentials) });
   },
 };
