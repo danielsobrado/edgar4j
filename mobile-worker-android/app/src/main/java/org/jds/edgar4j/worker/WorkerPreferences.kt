@@ -47,6 +47,8 @@ class WorkerPreferences(context: Context) {
 
     suspend fun save(settings: WorkerSettings, newPassword: String?) {
         validate(settings)
+        validateCredentials(settings, newPassword)
+
         appContext.workerDataStore.edit { preferences ->
             preferences[SERVER_URL] = settings.serverUrl.trim().trimEnd('/')
             preferences[SEC_USER_AGENT] = settings.secUserAgent.trim()
@@ -65,6 +67,21 @@ class WorkerPreferences(context: Context) {
     }
 
     fun password(): String = secretStore.getPassword()
+
+    private suspend fun validateCredentials(settings: WorkerSettings, newPassword: String?) {
+        val username = settings.username.trim()
+        if (username.isBlank()) return
+
+        val previousUsername = current().username.trim()
+        if (newPassword != null) {
+            require(newPassword.isNotBlank()) { "HTTP Basic password cannot be blank" }
+            return
+        }
+
+        require(previousUsername == username && secretStore.getPassword().isNotBlank()) {
+            "Enter the HTTP Basic password when setting or changing the username"
+        }
+    }
 
     companion object {
         private val SERVER_URL = stringPreferencesKey("server_url")
