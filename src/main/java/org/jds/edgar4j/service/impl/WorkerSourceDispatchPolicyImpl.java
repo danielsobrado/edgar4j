@@ -16,15 +16,23 @@ public class WorkerSourceDispatchPolicyImpl implements WorkerSourceDispatchPolic
 
     @Override
     public void reserveRemoteDispatch(WorkerSource source) {
-        if (source != WorkerSource.SEC_EDGAR) {
-            throw new IllegalArgumentException("Unsupported distributed worker source: " + source);
-        }
+        requireSupportedSource(source);
+    }
 
+    @Override
+    public void reserveSourceRequest(WorkerSource source) {
+        requireSupportedSource(source);
         try {
             secRateLimiter.acquire();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new IllegalStateException("Interrupted while reserving source dispatch capacity", e);
+            throw new IllegalStateException("Interrupted while reserving source request capacity", e);
+        }
+    }
+
+    private static void requireSupportedSource(WorkerSource source) {
+        if (source != WorkerSource.SEC_EDGAR) {
+            throw new IllegalArgumentException("Unsupported distributed worker source: " + source);
         }
     }
 }
