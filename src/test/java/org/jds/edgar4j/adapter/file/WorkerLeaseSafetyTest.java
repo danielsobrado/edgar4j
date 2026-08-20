@@ -23,6 +23,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 class WorkerLeaseSafetyTest {
 
     private static final Instant NOW = Instant.parse("2026-08-18T10:00:00Z");
+    private static final String EXPECTED_SHA256 = "a".repeat(64);
 
     @TempDir
     Path tempDir;
@@ -78,6 +79,7 @@ class WorkerLeaseSafetyTest {
                 .source(WorkerSource.SEC_EDGAR)
                 .sourceUrl("https://data.sec.gov/submissions/CIK0000320193.json")
                 .status(WorkerTaskStatus.PENDING)
+                .expectedSha256(EXPECTED_SHA256)
                 .requiredCapabilities(EnumSet.of(WorkerCapability.DOWNLOAD, WorkerCapability.SHA256))
                 .maxBytes(1024L)
                 .maxAttempts(3)
