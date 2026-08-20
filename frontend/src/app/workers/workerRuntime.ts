@@ -31,14 +31,15 @@ export async function evaluateWorkerEligibility(policy: WorkerPolicy): Promise<W
   const networkType = resolveNetworkType(connection);
   const metered = connection?.saveData === true || networkType === 'CELLULAR';
   const battery = await readBattery(workerNavigator);
-  const freeStorageBytes = await readFreeStorage(policy.maxArtifactBytes);
+  const availableStorageBytes = await readFreeStorage(policy.maxArtifactBytes);
+  const contributedStorageBytes = Math.min(availableStorageBytes, policy.maxArtifactBytes);
 
   const runtime: WorkerRuntimeState = {
     networkType,
     metered,
     charging: battery?.charging ?? false,
     batteryPercent: battery ? Math.round(battery.level * 100) : undefined,
-    freeStorageBytes,
+    freeStorageBytes: contributedStorageBytes,
   };
 
   if (!navigator.onLine) {
@@ -50,10 +51,13 @@ export async function evaluateWorkerEligibility(policy: WorkerPolicy): Promise<W
   if (policy.chargingOnly && battery?.charging !== true) {
     return { eligible: false, reason: 'Waiting for charging', runtime };
   }
+  if (policy.minimumBatteryPercent > 0 && !battery) {
+    return { eligible: false, reason: 'Battery state unavailable', runtime };
+  }
   if (battery && runtime.batteryPercent! < policy.minimumBatteryPercent) {
     return { eligible: false, reason: 'Battery below worker threshold', runtime };
   }
-  if (freeStorageBytes < policy.maxArtifactBytes) {
+  if (availableStorageBytes < policy.maxArtifactBytes) {
     return { eligible: false, reason: 'Insufficient browser storage budget', runtime };
   }
 
