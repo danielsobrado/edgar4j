@@ -2,6 +2,7 @@ package org.jds.edgar4j.worker
 
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.SocketTimeoutException
 import java.net.URI
@@ -17,9 +18,19 @@ class SourceDownloader(private val stagingDirectory: File) {
     ): DownloadedArtifact {
         validateSource(task.sourceUrl)
         require(secUserAgent.isNotBlank()) { "SEC User-Agent is required" }
-        stagingDirectory.mkdirs()
-        val target = File.createTempFile("task-${task.id}-", ".part", stagingDirectory)
         val maxBytes = minOf(task.maxBytes, configuredMaxBytes)
+        if (maxBytes <= 0) {
+            throw WorkerTaskException("CONTENT_INVALID", "Task size limit must be positive")
+        }
+        if (!stagingDirectory.exists() && !stagingDirectory.mkdirs()) {
+            throw WorkerTaskException("INSUFFICIENT_STORAGE", "Unable to create worker staging directory")
+        }
+
+        val target = try {
+            File.createTempFile("task-${task.id}-", ".part", stagingDirectory)
+        } catch (e: IOException) {
+            throw WorkerTaskException("INSUFFICIENT_STORAGE", "Unable to create worker staging file", e)
+        }
 
         try {
             val url = URL(task.sourceUrl)
@@ -34,24 +45,7 @@ class SourceDownloader(private val stagingDirectory: File) {
 
             try {
                 val status = connection.responseCode
-                when {
-                    status == HttpURLConnection.HTTP_NOT_FOUND -> throw WorkerTaskException(
-                        "SOURCE_NOT_FOUND",
-                        "Source returned HTTP 404",
-                    )
-                    status == 429 -> throw WorkerTaskException(
-                        "SOURCE_RATE_LIMITED",
-                        "Source returned HTTP 429",
-                    )
-                    status in 300..399 -> throw WorkerTaskException(
-                        "SOURCE_REJECTED",
-                        "Source redirects are not permitted",
-                    )
-                    status !in 200..299 -> throw WorkerTaskException(
-                        "SOURCE_REJECTED",
-                        "Source returned HTTP $status",
-                    )
-                }
+                classifyStatus(status)
 
                 val declaredLength = connection.contentLengthLong
                 if (declaredLength > maxBytes) {
@@ -131,6 +125,23 @@ class SourceDownloader(private val stagingDirectory: File) {
             }
             if (uri.fragment != null) {
                 throw WorkerTaskException("SOURCE_REJECTED", "Source URL cannot contain a fragment")
+            }
+        }
+
+        internal fun classifyStatus(status: Int) {
+            when {
+                status in 200..299 -> return
+                status == HttpURLConnection.HTTP_NOT_FOUND || status == HttpURLConnection.HTTP_GONE ->
+                    throw WorkerTaskException("SOURCE_NOT_FOUND", "Source returned HTTP $status")
+                status == HttpURLConnection.HTTP_CLIENT_TIMEOUT || status == HttpURLConnection.HTTP_GATEWAY_TIMEOUT ->
+                    throw WorkerTaskException("SOURCE_TIMEOUT", "Source returned HTTP $status")
+                status == HttpURLConnection.HTTP_FORBIDDEN || status == 429 ->
+                    throw WorkerTaskException("SOURCE_RATE_LIMITED", "Source returned HTTP $status")
+                status in 500..599 ->
+                    throw WorkerTaskException("NETWORK_UNAVAILABLE", "Source returned HTTP $status")
+                status in 300..399 ->
+                    throw WorkerTaskException("SOURCE_REJECTED", "Source redirects are not permitted")
+                else -> throw WorkerTaskException("SOURCE_REJECTED", "Source returned HTTP $status")
             }
         }
     }
