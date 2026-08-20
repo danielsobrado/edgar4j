@@ -4,12 +4,15 @@ import android.content.Context
 import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicBoolean
 
 class EdgarDownloadWorker(
     appContext: Context,
@@ -19,7 +22,20 @@ class EdgarDownloadWorker(
     private val stateReader = DeviceStateReader(appContext)
     private val downloader = SourceDownloader(appContext.cacheDir.resolve("worker-staging"))
 
-    override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
+    override suspend fun doWork(): Result {
+        if (!ACTIVE.compareAndSet(false, true)) {
+            Log.i(TAG, "Skipping overlapping mobile worker execution")
+            return Result.success()
+        }
+
+        return try {
+            executeWork()
+        } finally {
+            ACTIVE.set(false)
+        }
+    }
+
+    private suspend fun executeWork(): Result = withContext(Dispatchers.IO) {
         val settings = preferences.current()
         if (!settings.enabled) return@withContext Result.success()
 
@@ -30,14 +46,22 @@ class EdgarDownloadWorker(
             return@withContext Result.failure()
         }
 
-        val initialState = stateReader.read()
-        if (!stateReader.isEligible(settings, initialState)) {
-            return@withContext Result.retry()
+        val password = preferences.password()
+        if (settings.username.isNotBlank() && password.isBlank()) {
+            Log.e(TAG, "HTTP Basic username is configured without a stored password")
+            return@withContext Result.failure()
         }
 
-        val api = WorkerApiClient(settings, preferences.password())
+        val initialState = stateReader.read()
+        if (!stateReader.isEligible(settings, initialState)) {
+            return@withContext Result.success()
+        }
+
+        val api = WorkerApiClient(settings, password)
         val session = try {
             api.openSession()
+        } catch (e: WorkerApiException) {
+            return@withContext apiFailureResult("open session", e)
         } catch (e: Exception) {
             Log.w(TAG, "Unable to open worker session", e)
             return@withContext Result.retry()
@@ -51,6 +75,8 @@ class EdgarDownloadWorker(
 
                 val lease = try {
                     api.lease(session, runtime)
+                } catch (e: WorkerApiException) {
+                    return@withContext apiFailureResult("lease task", e)
                 } catch (e: Exception) {
                     Log.w(TAG, "Unable to lease worker task", e)
                     return@withContext Result.retry()
@@ -68,7 +94,11 @@ class EdgarDownloadWorker(
                     continue
                 }
 
-                processTask(api, session, task, settings)
+                try {
+                    processTask(api, session, task, settings)
+                } catch (e: WorkerApiException) {
+                    return@withContext apiFailureResult("process task", e)
+                }
             }
             Result.success()
         } finally {
@@ -93,24 +123,31 @@ class EdgarDownloadWorker(
         }
 
         try {
-            val maxBytes = settings.maxArtifactMb * 1024L * 1024L
+            val maxBytes = settings.maxArtifactMb.toLong() * WorkerConstants.MEBIBYTE_BYTES
             artifact = withContext(Dispatchers.IO) {
                 downloader.download(task, maxBytes, settings.secUserAgent)
             }
             withContext(Dispatchers.IO) { api.upload(session, task, artifact) }
             Log.i(TAG, "Completed worker task ${task.id} (${artifact.sizeBytes} bytes)")
+        } catch (e: CancellationException) {
+            abandonOnCancellation(api, session, task)
+            throw e
         } catch (e: WorkerTaskException) {
             Log.w(TAG, "Worker task ${task.id} failed with ${e.code}: ${e.message}")
             reportFailureSafely(api, session, task, e)
         } catch (e: WorkerApiException) {
-            if (e.statusCode != 409) {
-                Log.w(TAG, "Worker API rejected task ${task.id}: ${e.message}")
-                reportFailureSafely(
-                    api,
-                    session,
-                    task,
-                    WorkerTaskException("UPLOAD_FAILED", "Worker API rejected artifact upload", e),
-                )
+            when (e.statusCode) {
+                409 -> Log.i(TAG, "Worker lease became stale for task ${task.id}")
+                413, 422 -> {
+                    Log.w(TAG, "Worker API rejected artifact for task ${task.id}: ${e.message}")
+                    reportFailureSafely(
+                        api,
+                        session,
+                        task,
+                        WorkerTaskException("UPLOAD_FAILED", "Worker API rejected artifact upload", e),
+                    )
+                }
+                else -> throw e
             }
         } catch (e: Exception) {
             Log.e(TAG, "Unexpected worker task failure ${task.id}", e)
@@ -126,6 +163,17 @@ class EdgarDownloadWorker(
         }
     }
 
+    private suspend fun abandonOnCancellation(
+        api: WorkerApiClient,
+        session: WorkerSession,
+        task: WorkerTask,
+    ) {
+        withContext(NonCancellable + Dispatchers.IO) {
+            runCatching { api.abandon(session, task) }
+                .onFailure { Log.w(TAG, "Unable to abandon cancelled task ${task.id}") }
+        }
+    }
+
     private suspend fun reportFailureSafely(
         api: WorkerApiClient,
         session: WorkerSession,
@@ -138,6 +186,11 @@ class EdgarDownloadWorker(
         }
     }
 
+    private fun apiFailureResult(operation: String, failure: WorkerApiException): Result {
+        Log.w(TAG, "Worker API failed to $operation with HTTP ${failure.statusCode}: ${failure.message}")
+        return if (isRetryableApiStatus(failure.statusCode)) Result.retry() else Result.failure()
+    }
+
     private fun cleanupStaging() {
         applicationContext.cacheDir.resolve("worker-staging")
             .listFiles()
@@ -147,5 +200,9 @@ class EdgarDownloadWorker(
 
     companion object {
         private const val TAG = "Edgar4jWorker"
+        private val ACTIVE = AtomicBoolean(false)
+
+        private fun isRetryableApiStatus(statusCode: Int): Boolean =
+            statusCode == 408 || statusCode == 425 || statusCode == 429 || statusCode in 500..599
     }
 }
