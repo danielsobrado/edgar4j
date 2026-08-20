@@ -124,11 +124,12 @@ class EdgarDownloadWorker(
 
         try {
             val maxBytes = settings.maxArtifactMb.toLong() * WorkerConstants.MEBIBYTE_BYTES
-            artifact = withContext(Dispatchers.IO) {
+            val downloaded = withContext(Dispatchers.IO) {
                 downloader.download(task, maxBytes, settings.secUserAgent)
             }
-            withContext(Dispatchers.IO) { api.upload(session, task, artifact) }
-            Log.i(TAG, "Completed worker task ${task.id} (${artifact.sizeBytes} bytes)")
+            artifact = downloaded
+            withContext(Dispatchers.IO) { api.upload(session, task, downloaded) }
+            Log.i(TAG, "Completed worker task ${task.id} (${downloaded.sizeBytes} bytes)")
         } catch (e: CancellationException) {
             abandonOnCancellation(api, session, task)
             throw e
