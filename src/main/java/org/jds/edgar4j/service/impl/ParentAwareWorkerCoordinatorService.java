@@ -9,6 +9,8 @@ import org.jds.edgar4j.dto.worker.WorkerLeaseRequest;
 import org.jds.edgar4j.dto.worker.WorkerLeaseResponse;
 import org.jds.edgar4j.dto.worker.WorkerSessionRequest;
 import org.jds.edgar4j.dto.worker.WorkerSessionResponse;
+import org.jds.edgar4j.model.WorkerCapability;
+import org.jds.edgar4j.model.WorkerPlatform;
 import org.jds.edgar4j.port.ArtifactStorePort.VerifiedArtifact;
 import org.jds.edgar4j.port.WorkerTaskDataPort;
 import org.jds.edgar4j.service.WorkerCoordinatorService;
@@ -35,6 +37,7 @@ public class ParentAwareWorkerCoordinatorService implements WorkerCoordinatorSer
 
     @Override
     public WorkerSessionResponse openSession(String principalId, WorkerSessionRequest request) {
+        validateRemoteSession(request);
         return delegate.openSession(principalId, request);
     }
 
@@ -114,6 +117,19 @@ public class ParentAwareWorkerCoordinatorService implements WorkerCoordinatorSer
     @Override
     public int cleanupStagedArtifacts() {
         return delegate.cleanupStagedArtifacts();
+    }
+
+    private static void validateRemoteSession(WorkerSessionRequest request) {
+        if (request == null) {
+            throw new IllegalArgumentException("Worker session request is required");
+        }
+        if (request.platform() == WorkerPlatform.SERVER) {
+            throw new IllegalArgumentException("Remote clients cannot register as server workers");
+        }
+        if (request.capabilities() != null
+                && request.capabilities().contains(WorkerCapability.TRUSTED_SOURCE)) {
+            throw new IllegalArgumentException("Remote clients cannot claim trusted source capability");
+        }
     }
 
     private String parentJobId(String taskId) {
