@@ -36,6 +36,14 @@ export async function heartbeat(credentials, taskId, leaseToken, runtime) {
   });
 }
 
+export async function reserveSource(credentials, task) {
+  return requestJson(`/api/workers/tasks/${encodeURIComponent(task.id)}/source-permit`, {
+    method: 'POST',
+    headers: authJsonHeaders(credentials),
+    body: JSON.stringify({ leaseToken: task.leaseToken }),
+  });
+}
+
 export async function uploadArtifact(credentials, task, sha256, contentType, bytes) {
   return requestJson(`/api/workers/tasks/${encodeURIComponent(task.id)}/artifact`, {
     method: 'PUT',
