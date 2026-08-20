@@ -25,6 +25,11 @@ interface StoredSession extends WorkerCredentials {
   expiresAt: string;
 }
 
+interface ActiveTask {
+  controller: AbortController;
+  task: WorkerTaskResponse;
+}
+
 class WorkerTaskFailure extends Error {
   constructor(
     readonly code: WorkerFailureCode,
@@ -40,7 +45,7 @@ class DistributedWebWorker {
   private running = false;
   private policy: WorkerPolicy = DEFAULT_WORKER_POLICY;
   private session?: StoredSession;
-  private activeControllers = new Map<string, AbortController>();
+  private activeTasks = new Map<string, ActiveTask>();
   private listeners = new Set<StatusListener>();
   private status: WorkerStatus = {
     running: false,
@@ -70,12 +75,17 @@ class DistributedWebWorker {
 
   async stop(): Promise<void> {
     this.running = false;
-    this.activeControllers.forEach((controller) => controller.abort());
-    this.activeControllers.clear();
+    const active = Array.from(this.activeTasks.values());
+    active.forEach(({ controller }) => controller.abort());
+    this.activeTasks.clear();
+
     const session = this.session ?? this.loadSession();
     this.session = undefined;
     sessionStorage.removeItem(WORKER_SESSION_STORAGE_KEY);
     if (session) {
+      await Promise.allSettled(
+        active.map(({ task }) => workersApi.abandon(session, task.id, task.leaseToken)),
+      );
       try {
         await workersApi.revokeSession(session);
       } catch {
@@ -140,8 +150,8 @@ class DistributedWebWorker {
     runtime: WorkerRuntimeState,
   ): Promise<void> {
     const controller = new AbortController();
-    this.activeControllers.set(task.id, controller);
-    this.updateStatus({ activeTasks: this.activeControllers.size });
+    this.activeTasks.set(task.id, { task, controller });
+    this.updateStatus({ activeTasks: this.activeTasks.size });
 
     let heartbeatTimer: number | undefined;
     try {
@@ -152,6 +162,7 @@ class DistributedWebWorker {
           .catch(() => controller.abort());
       }, 60_000);
 
+      await workersApi.reserveSource(credentials, task.id, task.leaseToken);
       const bytes = await fetchBounded(task, this.policy.maxArtifactBytes, controller);
       const sha256 = await sha256Hex(bytes);
       if (task.expectedSha256 && sha256 !== task.expectedSha256.toLowerCase()) {
@@ -178,8 +189,8 @@ class DistributedWebWorker {
       });
     } finally {
       if (heartbeatTimer != null) window.clearInterval(heartbeatTimer);
-      this.activeControllers.delete(task.id);
-      this.updateStatus({ activeTasks: this.activeControllers.size });
+      this.activeTasks.delete(task.id);
+      this.updateStatus({ activeTasks: this.activeTasks.size });
     }
   }
 
@@ -189,13 +200,19 @@ class DistributedWebWorker {
     error: unknown,
   ): Promise<void> {
     const status = isAxiosError(error) ? error.response?.status : undefined;
+    if (status === 401) {
+      this.clearSession();
+      return;
+    }
     if (status === 409 || status === 422) return;
 
     let failure = classifyFailure(error);
     if (status === 413) {
       failure = new WorkerTaskFailure('INSUFFICIENT_STORAGE', 'Artifact exceeds worker upload policy');
+    } else if (status === 429) {
+      failure = new WorkerTaskFailure('SOURCE_RATE_LIMITED', 'Source request permit unavailable');
     } else if (status != null && status >= 500) {
-      failure = new WorkerTaskFailure('UPLOAD_FAILED', 'Artifact upload failed');
+      failure = new WorkerTaskFailure('UPLOAD_FAILED', 'Worker API request failed');
     }
 
     try {
@@ -273,6 +290,12 @@ function validateTask(task: WorkerTaskResponse, policy: WorkerPolicy): void {
   if (url.protocol !== 'https:' || !WORKER_ALLOWED_SEC_HOSTS.has(url.hostname.toLowerCase())) {
     throw new WorkerTaskFailure('SOURCE_REJECTED', 'Source URL is outside the SEC allowlist');
   }
+  if (url.port && url.port !== '443') {
+    throw new WorkerTaskFailure('SOURCE_REJECTED', 'Source URL must use the standard HTTPS port');
+  }
+  if (url.username || url.password || url.hash) {
+    throw new WorkerTaskFailure('SOURCE_REJECTED', 'Source URL contains forbidden components');
+  }
   if (task.maxBytes <= 0 || task.maxBytes > policy.maxArtifactBytes) {
     throw new WorkerTaskFailure('INSUFFICIENT_STORAGE', 'Task exceeds the local artifact policy');
   }
@@ -293,11 +316,17 @@ async function fetchBounded(
       redirect: 'error',
       signal: controller.signal,
     });
-    if (response.status === 404) {
+    if (response.status === 404 || response.status === 410) {
       throw new WorkerTaskFailure('SOURCE_NOT_FOUND', 'Source artifact was not found');
     }
-    if (response.status === 429) {
-      throw new WorkerTaskFailure('SOURCE_RATE_LIMITED', 'Source rate limited the worker');
+    if (response.status === 408 || response.status === 504) {
+      throw new WorkerTaskFailure('SOURCE_TIMEOUT', `Source returned HTTP ${response.status}`);
+    }
+    if (response.status === 403 || response.status === 429) {
+      throw new WorkerTaskFailure('SOURCE_RATE_LIMITED', `Source returned HTTP ${response.status}`);
+    }
+    if (response.status >= 500) {
+      throw new WorkerTaskFailure('NETWORK_UNAVAILABLE', `Source returned HTTP ${response.status}`);
     }
     if (!response.ok) {
       throw new WorkerTaskFailure('SOURCE_REJECTED', `Source returned HTTP ${response.status}`);
