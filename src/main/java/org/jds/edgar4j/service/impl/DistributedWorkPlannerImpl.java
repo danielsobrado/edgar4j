@@ -1,6 +1,7 @@
 package org.jds.edgar4j.service.impl;
 
 import static org.jds.edgar4j.constants.WorkerProtocolConstants.MAX_RESOURCE_ID_LENGTH;
+import static org.jds.edgar4j.constants.WorkerStorageConstants.SHA256_PATTERN;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -59,7 +60,7 @@ public class DistributedWorkPlannerImpl implements DistributedWorkPlanner {
                 .expectedSizeBytes(specification.expectedSizeBytes())
                 .contentType(normalize(specification.contentType()))
                 .maxBytes(specification.maxBytes())
-                .requiredCapabilities(EnumSet.of(WorkerCapability.DOWNLOAD, WorkerCapability.SHA256))
+                .requiredCapabilities(requiredCapabilities(specification))
                 .attemptCount(0)
                 .maxAttempts(properties.getCoordinator().getMaxAttempts())
                 .createdAt(now)
@@ -98,6 +99,20 @@ public class DistributedWorkPlannerImpl implements DistributedWorkPlanner {
                         || specification.expectedSizeBytes() > specification.maxBytes())) {
             throw new IllegalArgumentException("Expected resource size exceeds task limit");
         }
+        String expectedSha256 = normalize(specification.expectedSha256());
+        if (expectedSha256 != null && !SHA256_PATTERN.matcher(expectedSha256.toLowerCase()).matches()) {
+            throw new IllegalArgumentException("Expected worker SHA-256 is invalid");
+        }
+    }
+
+    private static EnumSet<WorkerCapability> requiredCapabilities(DownloadTaskSpec specification) {
+        EnumSet<WorkerCapability> capabilities = EnumSet.of(
+                WorkerCapability.DOWNLOAD,
+                WorkerCapability.SHA256);
+        if (normalize(specification.expectedSha256()) == null) {
+            capabilities.add(WorkerCapability.TRUSTED_SOURCE);
+        }
+        return capabilities;
     }
 
     private static String logicalKey(DownloadTaskSpec specification) {
