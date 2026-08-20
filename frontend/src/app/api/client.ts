@@ -36,13 +36,12 @@ class ApiClient {
     );
 
     this.client.interceptors.response.use(
-      (response) => {
-        return response;
-      },
+      (response) => response,
       (error: AxiosError<ApiResponse<unknown>>) => {
         const message = error.response?.data?.message || error.message || ERROR_MESSAGES.GENERIC;
         devLog.error('[API] Response error:', message);
-        return Promise.reject(new Error(message));
+        error.message = message;
+        return Promise.reject(error);
       }
     );
   }
