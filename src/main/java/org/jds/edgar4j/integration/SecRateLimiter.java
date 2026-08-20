@@ -1,7 +1,5 @@
 package org.jds.edgar4j.integration;
 
-import java.time.Duration;
-import java.time.Instant;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
@@ -14,71 +12,66 @@ import lombok.extern.slf4j.Slf4j;
 @Component
 public class SecRateLimiter {
 
-    private static final long WINDOW_SIZE_MS = 1000;
+    private static final long NANOS_PER_SECOND = TimeUnit.SECONDS.toNanos(1);
 
-    private final int maxRequestsPerSecond;
-    private final Semaphore semaphore;
-    private volatile Instant windowStart;
-    private volatile int requestsInWindow;
+    private final Semaphore semaphore = new Semaphore(1, true);
+    private final long minimumIntervalNanos;
+    private volatile long nextPermitNanos;
 
     public SecRateLimiter(@Value("${edgar4j.sec.rate-limit-per-second:10}") int maxRequestsPerSecond) {
-        this.maxRequestsPerSecond = Math.max(1, maxRequestsPerSecond);
-        this.semaphore = new Semaphore(1);
-        this.windowStart = Instant.now();
-        this.requestsInWindow = 0;
+        int safeRate = Math.max(1, maxRequestsPerSecond);
+        this.minimumIntervalNanos = Math.max(
+                1L,
+                (NANOS_PER_SECOND + safeRate - 1L) / safeRate);
+        this.nextPermitNanos = 0L;
     }
 
     public void acquire() throws InterruptedException {
         semaphore.acquire();
         try {
-            waitIfNeeded();
+            waitForPermit(Long.MAX_VALUE);
         } finally {
             semaphore.release();
         }
     }
 
     public boolean tryAcquire(long timeout, TimeUnit unit) throws InterruptedException {
-        if (!semaphore.tryAcquire(timeout, unit)) {
+        long timeoutNanos = Math.max(0L, unit.toNanos(timeout));
+        long startedAt = System.nanoTime();
+        if (!semaphore.tryAcquire(timeoutNanos, TimeUnit.NANOSECONDS)) {
             return false;
         }
         try {
-            waitIfNeeded();
-            return true;
+            long elapsed = Math.max(0L, System.nanoTime() - startedAt);
+            long remaining = Math.max(0L, timeoutNanos - elapsed);
+            return waitForPermit(remaining);
         } finally {
             semaphore.release();
         }
     }
 
-    private void waitIfNeeded() throws InterruptedException {
-        Instant now = Instant.now();
-        Duration elapsed = Duration.between(windowStart, now);
-
-        if (elapsed.toMillis() >= WINDOW_SIZE_MS) {
-            windowStart = now;
-            requestsInWindow = 0;
-        }
-
-        if (requestsInWindow >= maxRequestsPerSecond) {
-            long sleepTime = WINDOW_SIZE_MS - elapsed.toMillis();
-            if (sleepTime > 0) {
-                log.debug("Rate limit reached, sleeping for {} ms", sleepTime);
-                Thread.sleep(sleepTime);
-            }
-            windowStart = Instant.now();
-            requestsInWindow = 0;
-        }
-
-        requestsInWindow++;
+    public int getAvailablePermits() {
+        return System.nanoTime() >= nextPermitNanos ? 1 : 0;
     }
 
-    public int getAvailablePermits() {
-        Instant now = Instant.now();
-        Duration elapsed = Duration.between(windowStart, now);
-
-        if (elapsed.toMillis() >= WINDOW_SIZE_MS) {
-            return maxRequestsPerSecond;
+    private boolean waitForPermit(long maximumWaitNanos) throws InterruptedException {
+        long now = System.nanoTime();
+        long waitNanos = Math.max(0L, nextPermitNanos - now);
+        if (waitNanos > maximumWaitNanos) {
+            return false;
         }
+        if (waitNanos > 0L) {
+            log.debug("SEC request rate limited for {} ms", TimeUnit.NANOSECONDS.toMillis(waitNanos));
+            TimeUnit.NANOSECONDS.sleep(waitNanos);
+        }
+        nextPermitNanos = saturatingAdd(System.nanoTime(), minimumIntervalNanos);
+        return true;
+    }
 
-        return Math.max(0, maxRequestsPerSecond - requestsInWindow);
+    private static long saturatingAdd(long left, long right) {
+        if (right > 0 && left > Long.MAX_VALUE - right) {
+            return Long.MAX_VALUE;
+        }
+        return left + right;
     }
 }
