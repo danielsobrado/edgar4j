@@ -12,6 +12,7 @@ import java.util.Optional;
 import org.jds.edgar4j.model.WorkerCapability;
 import org.jds.edgar4j.model.WorkerSource;
 import org.jds.edgar4j.model.WorkerTask;
+import org.jds.edgar4j.model.WorkerTaskStatus;
 import org.jds.edgar4j.port.WorkerTaskDataPort;
 import org.jds.edgar4j.service.WorkerCoordinatorService;
 import org.jds.edgar4j.service.WorkerSourceDispatchPolicy;
@@ -79,6 +80,7 @@ class WorkerSourcePermitServiceImplTest {
                 .id("task-1")
                 .source(WorkerSource.SEC_EDGAR)
                 .sourceUrl("https://data.sec.gov/submissions/CIK0000320193.json")
+                .status(WorkerTaskStatus.LEASED)
                 .requiredCapabilities(capabilities)
                 .build();
     }
