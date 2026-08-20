@@ -23,7 +23,7 @@ public class SecRateLimiter {
         this.minimumIntervalNanos = Math.max(
                 1L,
                 (NANOS_PER_SECOND + safeRate - 1L) / safeRate);
-        this.nextPermitNanos = 0L;
+        this.nextPermitNanos = System.nanoTime();
     }
 
     public void acquire() throws InterruptedException {
