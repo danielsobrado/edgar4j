@@ -4,6 +4,7 @@ import {
   leaseTasks,
   openSession,
   reportFailure,
+  reserveSource,
   revokeSession,
   uploadArtifact,
   WorkerApiError,
@@ -125,6 +126,7 @@ async function processTask(credentials, task, runtime) {
       renderCounters();
       setStatus('Working', `Reusing cached ${task.resourceId}`);
     } else {
+      await reserveSource(credentials, task);
       artifact = await downloadTask(task, policy, controller);
       await putCachedArtifact(task, artifact.bytes, artifact.sha256, artifact.contentType);
     }
@@ -163,8 +165,12 @@ async function handleTaskFailure(credentials, task, error) {
       await safeReport(credentials, task, 'INSUFFICIENT_STORAGE', 'Artifact exceeds upload policy');
       return;
     }
+    if (error.status === 429) {
+      await safeReport(credentials, task, 'SOURCE_RATE_LIMITED', 'Source request permit unavailable');
+      return;
+    }
     if (error.status >= 500) {
-      await safeReport(credentials, task, 'UPLOAD_FAILED', 'Artifact upload failed');
+      await safeReport(credentials, task, 'UPLOAD_FAILED', 'Worker API request failed');
       return;
     }
   }
