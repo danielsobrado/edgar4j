@@ -16,7 +16,9 @@ object WorkerConstants {
     const val DEFAULT_MAX_ARTIFACT_MB = 10
     const val MAX_ARTIFACT_MB = 50
     const val MIN_ARTIFACT_MB = 1
-    const val STORAGE_RESERVE_BYTES = 64L * 1024L * 1024L
+    const val MEBIBYTE_BYTES = 1024L * 1024L
+    const val STORAGE_RESERVE_BYTES = 64L * MEBIBYTE_BYTES
+    const val MAX_API_RESPONSE_BYTES = 1L * MEBIBYTE_BYTES
     const val HEARTBEAT_INTERVAL_MS = 60_000L
     const val MIN_IDLE_RETRY_SECONDS = 5
     const val MAX_IDLE_RETRY_SECONDS = 60
