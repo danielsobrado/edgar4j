@@ -9,7 +9,6 @@ import org.jds.edgar4j.dto.worker.WorkerLeaseRequest;
 import org.jds.edgar4j.dto.worker.WorkerLeaseResponse;
 import org.jds.edgar4j.dto.worker.WorkerSessionRequest;
 import org.jds.edgar4j.dto.worker.WorkerSessionResponse;
-import org.jds.edgar4j.dto.worker.WorkerSourcePermitRequest;
 import org.jds.edgar4j.port.ArtifactStorePort.VerifiedArtifact;
 
 public interface WorkerCoordinatorService {
@@ -26,12 +25,6 @@ public interface WorkerCoordinatorService {
             String sessionToken,
             String taskId,
             WorkerHeartbeatRequest request);
-
-    void reserveSource(
-            String sessionId,
-            String sessionToken,
-            String taskId,
-            WorkerSourcePermitRequest request);
 
     void reportFailure(
             String sessionId,
