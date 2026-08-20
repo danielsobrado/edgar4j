@@ -39,6 +39,6 @@ public class WorkerSourcePermitController {
                         taskId,
                         request.leaseToken()))
                 .subscribeOn(Schedulers.boundedElastic())
-                .thenReturn(ResponseEntity.ok(ApiResponse.success(null, "Source request permitted")));
+                .thenReturn(ResponseEntity.ok(ApiResponse.<Void>success(null, "Source request permitted")));
     }
 }
