@@ -1,5 +1,8 @@
 package org.jds.edgar4j.service.impl;
 
+import static org.jds.edgar4j.constants.WorkerErrorCodes.SOURCE_DISPATCH_UNAVAILABLE;
+import static org.jds.edgar4j.constants.WorkerErrorCodes.TASK_NOT_FOUND;
+
 import org.jds.edgar4j.dto.worker.WorkerHeartbeatRequest;
 import org.jds.edgar4j.exception.WorkerCoordinatorException;
 import org.jds.edgar4j.model.WorkerCapability;
@@ -10,9 +13,6 @@ import org.jds.edgar4j.service.WorkerSourceDispatchPolicy;
 import org.jds.edgar4j.service.WorkerSourcePermitService;
 import org.jds.edgar4j.service.WorkerSourceResourcePolicy;
 import org.springframework.stereotype.Service;
-
-import static org.jds.edgar4j.constants.WorkerErrorCodes.SOURCE_DISPATCH_UNAVAILABLE;
-import static org.jds.edgar4j.constants.WorkerErrorCodes.TASK_NOT_FOUND;
 
 @Service
 public class WorkerSourcePermitServiceImpl implements WorkerSourcePermitService {
