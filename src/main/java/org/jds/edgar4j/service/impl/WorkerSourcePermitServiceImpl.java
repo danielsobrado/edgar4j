@@ -1,5 +1,6 @@
 package org.jds.edgar4j.service.impl;
 
+import static org.jds.edgar4j.constants.WorkerErrorCodes.LEASE_INVALID;
 import static org.jds.edgar4j.constants.WorkerErrorCodes.SOURCE_DISPATCH_UNAVAILABLE;
 import static org.jds.edgar4j.constants.WorkerErrorCodes.TASK_NOT_FOUND;
 
@@ -7,6 +8,7 @@ import org.jds.edgar4j.dto.worker.WorkerHeartbeatRequest;
 import org.jds.edgar4j.exception.WorkerCoordinatorException;
 import org.jds.edgar4j.model.WorkerCapability;
 import org.jds.edgar4j.model.WorkerTask;
+import org.jds.edgar4j.model.WorkerTaskStatus;
 import org.jds.edgar4j.port.WorkerTaskDataPort;
 import org.jds.edgar4j.service.WorkerCoordinatorService;
 import org.jds.edgar4j.service.WorkerSourceDispatchPolicy;
@@ -47,6 +49,9 @@ public class WorkerSourcePermitServiceImpl implements WorkerSourcePermitService 
 
         WorkerTask task = taskDataPort.findById(taskId)
                 .orElseThrow(() -> new WorkerCoordinatorException("Worker task not found", TASK_NOT_FOUND));
+        if (task.getStatus() != WorkerTaskStatus.LEASED) {
+            throw new WorkerCoordinatorException("Worker lease is no longer active", LEASE_INVALID);
+        }
         if (task.getRequiredCapabilities() != null
                 && task.getRequiredCapabilities().contains(WorkerCapability.TRUSTED_SOURCE)) {
             throw new WorkerCoordinatorException(
