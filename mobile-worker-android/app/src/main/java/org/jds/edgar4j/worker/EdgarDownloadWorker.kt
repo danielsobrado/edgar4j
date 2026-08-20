@@ -123,6 +123,21 @@ class EdgarDownloadWorker(
         }
 
         try {
+            try {
+                withContext(Dispatchers.IO) { api.reserveSource(session, task) }
+            } catch (e: WorkerApiException) {
+                if (e.statusCode == 429) {
+                    reportFailureSafely(
+                        api,
+                        session,
+                        task,
+                        WorkerTaskException("SOURCE_RATE_LIMITED", "Source request permit unavailable", e),
+                    )
+                    return@coroutineScope
+                }
+                throw e
+            }
+
             val maxBytes = settings.maxArtifactMb.toLong() * WorkerConstants.MEBIBYTE_BYTES
             val downloaded = withContext(Dispatchers.IO) {
                 downloader.download(task, maxBytes, settings.secUserAgent)
