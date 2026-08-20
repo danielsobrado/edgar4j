@@ -72,14 +72,17 @@ class WorkerPreferences(context: Context) {
         val username = settings.username.trim()
         if (username.isBlank()) return
 
-        val previousUsername = current().username.trim()
+        val previous = current()
         if (newPassword != null) {
             require(newPassword.isNotBlank()) { "HTTP Basic password cannot be blank" }
             return
         }
 
-        require(previousUsername == username && secretStore.getPassword().isNotBlank()) {
-            "Enter the HTTP Basic password when setting or changing the username"
+        val samePrincipal = previous.username.trim() == username
+        val sameOrigin = runCatching { serverOrigin(previous.serverUrl) }
+            .getOrNull() == serverOrigin(settings.serverUrl)
+        require(samePrincipal && sameOrigin && secretStore.getPassword().isNotBlank()) {
+            "Enter the HTTP Basic password when setting credentials or changing the server"
         }
     }
 
@@ -124,5 +127,19 @@ class WorkerPreferences(context: Context) {
 
         private fun parseServerUri(rawUrl: String): URI = runCatching { URI(rawUrl.trim()) }
             .getOrElse { throw IllegalArgumentException("Server URL is invalid") }
+
+        private fun serverOrigin(rawUrl: String): String {
+            val uri = parseServerUri(rawUrl)
+            val scheme = uri.scheme?.lowercase().orEmpty()
+            val host = uri.host?.lowercase().orEmpty()
+            val port = if (uri.port == -1) defaultPort(scheme) else uri.port
+            return "$scheme://$host:$port"
+        }
+
+        private fun defaultPort(scheme: String): Int = when (scheme) {
+            "https" -> 443
+            "http" -> 80
+            else -> -1
+        }
     }
 }
