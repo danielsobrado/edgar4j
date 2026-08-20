@@ -36,10 +36,42 @@ class SourceDownloaderTest {
         assertRejected("https://data.sec.gov/submissions/test.json#fragment")
     }
 
+    @Test
+    fun classifiesNotFoundAsPermanentSourceFailure() {
+        assertStatus(404, "SOURCE_NOT_FOUND")
+    }
+
+    @Test
+    fun classifiesRateLimitAsRetryableSourceFailure() {
+        assertStatus(429, "SOURCE_RATE_LIMITED")
+    }
+
+    @Test
+    fun classifiesForbiddenAsRateLimitedForFairAccessRecovery() {
+        assertStatus(403, "SOURCE_RATE_LIMITED")
+    }
+
+    @Test
+    fun classifiesServerErrorsAsRetryableNetworkFailure() {
+        assertStatus(503, "NETWORK_UNAVAILABLE")
+    }
+
+    @Test
+    fun classifiesRedirectAsRejectedSource() {
+        assertStatus(302, "SOURCE_REJECTED")
+    }
+
     private fun assertRejected(url: String) {
         val error = assertThrows(WorkerTaskException::class.java) {
             SourceDownloader.validateSource(url)
         }
         assertEquals("SOURCE_REJECTED", error.code)
+    }
+
+    private fun assertStatus(status: Int, expectedCode: String) {
+        val error = assertThrows(WorkerTaskException::class.java) {
+            SourceDownloader.classifyStatus(status)
+        }
+        assertEquals(expectedCode, error.code)
     }
 }
