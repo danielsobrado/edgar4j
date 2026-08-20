@@ -87,10 +87,16 @@ class WorkerPreferences(context: Context) {
             require(url.rawQuery == null) { "Server URL cannot contain a query" }
             require(url.rawFragment == null) { "Server URL cannot contain a fragment" }
             require(url.port == -1 || url.port in 1..65535) { "Server URL port is invalid" }
-            require(settings.secUserAgent.isNotBlank()) {
+
+            val secUserAgent = settings.secUserAgent.trim()
+            require(secUserAgent.isNotBlank()) {
                 "SEC User-Agent with a contact identity is required"
             }
-            require(settings.secUserAgent.length <= 256) { "SEC User-Agent is too long" }
+            require(secUserAgent.length <= 256) { "SEC User-Agent is too long" }
+            require(secUserAgent.none { it == '\r' || it == '\n' }) {
+                "SEC User-Agent cannot contain line breaks"
+            }
+
             require(settings.minimumBatteryPercent in 0..100) {
                 "Minimum battery must be between 0 and 100"
             }
