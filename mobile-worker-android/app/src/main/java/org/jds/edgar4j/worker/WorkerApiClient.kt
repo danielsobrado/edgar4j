@@ -3,7 +3,10 @@ package org.jds.edgar4j.worker
 import android.util.Base64
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.ByteArrayOutputStream
 import java.io.FileInputStream
+import java.io.IOException
+import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -29,12 +32,16 @@ class WorkerApiClient(
     }
 
     fun lease(session: WorkerSession, state: WorkerRuntimeState): WorkerLease {
+        val contributedStorageBytes = minOf(
+            state.freeStorageBytes.coerceAtLeast(0L),
+            settings.maxArtifactMb.toLong() * WorkerConstants.MEBIBYTE_BYTES,
+        )
         val runtime = JSONObject()
             .put("networkType", state.networkType)
             .put("metered", state.metered)
             .put("charging", state.charging)
             .put("batteryPercent", state.batteryPercent ?: JSONObject.NULL)
-            .put("freeStorageBytes", state.freeStorageBytes)
+            .put("freeStorageBytes", contributedStorageBytes)
         val body = JSONObject()
             .put("protocolVersion", WorkerConstants.PROTOCOL_VERSION)
             .put("capabilities", JSONArray().put("DOWNLOAD").put("SHA256"))
@@ -151,7 +158,7 @@ class WorkerApiClient(
     private fun readData(connection: HttpURLConnection): JSONObject {
         val status = connection.responseCode
         val stream = if (status in 200..299) connection.inputStream else connection.errorStream
-        val text = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+        val text = readBoundedText(stream)
         if (status !in 200..299) {
             val message = runCatching { JSONObject(text).optString("message") }.getOrNull()
                 ?.takeIf { it.isNotBlank() }
@@ -162,6 +169,25 @@ class WorkerApiClient(
         val root = JSONObject(text)
         val data = root.opt("data")
         return if (data is JSONObject) data else JSONObject()
+    }
+
+    private fun readBoundedText(stream: InputStream?): String {
+        if (stream == null) return ""
+        stream.use { input ->
+            val output = ByteArrayOutputStream()
+            val buffer = ByteArray(BUFFER_SIZE)
+            var total = 0L
+            while (true) {
+                val read = input.read(buffer)
+                if (read < 0) break
+                total += read
+                if (total > WorkerConstants.MAX_API_RESPONSE_BYTES) {
+                    throw IOException("Worker API response exceeded the configured limit")
+                }
+                output.write(buffer, 0, read)
+            }
+            return output.toString(Charsets.UTF_8.name())
+        }
     }
 
     private fun basicAuthorization(): String? {
