@@ -73,6 +73,11 @@ class WorkerApiClient(
         requestJson("POST", "/tasks/${task.id}/heartbeat", session, body)
     }
 
+    fun reserveSource(session: WorkerSession, task: WorkerTask) {
+        val body = JSONObject().put("leaseToken", task.leaseToken)
+        requestJson("POST", "/tasks/${task.id}/source-permit", session, body)
+    }
+
     fun reportFailure(session: WorkerSession, task: WorkerTask, failure: WorkerTaskException) {
         val body = JSONObject()
             .put("leaseToken", task.leaseToken)
