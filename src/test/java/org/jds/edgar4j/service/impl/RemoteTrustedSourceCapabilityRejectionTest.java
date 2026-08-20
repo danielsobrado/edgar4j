@@ -28,10 +28,7 @@ class RemoteTrustedSourceCapabilityRejectionTest {
 
     @Test
     void remoteSessionCannotClaimTrustedSourceCapability() {
-        ParentAwareWorkerCoordinatorService service = new ParentAwareWorkerCoordinatorService(
-                delegate,
-                taskDataPort,
-                parentJobService);
+        ParentAwareWorkerCoordinatorService service = service();
         WorkerSessionRequest request = new WorkerSessionRequest(
                 1,
                 WorkerPlatform.WEB,
@@ -44,5 +41,26 @@ class RemoteTrustedSourceCapabilityRejectionTest {
 
         assertThrows(IllegalArgumentException.class, () -> service.openSession("principal", request));
         verify(delegate, never()).openSession("principal", request);
+    }
+
+    @Test
+    void remoteSessionCannotImpersonateServerPlatform() {
+        ParentAwareWorkerCoordinatorService service = service();
+        WorkerSessionRequest request = new WorkerSessionRequest(
+                1,
+                WorkerPlatform.SERVER,
+                "malicious-client",
+                EnumSet.of(WorkerCapability.DOWNLOAD, WorkerCapability.SHA256),
+                1);
+
+        assertThrows(IllegalArgumentException.class, () -> service.openSession("principal", request));
+        verify(delegate, never()).openSession("principal", request);
+    }
+
+    private ParentAwareWorkerCoordinatorService service() {
+        return new ParentAwareWorkerCoordinatorService(
+                delegate,
+                taskDataPort,
+                parentJobService);
     }
 }
