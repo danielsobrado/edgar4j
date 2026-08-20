@@ -2,13 +2,13 @@ export async function evaluateEligibility(policy) {
   const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
   const networkType = resolveNetworkType(connection);
   const battery = await readBattery();
-  const freeStorageBytes = await readFreeStorage(policy.maxArtifactBytes);
+  const availableStorageBytes = await readFreeStorage(policy.maxArtifactBytes);
   const runtime = {
     networkType,
     metered: connection?.saveData === true || networkType === 'CELLULAR',
     charging: battery?.charging === true,
     batteryPercent: battery ? Math.round(battery.level * 100) : null,
-    freeStorageBytes,
+    freeStorageBytes: Math.min(availableStorageBytes, policy.maxArtifactBytes),
   };
 
   if (!navigator.onLine) return ineligible('Offline', runtime);
@@ -18,10 +18,13 @@ export async function evaluateEligibility(policy) {
   if (policy.chargingOnly && battery?.charging !== true) {
     return ineligible('Waiting for charging', runtime);
   }
+  if (policy.minimumBatteryPercent > 0 && !battery) {
+    return ineligible('Battery state unavailable', runtime);
+  }
   if (battery && runtime.batteryPercent < policy.minimumBatteryPercent) {
     return ineligible('Battery below threshold', runtime);
   }
-  if (freeStorageBytes < policy.maxArtifactBytes) {
+  if (availableStorageBytes < policy.maxArtifactBytes) {
     return ineligible('Insufficient browser storage budget', runtime);
   }
   return { eligible: true, runtime };
