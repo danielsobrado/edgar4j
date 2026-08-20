@@ -14,6 +14,8 @@ public class WorkerRetryPolicyImpl implements WorkerRetryPolicy {
             WorkerFailureCode.SOURCE_TIMEOUT,
             WorkerFailureCode.SOURCE_RATE_LIMITED,
             WorkerFailureCode.NETWORK_UNAVAILABLE,
+            WorkerFailureCode.POLICY_CHANGED,
+            WorkerFailureCode.INSUFFICIENT_STORAGE,
             WorkerFailureCode.CHECKSUM_MISMATCH,
             WorkerFailureCode.CONTENT_INVALID,
             WorkerFailureCode.UPLOAD_FAILED,
