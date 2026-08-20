@@ -28,6 +28,7 @@ import org.springframework.data.mongodb.core.query.Update;
 class WorkerTaskMongoAdapterTest {
 
     private static final Instant NOW = Instant.parse("2026-08-18T10:00:00Z");
+    private static final String EXPECTED_SHA256 = "a".repeat(64);
 
     @Mock
     private MongoTemplate mongoTemplate;
@@ -42,6 +43,7 @@ class WorkerTaskMongoAdapterTest {
                 .type(WorkerTaskType.DOWNLOAD)
                 .source(WorkerSource.SEC_EDGAR)
                 .status(WorkerTaskStatus.PENDING)
+                .expectedSha256(EXPECTED_SHA256)
                 .requiredCapabilities(EnumSet.of(WorkerCapability.DOWNLOAD, WorkerCapability.SHA256))
                 .maxBytes(1024L)
                 .attemptCount(0)
