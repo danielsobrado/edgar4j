@@ -13,6 +13,7 @@ import org.jds.edgar4j.model.WorkerCapability;
 import org.jds.edgar4j.model.WorkerSource;
 import org.jds.edgar4j.model.WorkerTask;
 import org.jds.edgar4j.model.WorkerTaskStatus;
+import org.jds.edgar4j.model.WorkerTaskType;
 import org.jds.edgar4j.port.WorkerTaskDataPort;
 import org.jds.edgar4j.service.WorkerCoordinatorService;
 import org.jds.edgar4j.service.WorkerSourceDispatchPolicy;
@@ -24,6 +25,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
 class WorkerSourcePermitServiceImplTest {
+
+    private static final String EXPECTED_SHA256 = "a".repeat(64);
 
     @Mock
     private WorkerCoordinatorService coordinatorService;
@@ -78,9 +81,11 @@ class WorkerSourcePermitServiceImplTest {
     private static WorkerTask task(EnumSet<WorkerCapability> capabilities) {
         return WorkerTask.builder()
                 .id("task-1")
+                .type(WorkerTaskType.DOWNLOAD)
                 .source(WorkerSource.SEC_EDGAR)
                 .sourceUrl("https://data.sec.gov/submissions/CIK0000320193.json")
                 .status(WorkerTaskStatus.LEASED)
+                .expectedSha256(EXPECTED_SHA256)
                 .requiredCapabilities(capabilities)
                 .build();
     }
