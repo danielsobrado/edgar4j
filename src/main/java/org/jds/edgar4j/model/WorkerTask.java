@@ -55,6 +55,19 @@ public class WorkerTask {
     private Instant completedAt;
     private String artifactId;
 
+    public Set<WorkerCapability> getRequiredCapabilities() {
+        LinkedHashSet<WorkerCapability> capabilities = new LinkedHashSet<>();
+        if (requiredCapabilities != null) {
+            capabilities.addAll(requiredCapabilities);
+        }
+        if (type == WorkerTaskType.DOWNLOAD
+                && source == WorkerSource.SEC_EDGAR
+                && (expectedSha256 == null || expectedSha256.isBlank())) {
+            capabilities.add(WorkerCapability.TRUSTED_SOURCE);
+        }
+        return Set.copyOf(capabilities);
+    }
+
     public boolean isEligibleForLease(Instant now) {
         Objects.requireNonNull(now, "now");
         return status == WorkerTaskStatus.PENDING
