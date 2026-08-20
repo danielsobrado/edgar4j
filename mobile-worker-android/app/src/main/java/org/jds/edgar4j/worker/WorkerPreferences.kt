@@ -9,6 +9,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import java.net.URI
 
 private val Context.workerDataStore by preferencesDataStore(name = "worker_settings")
 
@@ -47,7 +48,7 @@ class WorkerPreferences(context: Context) {
     suspend fun save(settings: WorkerSettings, newPassword: String?) {
         validate(settings)
         appContext.workerDataStore.edit { preferences ->
-            preferences[SERVER_URL] = settings.serverUrl.trimEnd('/')
+            preferences[SERVER_URL] = settings.serverUrl.trim().trimEnd('/')
             preferences[SEC_USER_AGENT] = settings.secUserAgent.trim()
             preferences[USERNAME] = settings.username.trim()
             preferences[ENABLED] = settings.enabled
@@ -56,7 +57,11 @@ class WorkerPreferences(context: Context) {
             preferences[MINIMUM_BATTERY] = settings.minimumBatteryPercent
             preferences[MAX_ARTIFACT_MB] = settings.maxArtifactMb
         }
-        newPassword?.let(secretStore::putPassword)
+        if (settings.username.isBlank()) {
+            secretStore.putPassword("")
+        } else {
+            newPassword?.let(secretStore::putPassword)
+        }
     }
 
     fun password(): String = secretStore.getPassword()
@@ -72,15 +77,20 @@ class WorkerPreferences(context: Context) {
         private val MAX_ARTIFACT_MB = intPreferencesKey("max_artifact_mb")
 
         fun validate(settings: WorkerSettings) {
-            val url = runCatching { java.net.URI(settings.serverUrl.trim()) }
-                .getOrElse { throw IllegalArgumentException("Server URL is invalid") }
-            require(url.host?.isNotBlank() == true) { "Server URL must include a host" }
-            require(url.scheme == "https" || (BuildConfig.DEBUG && url.scheme == "http")) {
+            val url = parseServerUri(settings.serverUrl)
+            val scheme = url.scheme?.lowercase()
+            require(scheme == "https" || (BuildConfig.DEBUG && scheme == "http")) {
                 "Release builds require HTTPS"
             }
+            require(url.host?.isNotBlank() == true) { "Server URL must include a host" }
+            require(url.userInfo == null) { "Server URL cannot contain credentials" }
+            require(url.rawQuery == null) { "Server URL cannot contain a query" }
+            require(url.rawFragment == null) { "Server URL cannot contain a fragment" }
+            require(url.port == -1 || url.port in 1..65535) { "Server URL port is invalid" }
             require(settings.secUserAgent.isNotBlank()) {
                 "SEC User-Agent with a contact identity is required"
             }
+            require(settings.secUserAgent.length <= 256) { "SEC User-Agent is too long" }
             require(settings.minimumBatteryPercent in 0..100) {
                 "Minimum battery must be between 0 and 100"
             }
@@ -88,5 +98,8 @@ class WorkerPreferences(context: Context) {
                 "Maximum artifact must be between ${WorkerConstants.MIN_ARTIFACT_MB} and ${WorkerConstants.MAX_ARTIFACT_MB} MB"
             }
         }
+
+        private fun parseServerUri(rawUrl: String): URI = runCatching { URI(rawUrl.trim()) }
+            .getOrElse { throw IllegalArgumentException("Server URL is invalid") }
     }
 }
