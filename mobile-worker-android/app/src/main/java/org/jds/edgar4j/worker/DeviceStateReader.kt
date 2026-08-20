@@ -27,18 +27,30 @@ class DeviceStateReader(private val context: Context) {
         if (state.networkType == "OTHER") return false
         if (settings.wifiOnly && state.metered) return false
         if (settings.chargingOnly && !state.charging) return false
-        if (state.batteryPercent != null && state.batteryPercent < settings.minimumBatteryPercent) return false
+        if (settings.minimumBatteryPercent > 0) {
+            val batteryPercent = state.batteryPercent ?: return false
+            if (batteryPercent < settings.minimumBatteryPercent) return false
+        }
 
-        val requiredBytes = settings.maxArtifactMb * 1024L * 1024L + WorkerConstants.STORAGE_RESERVE_BYTES
+        val requiredBytes = settings.maxArtifactMb.toLong() * WorkerConstants.MEBIBYTE_BYTES +
+            WorkerConstants.STORAGE_RESERVE_BYTES
         return state.freeStorageBytes >= requiredBytes
     }
 
-    private fun networkType(capabilities: NetworkCapabilities?): String = when {
-        capabilities == null -> "OTHER"
-        capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "WIFI"
-        capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "CELLULAR"
-        capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "ETHERNET"
-        else -> "OTHER"
+    private fun networkType(capabilities: NetworkCapabilities?): String {
+        if (capabilities == null ||
+            !capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) ||
+            !capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+        ) {
+            return "OTHER"
+        }
+
+        return when {
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "WIFI"
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "CELLULAR"
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "ETHERNET"
+            else -> "OTHER"
+        }
     }
 
     private fun isCharging(intent: Intent?): Boolean {
